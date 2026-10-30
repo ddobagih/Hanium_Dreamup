@@ -42,10 +42,10 @@ class CameraRuntimePreparationContractTest {
     }
 
     @Test fun cameraIsCacheOnlyAndStartsAuxiliaryAfterPrimaryWarmup() {
-        val create = body(camera, "override fun onCreate(")
-        assertTrue(create.contains("allowComparison = false"))
-        assertTrue(create.contains("resumeUnknownAfterPrimaryLiveAttempt()"))
-        assertTrue(create.contains("if (detector == null)"))
+        val prepare = body(camera, "private fun prepareCameraDetector(scope: RuntimeFeatureScope)")
+        assertTrue(prepare.contains("allowComparison = false"))
+        assertTrue(prepare.contains("resumeUnknownAfterPrimaryLiveAttempt()"))
+        assertTrue(prepare.contains("if (detector == null)"))
         val resume = body(camera, "private fun resumeUnknownAfterPrimaryLiveAttempt()")
         assertTrue(resume.indexOf("auxiliaryStartup.mayStart(generation, busy.get())") < resume.indexOf("unknownRuntime.resume()"))
         assertTrue(resume.contains("unknownRuntime.retry()"))
@@ -80,8 +80,13 @@ class CameraRuntimePreparationContractTest {
         assertFalse(open.contains("detectorLoadInFlight"))
         assertFalse(main.contains("cameraTestLaunchPending"))
         val create = body(camera, "override fun onCreate(")
-        assertTrue(create.contains("AndroidFixedFixtureRuntimeSelector.load("))
-        assertTrue(create.contains("allowComparison = false"))
+        assertFalse("The real depth scope must be known before choosing a live profile",
+            create.contains("AndroidFixedFixtureRuntimeSelector.load("))
+        val prepare = body(camera, "private fun prepareCameraDetector(scope: RuntimeFeatureScope)")
+        assertTrue(prepare.indexOf("worker.execute") < prepare.indexOf("AndroidFixedFixtureRuntimeSelector.load("))
+        assertTrue(prepare.contains("allowComparison = false"))
+        assertTrue(prepare.contains("AndroidDeviceTuningProfileStore.createBinding(applicationContext, config, scope)"))
+        assertTrue(body(camera, "private fun startCamera()").contains("prepareCameraDetector(scope)"))
     }
 
     @Test fun recheckDuringLoadingCannotResetAttemptAndLeaveSuccessPending() {

@@ -7,7 +7,7 @@ data class RuntimeCandidate(val backend: RuntimeBackend, val numThreads: Int) {
     init { require(numThreads > 0) }
 }
 
-enum class RuntimeFeatureScope { CAMERA_TRACKING, CAMERA_TRACKING_METRIC_DEPTH }
+enum class RuntimeFeatureScope { CAMERA_TRACKING, CAMERA_TRACKING_METRIC_DEPTH, ARCORE_CAMERA_TRACKING }
 
 /** Immutable conditions captured with each observation; never inferred from device name. */
 data class RuntimeComparisonEnvironment(

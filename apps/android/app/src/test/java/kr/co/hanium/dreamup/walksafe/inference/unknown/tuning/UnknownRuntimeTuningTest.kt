@@ -83,6 +83,49 @@ class UnknownRuntimeTuningTest {
     }
 
     @Test
+    fun noDepthArCoreCompositionRequiresTrackingAndPoseOnBothStreams() {
+        val workload = binding.copy(featureScope = RuntimeFeatureScope.ARCORE_CAMERA_TRACKING)
+        fun noDepth(e: RuntimeComparisonEnvironment = environment(workload)) = summary(environment = e).let {
+            it.copy(baselineLive = it.baselineLive.copy(depthTimestampFresh = false, positiveDepthSamples = 0),
+                candidateLive = it.candidateLive.copy(depthTimestampFresh = false, positiveDepthSamples = 0))
+        }
+        val valid = noDepth()
+        val profile = requireNotNull(confirm(valid, workload = workload))
+        assertTrue(profile.isValid(workload, 12))
+        assertNull(confirm(valid.copy(baselineLive = valid.baselineLive.copy(poseValid = false)), workload = workload))
+        assertNull(confirm(valid.copy(candidateLive = valid.candidateLive.copy(poseValid = false)), workload = workload))
+        for (state in listOf("PAUSED", "STOPPED", "UNSUPPORTED")) {
+            assertNull(state, confirm(noDepth(environment(workload).copy(arCoreState = state)), workload = workload))
+        }
+    }
+
+    @Test
+    fun cameraXArCoreAndMetricCompositionsHaveDistinctProfilesAndBindings() {
+        val scopes = listOf(RuntimeFeatureScope.CAMERA_TRACKING, RuntimeFeatureScope.ARCORE_CAMERA_TRACKING,
+            RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH)
+        val workloads = scopes.map { binding.copy(featureScope = it) }
+        assertEquals(scopes.size, workloads.map { it.hashOrNull() }.distinct().size)
+        for (workload in workloads) {
+            val hasArCore = workload.featureScope != RuntimeFeatureScope.CAMERA_TRACKING
+            val metric = workload.featureScope == RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH
+            val evidence = summary(environment = environment(workload).copy(
+                arCoreState = if (hasArCore) "TRACKING" else "UNSUPPORTED")).let {
+                it.copy(baselineLive = it.baselineLive.copy(poseValid = hasArCore,
+                    depthTimestampFresh = metric, positiveDepthSamples = if (metric) 10 else 0),
+                    candidateLive = it.candidateLive.copy(poseValid = hasArCore,
+                        depthTimestampFresh = metric, positiveDepthSamples = if (metric) 10 else 0))
+            }
+            val profile = requireNotNull(confirm(evidence, workload = workload))
+            assertTrue(profile.isValid(workload, 12))
+            for (other in workloads.filter { it != workload }) {
+                assertFalse("Composition from ${workload.featureScope} cannot run as ${other.featureScope}",
+                    profile.isValid(other, 12))
+                assertNull(confirm(evidence, workload = other))
+            }
+        }
+    }
+
+    @Test
     fun everyNonConfirmedPolicyOutcomeCannotIssueAnUnknownProfile() {
         val valid = summary()
         val partial = valid.copy(confirmation = valid.confirmation.copy(pairs = emptyList()))

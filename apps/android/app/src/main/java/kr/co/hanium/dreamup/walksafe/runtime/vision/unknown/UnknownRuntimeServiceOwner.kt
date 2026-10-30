@@ -66,7 +66,8 @@ internal class UnknownRuntimeServiceOwner(
     }
 
     /** Failed native close keeps this exact target in the slot; no replacement may start. */
-    private class ServiceReleaseAttempt(val service: FastSamRuntimeService<UnknownRuntimeAttachment>) {
+    private class ServiceReleaseAttempt(val service: FastSamRuntimeService<UnknownRuntimeAttachment>,
+        val onReleased: () -> Unit = {}) {
         val started = AtomicBoolean(false)
     }
 
@@ -101,13 +102,15 @@ internal class UnknownRuntimeServiceOwner(
             release = null
         }
         // Source checks, factories and synchronous callbacks never run under ownerLock.
+        attempt.onReleased()
         continueWalkingPreparation()
     }
 
-    private fun reserveRelease(service: FastSamRuntimeService<UnknownRuntimeAttachment>): ServiceReleaseAttempt {
+    private fun reserveRelease(service: FastSamRuntimeService<UnknownRuntimeAttachment>,
+        onReleased: () -> Unit = {}): ServiceReleaseAttempt {
         release?.takeIf { it.service === service }?.let { return it }
         check(release == null) { "unknown_native_release_already_owned" }
-        return ServiceReleaseAttempt(service).also { release = it }
+        return ServiceReleaseAttempt(service, onReleased).also { release = it }
     }
 
     private fun startRelease(attempt: ServiceReleaseAttempt) {
@@ -358,23 +361,42 @@ internal class UnknownRuntimeServiceOwner(
                 onClosed = { result ->
                     if (unknownCalibration === calibration) {
                         unknownCalibration = null
-                        onEvent(UnknownRuntimeServiceEvent.CalibrationClosed(result))
-                        continueWalkingPreparation()
+                        // The explicit check keeps the measured profile, not another idle native
+                        // model alongside the separate HOME camera. Publish completion after proof.
+                        val released = synchronized(ownerLock) {
+                            val ready = unknownRuntimeService?.takeIf { it.sessionEpoch == serviceEpoch }
+                            if (ready == null) null else {
+                                unknownRuntimeService = null
+                                unknownRuntimeBinding = null
+                                reserveRelease(ready) { onEvent(UnknownRuntimeServiceEvent.CalibrationClosed(result)) }
+                            }
+                        }
+                        if (released != null) startRelease(released)
+                        else {
+                            onEvent(UnknownRuntimeServiceEvent.CalibrationClosed(result))
+                            continueWalkingPreparation()
+                        }
                     }
                 },
                 onProductionResult = onResult,
                 onProductionError = { handleUnknownRuntimeError(serviceEpoch, it) },
                 onProductionDiscard = onDiscard,
                 onCalibrationResult = { result, evidence ->
-                    val snapshot = evidence.depthSnapshot
-                    val mapperFrame = evidence.mapperFrameId
-                    val capture = if (snapshot != null && mapperFrame != null) FrozenUnknownDepthCapture.freeze(
-                        result.token, snapshot, evidence.imageToDepthUv, mapperFrame,
-                    ) else null
-                    if (capture == null) false else {
-                        val outputs = calibrationDepth.process(capture, result.token, result.masks, clock.elapsedRealtimeMs())
-                        outputs.rejectionReason == null && snapshot!!.hasFreshMetricRawDepth &&
-                            evidence.positiveDepthSamples > 0 && evidence.poseValid
+                    if (scope == RuntimeFeatureScope.CAMERA_TRACKING) {
+                        // The CameraX workload has no ARCore metric claim.
+                        evidence.cameraTimestampNs > 0 && evidence.sourceFrameTimestampNs > 0
+                    } else {
+                        val snapshot = evidence.depthSnapshot
+                        val mapperFrame = evidence.mapperFrameId
+                        val capture = if (snapshot != null && mapperFrame != null) FrozenUnknownDepthCapture.freeze(
+                            result.token, snapshot, evidence.imageToDepthUv, mapperFrame,
+                        ) else null
+                        if (capture == null) false else {
+                            val outputs = calibrationDepth.process(capture, result.token, result.masks, clock.elapsedRealtimeMs())
+                            outputs.rejectionReason == null && evidence.poseValid &&
+                                (scope != RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH ||
+                                    snapshot!!.hasFreshMetricRawDepth && evidence.positiveDepthSamples > 0)
+                        }
                     }
                 },
             ))

@@ -79,7 +79,7 @@ data class UnknownRuntimeProfile internal constructor(
 
 /** Extends the existing selection gates only with the primary stream's independent non-regression. */
 object UnknownRuntimeTuning {
-    const val POLICY_VERSION = "unknown-composition-768-v2"
+    const val POLICY_VERSION = "unknown-composition-768-v3-shared-frame"
     const val MAX_BUDGET_MS = RuntimeSelectionPolicy.MAX_BUDGET_MS
     const val CLEANUP_RESERVE_MS = 20_000L
 

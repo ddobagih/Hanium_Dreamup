@@ -3896,7 +3896,8 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                 override fun measuredProfileStatus(profile: RuntimeTuningProfile) {
                     primaryDetectorLifecycleController.measuredProfileStatus(profile)
                 }
-                override fun schedulePreparation(deadlineMs: Long) = scheduleDeviceRuntimeCalibration(requestDeadlineMs = deadlineMs)
+                override fun schedulePreparation(deadlineMs: Long) =
+                    prepareDeviceRuntimeCalibration(manual = false, requestDeadlineMs = deadlineMs)
                 override fun closeDetectorAfterCalibration() = closeDetectorAsync()
                 override fun comparisonDeadlineReached() {
                     refreshStartupCapabilityUi()
@@ -10141,6 +10142,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                 reportPrivacyDisclosure = REPORT_PRIVACY_DISCLOSURE_KO,
             ),
             actions = SettingsPrivacyPanel.Actions(
+                onCameraPerformanceCheck = ::startCameraPerformanceCheck,
                 onGuidanceDiagnostics = ::toggleGuidanceDiagnostics,
                 onVoiceDataSettings = ::openVoiceDataInstallSettings,
                 onReportConsent = { onReportPrivacyConsentButtonClicked() },
@@ -13877,12 +13879,31 @@ generation != cameraFallbackGeneration
         return primaryDetectorLifecycleController.verifiedForOutput()
     }
 
-    /**
-     * Measures the installed model with the versioned in-app calibration images only. This is a
-     * device load check, not an ARCore or camera check, so users do not need to aim the phone.
-     */
-    private fun runFixedFixturePerformanceCheck() {
-        primaryDetectorLifecycleController.fixedFixturePerformanceCheck()
+    /** Explicit user check: the live primary comparison is followed by the combined FastSAM check. */
+    private fun startCameraPerformanceCheck() {
+        if (!BuildConfig.DEBUG) return
+        if (!deviceRuntimeCalibrationContextAvailable()) {
+            updateStatus("카메라 성능 점검 준비 필요", "기기 기능 점검을 완료한 뒤 설정에서 다시 시작하세요.")
+            return
+        }
+        if (postLoginDeviceProbes.signals.metricDepth !in setOf(
+                PostLoginMetricDepthState.SUPPORTED, PostLoginMetricDepthState.EXPLICITLY_UNSUPPORTED)) {
+            updateStatus("카메라 지원 확인 필요", "거리 측정 지원 여부가 아직 확인되지 않았습니다. 기기 기능을 다시 점검한 뒤 시작하세요.")
+            return
+        }
+        val calibration = primaryRuntimeCalibrationOwner.projection()
+        if (!calibrationCameraOwnerAvailable() || calibration.preparing || calibration.session != null ||
+            calibration.oldDetectorReleasePending ||
+            (unknownServiceOwnerLazy.isInitialized() && unknownServiceOwner.hasCalibration)) {
+            updateStatus("카메라 성능 점검 대기", "실행 중인 카메라나 점검을 끝낸 뒤 다시 시작하세요.")
+            return
+        }
+        if (!primaryDetectorOwner.projection().available) {
+            loadDetectorForCurrentProcess()
+            updateStatus("카메라 성능 점검 준비 중", "인식 모델 준비가 끝나면 다시 눌러 주세요.")
+            return
+        }
+        scheduleDeviceRuntimeCalibration(manual = true)
     }
 
 
@@ -13891,6 +13912,11 @@ generation != cameraFallbackGeneration
         if (!BuildConfig.DEBUG) return
         // The test Activity owns its cache-only model preparation. Opening it does
         // not prepare and validate another production detector first.
+        if (unknownServiceOwnerLazy.isInitialized() &&
+            (unknownServiceOwner.closing || unknownServiceOwner.hasCalibration)) {
+            updateStatus("카메라 성능 점검 정리 중", "점검용 모델의 종료를 확인한 뒤 카메라를 다시 열어 주세요.")
+            return
+        }
         cancelDeviceRuntimeCalibration("live_camera_requested")
         primaryDetectorLifecycleController.cancelPendingLoad()
         startActivity(Intent().setClassName(
@@ -13944,8 +13970,10 @@ generation != cameraFallbackGeneration
         requestDeadlineMs: Long = SystemClock.elapsedRealtime() + 300_000L,
     ) {
         primaryRuntimeCalibrationOwner.clearScheduledPreparation()
-        // User-facing performance checks use fixed assets. Do not seize the camera on home entry.
-        if (manual && SystemClock.elapsedRealtime() < requestDeadlineMs) runFixedFixturePerformanceCheck()
+        // Only an explicit check opens the live camera. Ordinary HOME restoration remains cache-only.
+        if (manual && SystemClock.elapsedRealtime() < requestDeadlineMs) {
+            prepareDeviceRuntimeCalibration(manual = true, requestDeadlineMs = requestDeadlineMs)
+        }
         else if (isActivityForeground && postLoginDeviceCheckSnapshot.passesFeatureGate && !isWalkSessionRuntimeActive()) {
             loadDetectorForCurrentProcess()
         }
@@ -13966,8 +13994,8 @@ generation != cameraFallbackGeneration
         val config = reportRuntimeConfig ?: return
         val candidate = primaryRuntimeCalibrationOwner.projection().activeCandidate ?: return
         if (primaryDetectorLifecycleController.metadata().loadedModelKey != TwoModelRuntimeConfig.UNIFIED_MODEL_KEY || primaryDetectorLifecycleController.metadata().fallbackUsed) return
-        val scope = if (postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE))
-            RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH else RuntimeFeatureScope.CAMERA_TRACKING
+        val scope = if (postLoginDeviceProbes.signals.metricDepth == PostLoginMetricDepthState.SUPPORTED)
+            RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH else RuntimeFeatureScope.ARCORE_CAMERA_TRACKING
         val accountBinding = currentPostLoginDeviceCheckSessionBinding() ?: return
         val firstRunLease = currentFirstRunAsyncLease()
         val page = nativeUiPage

@@ -655,12 +655,13 @@ class AndroidRuntimeCalibrationRunner(
                         window.dropped += 1
                         throw CandidateInconclusive("live_tracking_unverified")
                     }
-                    if (featureScope == RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH) {
+                    if (featureScope != RuntimeFeatureScope.CAMERA_TRACKING) {
                         if (evidence.environment.arCoreState != "TRACKING") {
                             window.dropped += 1
                             throw CandidateInconclusive("metric_depth_load_unverified")
                         }
-                        if (!evidence.poseValid || !evidence.depthTimestampFresh || evidence.positiveDepthSamples <= 0) {
+                        if (!evidence.poseValid || (featureScope == RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH &&
+                                (!evidence.depthTimestampFresh || evidence.positiveDepthSamples <= 0))) {
                             // Depth/pose observations can be absent on an individual camera frame.
                             // Keep its submitted/drop denominator and gap cost, but require enough
                             // later valid observations within this same bounded live window.

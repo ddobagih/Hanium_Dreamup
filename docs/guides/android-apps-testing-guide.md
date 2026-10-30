@@ -57,6 +57,15 @@ adb install -r "$VISUAL_TEST_WORKSPACE/apps/android/app/build/outputs/apk/visual
 
 별도 로컬 기능 시험에서 `developmentQuickStart=true`를 사용하는 경우에도 계정 정보는 APK에 넣지 않습니다. 앱의 기존 로그인 화면에서 직접 로그인한 뒤 개발 기능 테스트를 시작합니다. 이전 `developmentQuickStartEmail`과 `WALKSAFE_DEVELOPMENT_TEST_PASSWORD` 빌드 입력은 더 이상 사용하지 않습니다. 이 옵션은 실외 보행 검증용이 아니며, 시험 계정 권한·수명 관리는 별도로 적용해야 합니다.
 
+## 카메라 전체 성능 점검
+
+- debug 앱에서 기기 기능 점검을 완료하고 거리 측정 지원 여부를 확인한 뒤, **설정 → 카메라 전체 성능 점검**을 누릅니다. 렌즈를 가리지 않고 밝은 곳의 물체·무늬를 비추며 점검합니다. 홈 진입이나 카메라 열기만으로 전체 비교를 자동 실행하지 않습니다.
+- 기본 모델의 실제 카메라 비교 뒤 FastSAM을 함께 실행하며 CPU/GPU·스레드 후보와 기본 인식의 성능 저하 여부를 확인합니다. 같은 전체 제한 시간 안에 유효한 비교를 끝내지 못하면 미확정으로 남습니다. 내장 이미지 비교나 기능 점검 통과만으로 전체 성능 확인을 표시하지 않습니다.
+- 홈 카메라는 모델·실제 기본 실행 설정·기기·카메라 처리 범위가 일치하는 저장 결과를 복원합니다. CameraX, 거리 없는 ARCore, ARCore와 거리 측정은 서로 다른 범위입니다. 저장 결과가 없으면 임시 설정임을 표시하고 기본·추가 모델의 실행 간격을 실제 지연과 발열에 따라 조절합니다.
+- 점검이 끝나면 시험용 추가 모델의 실제 종료를 확인합니다. 카메라 열기·닫기·다시 열기에서도 자원 해제와 두 모델의 실제 영상 실행을 확인해야 합니다. 앱 데이터 삭제·로그인 상태·교육·동의 상태의 임의 변경은 필요하지 않습니다.
+- `CameraHomeReopenDiagnosticDeviceTest`는 `allowCameraHomeReopenDiagnostic=true`로 실행합니다. `cameraDiagnosticEntry=restoredHome`은 실제 복원된 홈 버튼 경로이며, `directCamera`는 카메라 구성요소만 시험합니다. 두 결과를 구분합니다.
+- `CameraCompositionCalibrationDeviceTest`는 `allowCameraCompositionCalibration=true`로 실제 기본 모델·FastSAM·ARCore·Raw Depth의 조합과 종료를 시험합니다. 로그인·홈 상태를 만들어내지 않으며, 조합 실행 관측과 설정 확정 여부를 별도로 출력합니다. 실제 보행·거리 정확도·팀원 기기의 성능을 대신 증명하지 않습니다.
+
 ## 관리자 앱
 
 `adminapp`은 applicationId `kr.co.hanium.dreamup.walksafe.admin`의 별도 앱입니다. [관리자 빌드 설정](../../apps/android/adminapp/build.gradle.kts)은 비밀번호·TOTP 인증과 보안 제어 화면을 사용하며, 신고 검토·수동 기관 전달 기록 같은 운영 워크플로는 기본적으로 잠급니다.

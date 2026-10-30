@@ -7,6 +7,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 import kr.co.hanium.dreamup.walksafe.device.DeviceTuningRecheckReason
+import kr.co.hanium.dreamup.walksafe.device.RuntimeCalibrationResult
 import kr.co.hanium.dreamup.walksafe.inference.*
 import kr.co.hanium.dreamup.walksafe.inference.unknown.*
 import kr.co.hanium.dreamup.walksafe.inference.unknown.tuning.*
@@ -16,6 +17,49 @@ import org.junit.Test
 
 /** Real FastSam model/post owners; release futures are driven by a controlled test engine. */
 class UnknownRuntimeServiceOwnerTest {
+    @Test fun explicitCheckReturnsItsWarmedModelBeforePublishingCompletion() {
+        val f = Fixture()
+        f.needsRecheck = true
+        val request = AtomicReference<UnknownCalibrationRequest>()
+        f.calibrationFactory = { value ->
+            request.set(value)
+            object : UnknownCalibrationSession {
+                override val isRunning = true
+                override val isDraining = false
+                override fun start() = true
+                override fun cancel(reason: String) {}
+            }
+        }
+        f.prepare(); f.drain()
+        val check = requireNotNull(request.get())
+        val ready = f.native.create(check.serviceEpoch,
+            FastSamRuntimeOptions(FastSamRuntimeOptions.Backend.CPU, 1, false,
+                f.elapsedRealtimeNanos() + 60_000_000_000L, 800L, false),
+            FastSamRuntimeService.Listener<UnknownRuntimeAttachment> {}, f::elapsedRealtimeNanos)
+        ready.start().get(3, TimeUnit.SECONDS)
+        check.onSelected(UnknownRuntimeSelection(null, ready, RuntimeCandidate(RuntimeBackend.CPU, 1),
+            1L, { swap -> swap() }, {}))
+        assertSame(ready, f.owner.currentService)
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        f.native.closeEntered = entered
+        f.native.releaseClose = release
+        try {
+            check.onClosed(RuntimeCalibrationResult(RuntimeSelectionStatus.PARTIAL, "unconfirmed", null,
+                null, true, true, null))
+            assertTrue(entered.await(3, TimeUnit.SECONDS))
+            assertNull("The separate HOME camera must not share another idle FastSAM", f.owner.currentService)
+            assertTrue(f.owner.closing)
+            assertFalse("Completion cannot precede native release proof",
+                f.events.any { it is UnknownRuntimeServiceEvent.CalibrationClosed })
+        } finally { release.countDown() }
+        ready.releasedFuture().get(3, TimeUnit.SECONDS)
+        f.awaitQueue(1); f.drain()
+        assertFalse(f.owner.closing)
+        assertEquals(1, f.events.count { it is UnknownRuntimeServiceEvent.CalibrationClosed })
+        assertEquals(1, f.native.nativeCloses.get())
+    }
+
     @Test fun concurrentTuningAndMainReleaseCompletionCannotClearASuccessorsRelease() {
         repeat(30) { iteration ->
             val f = Fixture()
@@ -414,6 +458,8 @@ class UnknownRuntimeServiceOwnerTest {
         var authorityReads = 0
         var mayStart = true
         var pendingMarks = 0
+        var needsRecheck = false
+        var calibrationFactory: ((UnknownCalibrationRequest) -> UnknownCalibrationSession)? = null
         val events = mutableListOf<UnknownRuntimeServiceEvent>()
         var dispatchOnOtherThreadAndWait = false
         private val config = TwoModelRuntimeConfig("test", null, TwoModelRuntimeConfig.UNIFIED_MODEL_KEY,
@@ -429,7 +475,7 @@ class UnknownRuntimeServiceOwnerTest {
             override fun createBinding(config: TwoModelRuntimeConfig, primary: RuntimeCandidate,
                 scope: RuntimeFeatureScope): UnknownRuntimeBinding = profileBinding.also { onBinding() }
             override fun load(binding: UnknownRuntimeBinding): UnknownRuntimeProfile? = null
-            override fun needsRecheck(binding: UnknownRuntimeBinding, manual: Boolean) = false
+            override fun needsRecheck(binding: UnknownRuntimeBinding, manual: Boolean) = this@Fixture.needsRecheck
             override fun markPending(binding: UnknownRuntimeBinding, reason: DeviceTuningRecheckReason): Boolean {
                 pendingMarks++; return true
             }
@@ -438,7 +484,7 @@ class UnknownRuntimeServiceOwnerTest {
                 listener: FastSamRuntimeService.Listener<UnknownRuntimeAttachment>): FastSamRuntimeService<UnknownRuntimeAttachment> =
                 native.create(epoch, options, listener, this@Fixture::elapsedRealtimeNanos)
             override fun createCalibration(request: UnknownCalibrationRequest): UnknownCalibrationSession =
-                error("No calibration factory call is expected")
+                calibrationFactory?.invoke(request) ?: error("No calibration factory call is expected")
         }, object : UnknownRuntimeServiceAuthority {
             override fun destroyedOrDetectorClosing(): Boolean { authorityReads++; return false }
             override fun mayStartWalkingService(): Boolean { authorityReads++; return mayStart }

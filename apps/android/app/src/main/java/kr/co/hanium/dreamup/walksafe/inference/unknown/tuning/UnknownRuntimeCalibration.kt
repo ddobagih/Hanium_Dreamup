@@ -221,8 +221,9 @@ class UnknownRuntimeCalibration(
             var status = RuntimeSelectionStatus.PARTIAL
             var reason = "live_or_comparison_unverified"
             var summary: RuntimeMeasurementSummary? = null
+            val cpuBaseline = RuntimeSelectionPolicy.initialCpuCandidate(Runtime.getRuntime().availableProcessors())
             val queue = RuntimeSelectionPolicy.createCandidateQueue(Runtime.getRuntime().availableProcessors(),
-                RuntimeCandidate(RuntimeBackend.CPU, 1), true, restored = store.loadCursor(binding))
+                cpuBaseline, true, restored = store.loadCursor(binding))
             try {
                 checkCurrent()
                 check(store.markStarted(binding)) { "attempt_store_failed" }
@@ -234,7 +235,9 @@ class UnknownRuntimeCalibration(
                 open(RuntimeCandidate(RuntimeBackend.CPU, 1))
                 cases.forEach { fixture -> references[fixture.id] = output(fixture, checkReference = false).second }
                 closeService()
-                var baseline = RuntimeCandidate(RuntimeBackend.CPU, 1)
+                // One thread is the numerical reference only. It can exceed the live freshness
+                // budget before GPU is ever compared; use the executable CPU baseline for live work.
+                var baseline = cpuBaseline
                 while (current()) {
                     val next = queue.nextCandidate(Runtime.getRuntime().availableProcessors()) ?: break
                     if (next == baseline) { queue.recordOutcome(next, RuntimeSelectionStatus.CONFIRMED); continue }
@@ -281,14 +284,17 @@ class UnknownRuntimeCalibration(
                             reason = if (selectedProfile != null) "confirmed_fixed_primary_composition" else "adoption_not_confirmed"
                             break
                         }
-                    } catch (_: Incomplete) {
+                    } catch (error: Incomplete) {
+                        android.util.Log.i("WalkSafeComposition", "Incomplete candidate=$candidate", error)
                         queue.recordOutcome(next, RuntimeSelectionStatus.PARTIAL)
                         if (service != null && current()) offer(null)
                         break
-                    } catch (_: Rejected) {
+                    } catch (error: Rejected) {
+                        android.util.Log.i("WalkSafeComposition", "Rejected candidate=$candidate", error)
                         queue.recordOutcome(next, RuntimeSelectionStatus.REJECTED)
                         closeService()
                     } catch (error: ExecutionException) {
+                        android.util.Log.i("WalkSafeComposition", "Execution candidate=$candidate", error.cause)
                         val outcome = when (error.cause) {
                             is UnsupportedOperationException -> RuntimeSelectionStatus.UNSUPPORTED
                             is Incomplete, is TimeoutException -> RuntimeSelectionStatus.PARTIAL
@@ -298,8 +304,13 @@ class UnknownRuntimeCalibration(
                         closeService()
                     }
                 }
-            } catch (_: Incomplete) { reason = "deadline_or_cancelled" }
-            catch (_: Throwable) { reason = "execution_or_output_unverified" }
+            } catch (error: Incomplete) {
+                android.util.Log.i("WalkSafeComposition", "Deadline or cancelled candidate=$candidate", error)
+                reason = "deadline_or_cancelled"
+            } catch (error: Throwable) {
+                android.util.Log.w("WalkSafeComposition", "Unverified candidate=$candidate", error)
+                reason = "execution_or_output_unverified"
+            }
             finally {
                 isDraining = true
                 synchronized(lock) { window = null; while (imageBusy.get()) lock.wait(50L) }
@@ -382,10 +393,35 @@ class UnknownRuntimeCalibration(
         }
 
         private fun warmup() {
+            fun ready(value: RuntimeComparisonEnvironment): Boolean = value.cameraState == "ACTIVE" &&
+                (binding.featureScope == RuntimeFeatureScope.CAMERA_TRACKING || value.arCoreState == "TRACKING")
+            // Give the user time to aim the camera. Camera setup is not model warmup, and neither
+            // this wait nor the later model warmup can extend the caller's overall deadline.
+            val cameraDeadline = minOf(requestDeadlineMs - UnknownRuntimeTuning.CLEANUP_RESERVE_MS, now() + 60_000L)
+            while (now() < cameraDeadline && (!ready(environment()) || speechActive())) {
+                checkCurrent()
+                synchronized(lock) { lock.wait(50L) }
+            }
+            if (!ready(environment()) || speechActive()) throw Incomplete()
             val times = mutableListOf<Double>()
             val limit = minOf(requestDeadlineMs - UnknownRuntimeTuning.CLEANUP_RESERVE_MS, now() + 15_000L)
             while (now() < limit) {
-                val measured = output(cases.first())
+                checkCurrent()
+                val before = environment()
+                val cameraReady = ready(before)
+                if (!cameraReady || speechActive()) {
+                    times.clear()
+                    synchronized(lock) { lock.wait(50L) }
+                    continue
+                }
+                // Camera/SLAM startup may legitimately change the environment during warmup.
+                // Discard that timing; paired fixture and live measurements still check equality.
+                val measured = output(cases.first(), checkReference = false)
+                if (measured.second.environment != before || measured.second.speechActive ||
+                    before != environment() || speechActive()) {
+                    times.clear()
+                    continue
+                }
                 times += measured.first
                 if (UnknownRuntimeTuning.warmupStable(times)) return
             }
@@ -552,8 +588,10 @@ class UnknownRuntimeCalibration(
             e.environment.bindingHash == binding.hashOrNull() && e.environment.featureScope == binding.featureScope &&
                 e.environment.cameraState == "ACTIVE" && !e.speechActive && e.cameraTimestampNs > 0 &&
                 e.sourceFrameTimestampNs > 0 && abs(e.cameraTimestampNs - e.sourceFrameTimestampNs) <= 50_000_000L &&
+                (binding.featureScope == RuntimeFeatureScope.CAMERA_TRACKING ||
+                    e.poseValid && e.environment.arCoreState == "TRACKING") &&
                 (binding.featureScope != RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH ||
-                    e.poseValid && e.depthTimestampFresh && e.positiveDepthSamples > 0 && e.imageToDepthUv != null)
+                    e.depthTimestampFresh && e.positiveDepthSamples > 0 && e.imageToDepthUv != null)
         private fun enough(workMs: Long) = RuntimeSelectionPolicy.canStartCandidate(now(), requestDeadlineMs,
             workMs, UnknownRuntimeTuning.CLEANUP_RESERVE_MS)
         private fun checkCurrent() { if (!current() || requestDeadlineMs - now() <= UnknownRuntimeTuning.CLEANUP_RESERVE_MS) throw Incomplete() }

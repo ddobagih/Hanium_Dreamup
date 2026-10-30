@@ -164,8 +164,8 @@ class AndroidRuntimeCalibrationSession(
             showDialog()
             main.post(tick)
             if (startRunnerBeforeCameraReady) requestRunnerStart()
-            if (featureScope == RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH) startArCore()
-            else startCameraX()
+            if (featureScope == RuntimeFeatureScope.CAMERA_TRACKING) startCameraX()
+            else startArCore()
         } catch (_: Exception) {
             cancel("camera_setup_unavailable")
         }
@@ -315,9 +315,13 @@ class AndroidRuntimeCalibrationSession(
                     arSession = session
                     val provider = ArCoreFrameProvider(session)
                     arProvider = provider
-                    prepared = provider.configureDepthMode()
+                    val depthSupported = provider.configureDepthMode()
+                    prepared = depthSupported || featureScope == RuntimeFeatureScope.ARCORE_CAMERA_TRACKING
                     if (prepared) {
-                        session.configure(session.config.apply { updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE })
+                        session.configure(session.config.apply {
+                            updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+                            if (featureScope == RuntimeFeatureScope.ARCORE_CAMERA_TRACKING) depthMode = Config.DepthMode.DISABLED
+                        })
                     }
                 }
             } catch (_: Exception) {
@@ -359,26 +363,35 @@ class AndroidRuntimeCalibrationSession(
             cameraState = "ACTIVE"
             arCoreState = frame.camera.trackingState.name
             val capturedAt = nowMs()
-            val snapshot = provider.acquireDepthSnapshot(frame, includeFullDepthWhenRawAvailable = true)
-            val pose = frame.camera.pose
-            val poseValid = frame.camera.trackingState == TrackingState.TRACKING &&
-                pose.translation.all { it.isFinite() } && pose.rotationQuaternion.all { it.isFinite() } &&
-                snapshot.cameraPoseEvidence != null
-            val image = provider.acquireCameraImageOrNull(frame) ?: return
-            val imageToDepth = runCatching {
-                val w = image.width.toFloat()
-                val h = image.height.toFloat()
-                val input = floatArrayOf(0f, 0f, w, 0f, 0f, h, w, h, w / 2f, h / 2f)
-                val output = FloatArray(10)
-                frame.transformCoordinates2d(com.google.ar.core.Coordinates2d.IMAGE_PIXELS, input,
-                    com.google.ar.core.Coordinates2d.TEXTURE_NORMALIZED, output)
-                val points = output.toList().chunked(2).map { kr.co.hanium.dreamup.walksafe.depth.Point2(it[0], it[1]) }
-                kr.co.hanium.dreamup.walksafe.navigation.FrozenImageToDepthTransform.create(
-                    frame.timestamp, points.take(4), points[4],
-                )?.imagePixelsToDepthUvMatrix(image.width, image.height)
-            }.getOrNull()
-            offerImage(image, frame.timestamp, capturedAt, snapshot, poseValid, image::close,
-                imageToDepth, frame.timestamp)
+            val packet = provider.acquireRecognitionCameraImageOrNull(frame) ?: return
+            val image = packet.image
+            var handedToRunner = false
+            try {
+                val snapshot = provider.acquireDepthSnapshot(frame,
+                    cameraImageTimestampEvidence = packet.timestampEvidence,
+                    includeFullDepthWhenRawAvailable = true)
+                val pose = frame.camera.pose
+                val poseValid = frame.camera.trackingState == TrackingState.TRACKING &&
+                    pose.translation.all { it.isFinite() } && pose.rotationQuaternion.all { it.isFinite() } &&
+                    snapshot.cameraPoseEvidence != null
+                val imageToDepth = runCatching {
+                    val w = image.width.toFloat()
+                    val h = image.height.toFloat()
+                    val input = floatArrayOf(0f, 0f, w, 0f, 0f, h, w, h, w / 2f, h / 2f)
+                    val output = FloatArray(10)
+                    frame.transformCoordinates2d(com.google.ar.core.Coordinates2d.IMAGE_PIXELS, input,
+                        com.google.ar.core.Coordinates2d.TEXTURE_NORMALIZED, output)
+                    val points = output.toList().chunked(2).map { kr.co.hanium.dreamup.walksafe.depth.Point2(it[0], it[1]) }
+                    kr.co.hanium.dreamup.walksafe.navigation.FrozenImageToDepthTransform.create(
+                        frame.timestamp, points.take(4), points[4],
+                    )?.imagePixelsToDepthUvMatrix(image.width, image.height)
+                }.getOrNull()
+                handedToRunner = true // offerImage owns every success, rejection and exception from here.
+                offerImage(image, frame.timestamp, capturedAt, snapshot, poseValid, image::close,
+                    imageToDepth, frame.timestamp)
+            } finally {
+                if (!handedToRunner) image.close()
+            }
         } catch (_: Exception) {
             cancel("camera_frame_unavailable")
         }
@@ -487,8 +500,10 @@ class AndroidRuntimeCalibrationSession(
                 minimumRawConfidence = 0.5, minimumDistanceMeters = 0.1,
                 maximumDistanceMeters = 10.0, requireFreshRaw = true,
             ) ?: 0 else 0
-            val metricReady = featureScope != RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH ||
-                (poseValid && freshDepth && samples > 0 && arCoreState == "TRACKING")
+            val metricReady = (featureScope == RuntimeFeatureScope.CAMERA_TRACKING ||
+                (poseValid && arCoreState == "TRACKING")) &&
+                (featureScope != RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH ||
+                    (freshDepth && samples > 0))
             if (metricReady && interval.isFinite() && uiDelayMs.isFinite()) requestRunnerStart()
             val evidence = RuntimeCalibrationLiveEvidence(
                 capturedAtElapsedRealtimeMs = capturedAt,

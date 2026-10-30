@@ -181,8 +181,10 @@ object RuntimeSelectionPolicy {
             live.uniqueCameraFrames >= live.submittedFrames && positive(live.cameraFrameIntervalMs) &&
             nonnegative(live.trackingCostMs) && nonnegative(live.uiFrameDelayMs) &&
             positive(live.longestCompletionGapMs) && live.adaptivePacing &&
+            (live.environment.featureScope == RuntimeFeatureScope.CAMERA_TRACKING ||
+                (live.environment.arCoreState == "TRACKING" && live.poseValid)) &&
             (live.environment.featureScope != RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH ||
-                (live.environment.arCoreState == "TRACKING" && live.poseValid && live.depthTimestampFresh && live.positiveDepthSamples > 0))
+                (live.depthTimestampFresh && live.positiveDepthSamples > 0))
 
     private fun liveNotWorse(a: RuntimeLiveMetrics, b: RuntimeLiveMetrics, clock: Double): Boolean =
         b.validCompletions.toDouble() / b.submittedFrames >= a.validCompletions.toDouble() / a.submittedFrames &&

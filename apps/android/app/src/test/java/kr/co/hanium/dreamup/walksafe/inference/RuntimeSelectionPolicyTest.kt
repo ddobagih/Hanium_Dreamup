@@ -110,6 +110,39 @@ class RuntimeSelectionPolicyTest {
         )).status)
     }
 
+    @Test fun arCoreWithoutDepthCanConfirmOnlyWithRealTrackingAndValidPose() {
+        val arCore = changeEnvironment(summary(), env.copy(featureScope = RuntimeFeatureScope.ARCORE_CAMERA_TRACKING))
+            .let { it.copy(
+                baselineLive = it.baselineLive.copy(depthTimestampFresh = false, positiveDepthSamples = 0),
+                candidateLive = it.candidateLive.copy(depthTimestampFresh = false, positiveDepthSamples = 0),
+            ) }
+        assertEquals(RuntimeSelectionStatus.CONFIRMED, evaluate(arCore).status)
+        val profile = requireNotNull(RuntimeTuningProfile.fromConfirmed(evaluate(arCore), 123))
+        assertEquals(RuntimeFeatureScope.ARCORE_CAMERA_TRACKING, profile.featureScope)
+        assertTrue(profile.isValid(env.bindingHash, 12))
+
+        notConfirmed(arCore.copy(baselineLive = arCore.baselineLive.copy(poseValid = false)))
+        notConfirmed(arCore.copy(candidateLive = arCore.candidateLive.copy(poseValid = false)))
+        for (state in listOf("PAUSED", "STOPPED", "UNSUPPORTED")) {
+            notConfirmed(changeEnvironment(arCore, arCore.baselineLive.environment.copy(arCoreState = state)))
+        }
+    }
+
+    @Test fun cameraXArCoreAndMetricEvidenceCannotBeMixedOrRelabelled() {
+        val scopes = listOf(RuntimeFeatureScope.CAMERA_TRACKING, RuntimeFeatureScope.ARCORE_CAMERA_TRACKING,
+            RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH)
+        for (scope in scopes) {
+            val evidence = changeEnvironment(summary(), env.copy(featureScope = scope))
+            val profile = requireNotNull(RuntimeTuningProfile.fromConfirmed(evaluate(evidence), 123))
+            for (other in scopes.filter { it != scope }) {
+                assertFalse("A profile cannot be relabelled from $scope to $other",
+                    profile.copy(featureScope = other).isValid(env.bindingHash, 12))
+                notConfirmed(evidence.copy(candidateLive = evidence.candidateLive.copy(
+                    environment = evidence.candidateLive.environment.copy(featureScope = other))))
+            }
+        }
+    }
+
     @Test fun anyLatencyTailCameraTrackingOrUiRegressionBlocksPromotion() {
         val s = summary()
         val regressions = listOf(

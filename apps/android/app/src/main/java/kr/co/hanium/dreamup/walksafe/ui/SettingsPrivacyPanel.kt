@@ -41,6 +41,7 @@ internal class SettingsPrivacyPanel(
         val onVoiceDataSettings: () -> Unit,
         val onGuidanceDiagnostics: () -> Unit = {},
         val onDeletionPasswordLogin: () -> Unit = {},
+        val onCameraPerformanceCheck: () -> Unit = {},
     )
 
     val privacyConsentStatusText: TextView = TextView(context).apply {
@@ -51,6 +52,13 @@ internal class SettingsPrivacyPanel(
         accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         ViewCompat.setAccessibilityHeading(this, true)
     }
+
+    private val cameraPerformanceCheckButton = if (BuildConfig.DEBUG) {
+        style.accessiblePriorityUserButton(
+            label = "카메라 전체 성능 점검",
+            onClick = actions.onCameraPerformanceCheck,
+        )
+    } else null
 
     val reportPrivacyDisclosureText: TextView = TextView(context).apply {
         text = props.reportPrivacyDisclosure
@@ -261,6 +269,7 @@ internal class SettingsPrivacyPanel(
         orientation = LinearLayout.VERTICAL
         visibility = View.GONE
         addView(nativeSettingsTitle)
+        cameraPerformanceCheckButton?.let { addView(it) }
         addView(privacySettingsControls)
         addView(accountDeletionControls)
         addView(gatewaySessionControls)

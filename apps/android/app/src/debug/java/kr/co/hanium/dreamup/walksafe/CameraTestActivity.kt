@@ -10,8 +10,10 @@ import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.os.Bundle
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
 import android.view.Gravity
@@ -37,6 +39,15 @@ import kr.co.hanium.dreamup.walksafe.depth.ObjectDepthRuntimePipeline
 import kr.co.hanium.dreamup.walksafe.depth.ObjectTracker
 import kr.co.hanium.dreamup.walksafe.depth.Point2
 import kr.co.hanium.dreamup.walksafe.inference.AdaptiveInferencePacingPolicy
+import kr.co.hanium.dreamup.walksafe.inference.AndroidRuntimeLoadObservationSource
+import kr.co.hanium.dreamup.walksafe.inference.AndroidDetectorLoadResult
+import kr.co.hanium.dreamup.walksafe.inference.DetectorNativeCleanupFailure
+import kr.co.hanium.dreamup.walksafe.inference.RuntimeCandidate
+import kr.co.hanium.dreamup.walksafe.inference.RuntimeBackend
+import kr.co.hanium.dreamup.walksafe.inference.RuntimeFeatureScope
+import kr.co.hanium.dreamup.walksafe.inference.RuntimeSelectionPolicy
+import kr.co.hanium.dreamup.walksafe.inference.RuntimeCalibrationFixtures
+import kr.co.hanium.dreamup.walksafe.inference.YuvPreprocessingStrategy
 import kr.co.hanium.dreamup.walksafe.depth.TrackedObjectDepth
 import kr.co.hanium.dreamup.walksafe.inference.AndroidDetectorLoadTiming
 import kr.co.hanium.dreamup.walksafe.inference.AndroidDetectorLoadPhase
@@ -48,6 +59,8 @@ import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
 import kr.co.hanium.dreamup.walksafe.inference.TfliteAndroidFrameDetector
 import kr.co.hanium.dreamup.walksafe.inference.TwoModelRuntimeConfig
 import kr.co.hanium.dreamup.walksafe.device.AndroidFixedFixtureRuntimeSelector
+import kr.co.hanium.dreamup.walksafe.device.AndroidDeviceTuningProfileStore
+import kr.co.hanium.dreamup.walksafe.inference.unknown.tuning.AndroidUnknownRuntimeProfileStore
 import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamRuntimeService
 import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamRuntimeOptions
 import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamFrameToken
@@ -139,6 +152,21 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
     private val cameraWorker = Executors.newSingleThreadExecutor { task -> Thread(task, "WalkSafeCameraSetup") }
     private val busy = AtomicBoolean(false)
     private val primaryInferencePacing = AdaptiveInferencePacingPolicy()
+    private val auxiliaryPacing = CameraAuxiliaryPacing()
+    @Volatile private var cameraFrameBudgetMs: Long? = null
+    private val loadObservations by lazy {
+        AndroidRuntimeLoadObservationSource(feedbackHandler, { cameraFrameBudgetMs }, {
+            @Suppress("DEPRECATION")
+            windowManager.defaultDisplay.refreshRate.takeIf { it.isFinite() && it > 0f }
+                ?.let { kotlin.math.ceil(1000.0 / it).toLong() }
+        })
+    }
+    @Volatile private var preparedScope: RuntimeFeatureScope? = null
+    @Volatile private var cameraScope: RuntimeFeatureScope? = null
+    @Volatile private var primaryCandidate: RuntimeCandidate? = null
+    @Volatile private var auxiliaryCandidate: RuntimeCandidate? = null
+    @Volatile private var primarySetting = "실시간 성능 점검 미확정"
+    @Volatile private var auxiliarySetting = "보수적 CPU 임시 설정 · 조합 점검 미확정"
     @Volatile private var foreground = false
     @Volatile private var generation = 0
     @Volatile private var session: Session? = null
@@ -224,25 +252,91 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
             addView(preview, FrameLayout.LayoutParams(-1, -1))
             addView(controls, FrameLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
         })
+    }
+
+    /** The AR session supplies the feature scope before a persisted live profile can be restored. */
+    private fun prepareCameraDetector(scope: RuntimeFeatureScope) {
+        if (detector != null && preparedScope == scope) return
         val modelQueuedNs = System.nanoTime()
         worker.execute {
+            if (detector != null && preparedScope == scope) return@execute
             logCameraQueue("model_load_queue", generation, modelQueuedNs)
-            val loaded = runCatching { AndroidFixedFixtureRuntimeSelector.load(
-                applicationContext, TwoModelRuntimeConfig.load(applicationContext), allowComparison = false,
-                isCurrent = { !isDestroyed && !isFinishing },
-                onProgress = { message -> runOnUiThread {
-                    if (!isDestroyed && !isFinishing) status.text = message
-                } },
-            ) }.onFailure { Log.e("WalkSafeCameraTest", "Model initialization failed", it) }.getOrNull()
+            val previous = detector
+            detector = null
+            var owned: TfliteAndroidFrameDetector? = null
+            val loaded = runCatching {
+                previous?.close()
+                val config = TwoModelRuntimeConfig.load(applicationContext)
+                val binding = AndroidDeviceTuningProfileStore.createBinding(applicationContext, config, scope)
+                val profile = binding?.let { AndroidDeviceTuningProfileStore(applicationContext).load(it) }
+                val fixtures = RuntimeCalibrationFixtures(applicationContext)
+                val fixture = fixtures.loadArgb(fixtures.loadManifest().fixtures.first { it.required })
+                fun warm(load: AndroidDetectorLoadResult): Pair<AndroidDetectorLoadResult, RuntimeCandidate> {
+                    if (load.reason == "DetectorNativeCleanupFailure")
+                        throw DetectorNativeCleanupFailure(IllegalStateException("Previous native allocation did not release"))
+                    val model = requireNotNull(load.detector)
+                    owned = model
+                    val result = model.detectCalibrationImage(fixture)
+                    check(result.inferenceCompleted && !result.partial)
+                    val runtime = requireNotNull(result.timing.modelRuntime)
+                    val backend = when (runtime.activeDelegate) {
+                        "cpu" -> RuntimeBackend.CPU
+                        "gpu" -> RuntimeBackend.GPU
+                        else -> error("Unverified camera runtime")
+                    }
+                    return load to RuntimeCandidate(backend, runtime.numThreads)
+                }
+                val restored = profile?.let { measured ->
+                    runCatching {
+                        val options = requireNotNull(config.unifiedWalksafe).runtime.copy(
+                            delegate = measured.candidate.backend.delegate, numThreads = measured.candidate.numThreads,
+                            fallbackToCpu = false)
+                        warm(TfliteAndroidFrameDetector.createWithStatus(applicationContext, config, options,
+                            YuvPreprocessingStrategy.FUSED_YUV_TO_TENSOR)).also {
+                            check(it.second == measured.candidate) { "Stored camera runtime changed" }
+                        }
+                    }.onFailure {
+                        if (it is DetectorNativeCleanupFailure) throw it
+                        owned?.close()
+                        owned = null
+                        Log.w("WalkSafeCameraTest", "Stored live runtime unavailable; using cache-only preparation", it)
+                    }.getOrNull()
+                }
+                val selected = restored ?: warm(AndroidFixedFixtureRuntimeSelector.load(
+                    applicationContext, config, allowComparison = false,
+                    isCurrent = { !isDestroyed && !isFinishing },
+                    onProgress = { message -> runOnUiThread {
+                        if (!isDestroyed && !isFinishing) status.text = message
+                    } },
+                ))
+                check(!isDestroyed && !isFinishing)
+                primaryCandidate = selected.second
+                primarySetting = if (restored != null) "저장된 실시간 점검 설정" else "고정 자료 설정 · 실시간 점검 미확정"
+                val auxiliaryBinding = AndroidUnknownRuntimeProfileStore.createBinding(applicationContext,
+                    config, selected.second, scope)
+                auxiliaryCandidate = auxiliaryBinding?.let { AndroidUnknownRuntimeProfileStore(applicationContext).load(it) }?.candidate
+                auxiliarySetting = if (auxiliaryCandidate != null) "저장된 조합 점검 설정"
+                    else "보수적 CPU 임시 설정 · 조합 점검 미확정"
+                preparedScope = scope
+                selected.first
+            }.onFailure {
+                owned?.close()
+                owned = null
+                primaryCandidate = null
+                auxiliaryCandidate = null
+                preparedScope = null
+                Log.e("WalkSafeCameraTest", "Model initialization failed", it)
+            }.getOrNull()
             primaryInferencePacing.reset()
             detector = loaded?.detector
-            Log.i("WalkSafeCameraTest", "Model initialization: ${loaded?.reason ?: "exception"}")
+            Log.i("WalkSafeCameraTest", "Model initialization: ${loaded?.reason ?: "exception"} " +
+                "scope=$scope primary=$primaryCandidate primarySetting=$primarySetting auxiliary=$auxiliaryCandidate")
             logDetectorTiming("model_load", loaded?.loadTiming)
             runOnUiThread {
                 if (isDestroyed || isFinishing) return@runOnUiThread
                 if (detector == null) status.text = "카메라 테스트 · 객체 모델 로드 실패: ${loaded?.reason ?: "exception"}"
                 else if (foreground) {
-                    status.text = "객체 인식 준비 완료 · 카메라 영상을 기다리는 중"
+                    status.text = "객체 인식 준비 완료 · $primarySetting"
                     resumeUnknownAfterPrimaryLiveAttempt()
                 }
             }
@@ -254,18 +348,37 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         unknownMaterialPoints.invalidate()
         unknownPipeline = UnknownObjectDepthPipeline(SystemClock::elapsedRealtime)
         unknownFeedbackPolicy = UnknownObjectFeedbackPolicy()
+        auxiliaryPacing.begin(epoch)
+        val selected = auxiliaryCandidate ?: RuntimeSelectionPolicy.initialCpuCandidate(Runtime.getRuntime().availableProcessors())
+        Log.i("WalkSafeCameraTest", "FastSAM preparation: candidate=$selected setting=$auxiliarySetting primary=$primaryCandidate")
         return FastSamRuntimeService(applicationContext, epoch,
-            FastSamRuntimeOptions(FastSamRuntimeOptions.Backend.GPU,
-                minOf(4, Runtime.getRuntime().availableProcessors()).coerceAtLeast(1), true,
+            FastSamRuntimeOptions(FastSamRuntimeOptions.Backend.valueOf(selected.backend.name),
+                selected.numThreads, auxiliaryCandidate == null,
                 SystemClock.elapsedRealtimeNanos() + 60_000_000_000L, 1_000L, false, false, true),
             object : FastSamRuntimeService.Listener<UnknownCapture> {
-                override fun onResult(result: FastSamResult<UnknownCapture>) = showUnknownResult(result)
+                override fun onResult(result: FastSamResult<UnknownCapture>) {
+                    try { showUnknownResult(result) }
+                    finally {
+                        val token = result.token
+                        val now = SystemClock.elapsedRealtime()
+                        if (unknownTrackingLive(result.attachment.trackingScope)) {
+                            auxiliaryPacing.complete(token.sessionEpoch, token.frameId, now,
+                                result.inferenceMs.toLong(), thermalThrottled(), loadObservations.latestObservation(now))
+                        } else auxiliaryPacing.cancel(token.sessionEpoch, token.frameId)
+                    }
+                }
                 override fun onError(error: Throwable) {
+                    auxiliaryPacing.cancelService(epoch)
                     Log.e("WalkSafeCameraTest", "FastSAM failed", error)
                     unknownMaterialPoints.invalidate(epoch)
                     unknownRuntime.failed(epoch)
                 }
                 override fun onDiscard(token: FastSamFrameToken, reason: String) {
+                    if (reason.startsWith("stale") && foreground && unknownRuntime.accepts(token.sessionEpoch)) {
+                        val now = SystemClock.elapsedRealtime()
+                        auxiliaryPacing.complete(token.sessionEpoch, token.frameId, now,
+                            thermalThrottled = thermalThrottled(), load = loadObservations.latestObservation(now))
+                    } else auxiliaryPacing.cancel(token.sessionEpoch, token.frameId)
                     if (foreground && !isDestroyed && !isFinishing)
                         unknownMaterialPoints.cancelCapture(token) { scope -> unknownTrackingLive(scope) }
                 }
@@ -283,7 +396,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         }
         unknownStatus.setTextIfChanged(when (state) {
             CameraUnknownRuntime.Status.IDLE, CameraUnknownRuntime.Status.LOADING -> "이름 없는 영역 · FastSAM 준비 중"
-            CameraUnknownRuntime.Status.READY -> "이름 없는 영역 · ${unknownRuntime.backendName ?: "FastSAM"} 준비됨"
+            CameraUnknownRuntime.Status.READY -> "이름 없는 영역 · ${unknownRuntime.backendName ?: "FastSAM"} · $auxiliarySetting"
             CameraUnknownRuntime.Status.FAILED -> "이름 없는 영역 실패 · 카메라 다시 연결을 눌러 재시도하세요"
             CameraUnknownRuntime.Status.WAITING_RELEASE -> "이름 없는 영역 · 이전 모델 종료를 기다리는 중"
             CameraUnknownRuntime.Status.RELEASE_FAILED -> "이름 없는 영역 · 이전 모델 해제 미확인으로 재시작할 수 없습니다"
@@ -355,6 +468,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                         measureCameraStep("session_resume", sessionEpoch) { value.first.resume() }
                         generation++
                         primaryInferencePacing.reset()
+                        auxiliaryPacing.reset()
                         auxiliaryStartup.begin(generation)
                         unknownMaterialPoints.invalidate()
                         unknownPipeline = UnknownObjectDepthPipeline(SystemClock::elapsedRealtime)
@@ -370,6 +484,13 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                         provider = value.second
                         cameraSessionEpoch = sessionEpoch
                         session = value.first
+                        cameraFrameBudgetMs = value.first.cameraConfig.fpsRange.lower.takeIf { it > 0 }
+                            ?.let { kotlin.math.ceil(1000.0 / it).toLong() }
+                        loadObservations.start()
+                        val scope = if (value.third) RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH
+                            else RuntimeFeatureScope.ARCORE_CAMERA_TRACKING
+                        cameraScope = scope
+                        prepareCameraDetector(scope)
                         surface.onResume()
                         status.text = if (value.third) "Depth 지원 · 실제 프레임을 기다리는 중"
                             else "Depth 미지원 · 카메라와 객체 인식만 표시합니다."
@@ -435,6 +556,8 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         foreground = false
         generation++
         primaryInferencePacing.reset()
+        auxiliaryPacing.reset()
+        loadObservations.pause()
         auxiliaryStartup.clear()
         auxiliaryRetryRequested = false
         unknownMaterialPoints.invalidate()
@@ -447,6 +570,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         val closingSessionEpoch = cameraSessionEpoch
         session = null
         provider = null
+        cameraScope = null
         cameraSessionEpoch = null
         objectPresentation.clear()
         primaryUiPresentation.clear()
@@ -468,6 +592,8 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         foreground = false
         generation++
         primaryInferencePacing.reset()
+        auxiliaryPacing.reset()
+        loadObservations.close()
         unknownMaterialPoints.invalidate()
         unknownRuntime.destroy()
         val closingEpoch = generation
@@ -506,6 +632,15 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         GLES20.glViewport(0, 0, width, height)
     }
 
+    private fun thermalThrottled(): Boolean? = if (Build.VERSION.SDK_INT >= 29) runCatching {
+        getSystemService(PowerManager::class.java)?.currentThermalStatus?.let { it >= PowerManager.THERMAL_STATUS_SEVERE }
+    }.getOrNull() else null
+
+    private fun recordCameraLoad(timestampNs: Long, depthMs: Long? = null) {
+        loadObservations.recordFrame(timestampNs, SystemClock.elapsedRealtime(), depthMs, null, null,
+            "$generation:${unknownGeometryGeneration.get()}:$preparedScope:$primaryCandidate")
+    }
+
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
         val camera = session ?: return
@@ -529,16 +664,22 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
             background.draw(frame, texture)
             if (frame.timestamp <= lastFrame) return
             lastFrame = frame.timestamp
-            val model = detector ?: return
-            if (!busy.compareAndSet(false, true)) return
-            val pacingTicket = primaryInferencePacing.tryStart(SystemClock.elapsedRealtime()) ?: run {
+            val model = detector?.takeIf { preparedScope == cameraScope }
+                ?: run { recordCameraLoad(frame.timestamp); return }
+            if (!busy.compareAndSet(false, true)) { recordCameraLoad(frame.timestamp); return }
+            val capturedMs = SystemClock.elapsedRealtime()
+            val pacingTicket = primaryInferencePacing.tryStart(capturedMs) ?: run {
+                recordCameraLoad(frame.timestamp)
                 busy.set(false)
                 return
             }
+            val auxiliary = unknownRuntime.service
             var transferred = false
             var image: android.media.Image? = null
             try {
+                val depthStartedMs = SystemClock.elapsedRealtime()
                 val capture = captureCameraTestFrame(source, frame, profileFullDepth = true) ?: return
+                recordCameraLoad(frame.timestamp, (SystemClock.elapsedRealtime() - depthStartedMs).coerceAtLeast(0L))
                 image = capture.image
                 val ownedImage = image
                 val snapshot = capture.snapshot
@@ -549,7 +690,6 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                 frame.transformCoordinates2d(Coordinates2d.IMAGE_NORMALIZED, basis, Coordinates2d.VIEW, view)
                 frame.transformCoordinates2d(Coordinates2d.IMAGE_NORMALIZED, basis, Coordinates2d.TEXTURE_NORMALIZED, depth)
                 val frameId = frame.timestamp
-                val capturedMs = SystemClock.elapsedRealtime()
                 val trackingGeometryGeneration = unknownGeometryGeneration.get()
                 val tracking = frame.camera.trackingState.name
                 val trackingFailure = frame.camera.trackingFailureReason.name
@@ -562,7 +702,6 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                 // object reach the nonmetric gap estimator. The 1x1 size is never sampled.
                 val mapper = if (frozenTransform != null) FrozenImageToTextureCoordinateMapper(
                     frameId, frozenTransform, ImageSize(grid?.width ?: 1, grid?.height ?: 1)) else null
-                val auxiliary = unknownRuntime.service
                 val pipeline = unknownPipeline
                 val auxiliaryFeedbackPolicy = unknownFeedbackPolicy
                 val primary = primaryDepth
@@ -571,6 +710,18 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                     var inferenceDurationMs: Long? = null
                     try {
                         if (!foreground || epoch != generation || model !== detector) return@execute
+                        // Match the calibrated workload: primary first, then independently paced FastSAM.
+                        val meanLuma = meanLuma(ownedImage)
+                        val result = try {
+                            detectorInvoked = true
+                            model.detectOriented(ownedImage, frameId / 1_000_000L, turns)
+                        }
+                        finally {
+                            if (firstInferenceLog.pending) {
+                                logDetectorTiming("first_inference", firstInferenceLog.take(model.lifecycleTiming()))
+                            }
+                        }
+                        inferenceDurationMs = result.timing.modelInferenceMs
                         val qualifiedUnknownFrame = unknownMaterialPoints.qualifyFrame(capturedSnapshot.cameraImageTimestampNs) {
                             foreground && epoch == generation && trackingGeometryGeneration == unknownGeometryGeneration.get()
                         }
@@ -600,34 +751,26 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                                     val flight = unknownMaterialPoints.reserveCapture(trackingScope, token, turns,
                                         SystemClock.elapsedRealtime()) { unknownTrackingLive(trackingScope) }
                                     if (flight != null) runCatching {
-                                        if (!unknownTrackingLive(trackingScope) || !flight.accepts) {
+                                        if (!unknownTrackingLive(trackingScope) || !flight.accepts ||
+                                            !auxiliaryPacing.tryStart(auxiliary.sessionEpoch, frameId, capturedMs)) {
                                             unknownMaterialPoints.cancelFlight(trackingScope, flight) { unknownTrackingLive(trackingScope) }
                                         } else {
                                             val admission = auxiliary.submit(ownedImage, token, UnknownCapture(epoch, view, capture,
                                                 trackingScope, turns, flight, auxiliaryFeedbackPolicy))
                                             if (admission != FastSamRuntimeService.Admission.ACCEPTED &&
                                                 admission != FastSamRuntimeService.Admission.REPLACED_PENDING) {
+                                                auxiliaryPacing.cancel(auxiliary.sessionEpoch, frameId)
                                                 unknownMaterialPoints.cancelFlight(trackingScope, flight) { unknownTrackingLive(trackingScope) }
                                             }
                                         }
                                     }.onFailure {
+                                        auxiliaryPacing.cancel(auxiliary.sessionEpoch, frameId)
                                         unknownMaterialPoints.cancelFlight(trackingScope, flight) { unknownTrackingLive(trackingScope) }
                                         Log.w("WalkSafeCameraTest", "FastSAM frame submission failed", it)
                                     }
                                 }
                             }
                         }
-                        val meanLuma = meanLuma(ownedImage)
-                        val result = try {
-                            detectorInvoked = true
-                            model.detectOriented(ownedImage, frameId / 1_000_000L, turns)
-                        }
-                        finally {
-                            if (firstInferenceLog.pending) {
-                                logDetectorTiming("first_inference", firstInferenceLog.take(model.lifecycleTiming()))
-                            }
-                        }
-                        inferenceDurationMs = result.timing.modelInferenceMs
                         val outputs = if (mapper != null && tracking == "TRACKING") {
                             val primaryPipeline = primary.forGeometry(geometryId)
                             primary.sourceGate.qualify(capturedSnapshot)?.let { qualified -> primaryPipeline.process(
@@ -667,6 +810,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                                 ?.prediction?.let { DepthPredictionPresentation.validUntilMs(it, capturedMs) ?: capturedMs - 1L }
                         }
                         val message = "테스트 카메라 · ARCore $tracking\n" +
+                            "$primarySetting · 실행 ${result.timing.modelRuntime?.activeDelegate}\n" +
                             "객체 ${result.detections.size}개 · 추론 ${result.timing.modelInferenceMs}ms\n" +
                             "센서 영상 → 화면 방향 보정 ${turns * 90}° (휴대폰을 돌리라는 뜻이 아닙니다)\n" +
                             "Raw Depth ${snapshot.hasMetricRawDepth} · Full Depth ${snapshot.hasFullDepth}\n" +
@@ -679,6 +823,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                         if (now - lastNoticeMs > 2000) {
                             lastNoticeMs = now
                             Log.i("WalkSafeCameraTest", "inferenceMs=${result.timing.modelInferenceMs} objects=${mapped.size} meanLuma=$meanLuma tracking=$tracking/$trackingFailure depthError=${capture.depthError?.javaClass?.simpleName} " +
+                                "primaryIntervalMs=${primaryInferencePacing.snapshot().targetIntervalMs} auxiliaryIntervalMs=${auxiliaryPacing.snapshot().targetIntervalMs} thermal=${thermalThrottled()} " +
                                 (capture.fullDepthTiming?.let { cameraFullDepthTimingDiagnostic(it) } ?: "Full 요청 없음"))
                         }
                         runOnUiThread {
@@ -725,13 +870,15 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                             try {
                                 // Include capture, queueing, preprocessing and publication, not just native inference.
                                 if (detectorInvoked && foreground && epoch == generation && model === detector) {
-                                    primaryInferencePacing.complete(pacingTicket, SystemClock.elapsedRealtime(), inferenceDurationMs)
+                                    val completedAtMs = SystemClock.elapsedRealtime()
+                                    primaryInferencePacing.complete(pacingTicket, completedAtMs, inferenceDurationMs,
+                                        thermalThrottled(), loadObservations.latestObservation(completedAtMs))
                                 } else primaryInferencePacing.cancel(pacingTicket)
                             } finally {
                                 busy.set(false)
                                 if (foreground && epoch == generation) runOnUiThread {
                                     if (foreground && epoch == generation && !isDestroyed && !isFinishing) {
-                                        auxiliaryStartup.complete(epoch)
+                                        if (detectorInvoked) auxiliaryStartup.complete(epoch)
                                         // A newer primary flight may have started before this UI callback.
                                         // Its completion gets another chance to start the auxiliary model.
                                         resumeUnknownAfterPrimaryLiveAttempt()
