@@ -3,18 +3,37 @@ package kr.co.hanium.dreamup.walksafe.runtime.vision.primary
 import android.content.Context
 import kr.co.hanium.dreamup.walksafe.device.AndroidFixedFixtureRuntimeSelector
 import kr.co.hanium.dreamup.walksafe.inference.*
+import kr.co.hanium.dreamup.walksafe.inference.composite.AndroidJointRuntimeLoader
+import java.util.WeakHashMap
 
 /** SDK operations at their original native/tuning call sites; obtaining Context remains lazy. */
 internal class AndroidPrimaryLifecyclePlatform(private val context: () -> Context) : PrimaryLifecyclePlatform {
+    private val prepared = WeakHashMap<TfliteAndroidFrameDetector, Pair<RuntimeCandidate, Long>>()
     override fun loadDefault() = TfliteAndroidFrameDetector.createWithStatus(context(),
         preprocessingStrategy = YuvPreprocessingStrategy.FUSED_YUV_TO_TENSOR)
     override fun select(config: TwoModelRuntimeConfig, allowComparison: Boolean, current: () -> Boolean,
-        progress: (String) -> Unit) = AndroidFixedFixtureRuntimeSelector.load(context(), config,
+        progress: (String) -> Unit): AndroidDetectorLoadResult {
+        val joint = AndroidJointRuntimeLoader.restore(context(), config, isCurrent = current)
+        if (joint != null) {
+            joint.load.detector?.let { synchronized(prepared) {
+                prepared[it] = joint.choice.candidate.primary to joint.choice.candidate.primaryIntervalMs
+            } }
+            return joint.load
+        }
+        return AndroidFixedFixtureRuntimeSelector.load(context(), config,
             allowComparison = allowComparison, isCurrent = current, onProgress = progress)
+    }
     override fun logPreparationFailure(error: Throwable) {
         android.util.Log.w("WalkSafeRuntimeChoice", "Model preparation failed", error)
     }
-    override fun close(detector: TfliteAndroidFrameDetector) = detector.close()
+    override fun close(detector: TfliteAndroidFrameDetector) {
+        detector.close()
+        synchronized(prepared) { prepared.remove(detector) }
+    }
+    override fun observedCandidate(detector: TfliteAndroidFrameDetector) =
+        synchronized(prepared) { prepared[detector]?.first }
+    override fun measuredPrimaryIntervalMs(detector: TfliteAndroidFrameDetector) =
+        synchronized(prepared) { prepared[detector]?.second }
     override fun firstSuccessfulDelegate(detector: TfliteAndroidFrameDetector) = detector.lifecycleTiming().phases.lastOrNull {
         it.phase == AndroidDetectorLoadPhase.FIRST_INFERENCE && it.outcome == AndroidDetectorPhaseOutcome.SUCCEEDED
     }?.delegate

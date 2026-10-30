@@ -11,11 +11,12 @@ internal class CameraAuxiliaryPacing {
     private var flight: Flight? = null
     private data class Flight(val epoch: Long, val frame: Long, val ticket: InferencePacingTicket)
 
-    @Synchronized fun begin(serviceEpoch: Long) {
+    @Synchronized fun begin(serviceEpoch: Long, intervalMs: Long? = null) {
         flight?.let { pacing.cancel(it.ticket) }
         epoch = serviceEpoch
         flight = null
         pacing.reset()
+        intervalMs?.let(pacing::configureMinimumInterval)
     }
 
     @Synchronized fun isDue(serviceEpoch: Long, nowMs: Long): Boolean =

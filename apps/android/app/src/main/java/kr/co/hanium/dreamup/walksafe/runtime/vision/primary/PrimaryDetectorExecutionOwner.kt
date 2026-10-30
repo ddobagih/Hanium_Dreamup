@@ -209,6 +209,7 @@ internal class PrimaryDetectorExecutionOwner(
 
     // Each pacing operation already owns the original policy lock; callers keep their existing outer lock.
     fun resetPacing(): Unit = pacing.reset()
+    fun configurePacingMinimum(intervalMs: Long): Unit = pacing.configureMinimumInterval(intervalMs)
     fun requestEarlyWork(nowMs: Long): Boolean = pacing.requestEarlyStart(nowMs)
     fun pacingSnapshot() = pacing.snapshot()
     fun workIsDue(nowMs: Long): Boolean = pacing.isDue(nowMs)

@@ -29,6 +29,8 @@ internal interface PrimaryLifecyclePlatform {
     fun logPreparationFailure(error: Throwable)
     fun close(detector: TfliteAndroidFrameDetector)
     fun firstSuccessfulDelegate(detector: TfliteAndroidFrameDetector): String?
+    fun observedCandidate(detector: TfliteAndroidFrameDetector): RuntimeCandidate? = null
+    fun measuredPrimaryIntervalMs(detector: TfliteAndroidFrameDetector): Long? = null
     fun availableProcessors(): Int
     fun sample(detector: TfliteAndroidFrameDetector): AndroidDetectionResult
     fun performance(detector: TfliteAndroidFrameDetector): PrimaryFixedFixtureResult

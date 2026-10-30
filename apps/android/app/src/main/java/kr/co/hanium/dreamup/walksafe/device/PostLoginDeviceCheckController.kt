@@ -11,9 +11,10 @@ internal class PostLoginDeviceCheckController(
     private val effects: PostLoginDeviceCheckEffects,
     private val scheduler: PostLoginDeviceCheckScheduler,
     private val config: Config,
+    private val elapsedRealtimeMs: () -> Long = { System.nanoTime() / 1_000_000L },
 ) {
     data class Config(
-        val overallTimeoutMs: Long = 180_000L,
+        val overallTimeoutMs: Long = 300_000L,
         val developmentQuickStartEnabled: Boolean = false,
         val developmentGateBypassed: Boolean = false,
     )
@@ -27,6 +28,8 @@ internal class PostLoginDeviceCheckController(
     private var pendingPermissionBinding: PostLoginDeviceCheckBinding? = null
     private var backgroundFailurePending = false
     private var overallTimeout: DeviceCheckScheduledTask? = null
+    var runtimeDeadlineMs: Long? = null
+        private set
     private var timeoutGeneration = 0L
     private var runtimeCallbackGeneration = 0L
     private var storedMetricRefresh: StoredDeviceCheckMetricRefresh? = null
@@ -241,16 +244,18 @@ internal class PostLoginDeviceCheckController(
     }
 
     fun startRuntime(binding: PostLoginDeviceCheckBinding) {
-        if (!isRunningBindingCurrent(binding)) return
+        if (!isRunningBindingCurrent(binding) || runtimeDeadlineMs != null) return
         resourceWaitThermal = null
         probes.clearStoredBindingValidation()
         val callbackGeneration = ++runtimeCallbackGeneration
+        // Synchronous capability callbacks may start the camera stage. Its single shared deadline
+        // must exist before any source is allowed to publish readiness.
+        armOverallTimeout(binding)
         probes.restartCapabilityAndResources(binding) {
             if (callbackGeneration != runtimeCallbackGeneration) return@restartCapabilityAndResources
             maybeContinue(binding)
             effects.refreshReadinessPresentation()
         }
-        armOverallTimeout(binding)
         probes.prepareVoiceModelAndDetector()
         probes.startAutomaticProbes(binding)
         maybeContinue(binding)
@@ -258,6 +263,9 @@ internal class PostLoginDeviceCheckController(
 
     private fun armOverallTimeout(binding: PostLoginDeviceCheckBinding) {
         clearOverallTimeout()
+        val started = elapsedRealtimeMs().coerceAtLeast(0L)
+        runtimeDeadlineMs = if (started > Long.MAX_VALUE - config.overallTimeoutMs) Long.MAX_VALUE
+            else started + config.overallTimeoutMs
         val generation = ++timeoutGeneration
         overallTimeout = scheduler.schedule(config.overallTimeoutMs) {
             if (generation != timeoutGeneration || !isRunningBindingCurrent(binding)) return@schedule
@@ -367,6 +375,8 @@ internal class PostLoginDeviceCheckController(
                 startup.androidVersionSupported == false -> PostLoginDeviceCheckFailure.MINIMUM_ANDROID_VERSION
                 hardware.resourceReadiness == WalkSessionReadinessStatus.UNAVAILABLE -> PostLoginDeviceCheckFailure.DEVICE_RESOURCE
                 koreanTextToSpeechAvailable == false -> PostLoginDeviceCheckFailure.KOREAN_TTS_UNAVAILABLE
+                cameraPipeline == PostLoginDeviceCheckSignal.UNAVAILABLE && startup.cameraAvailable != false &&
+                    hardware.cameraPermission && !detectorUnavailable -> PostLoginDeviceCheckFailure.CAMERA_PIPELINE_UNAVAILABLE
                 else -> null
             },
         )
@@ -429,6 +439,7 @@ internal class PostLoginDeviceCheckController(
         ++timeoutGeneration
         overallTimeout?.cancel()
         overallTimeout = null
+        runtimeDeadlineMs = null
     }
 
     fun enteredBackground() {

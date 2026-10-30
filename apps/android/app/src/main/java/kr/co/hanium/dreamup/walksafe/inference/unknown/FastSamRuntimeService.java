@@ -139,10 +139,16 @@ public final class FastSamRuntimeService<T> implements AutoCloseable {
         if(stopping)return Admission.CLOSED;
         if(!ready.isDone() || ready.isCompletedExceptionally())return Admission.NOT_READY;
         if(token.sessionEpoch!=sessionEpoch)return Admission.WRONG_EPOCH;
-        if(!token.isFreshAt(clock.getAsLong(),options.maximumResultAgeMs))return Admission.STALE;
+        if(!isFresh(token))return Admission.STALE;
         if(token.frameId<=lastFrameId || (token.source==FastSamFrameToken.Source.LIVE_CAMERA
                 && token.cpuImageTimestampNs<=lastCpuTimestampNs))return Admission.OUT_OF_ORDER;
         return null;
+    }
+    private boolean isFresh(FastSamFrameToken token) {
+        long now=clock.getAsLong();
+        if(token.source==FastSamFrameToken.Source.CALIBRATION_FIXTURE && options.calibrationFixtureDeadlineElapsedNs>0)
+            return now>=token.capturedElapsedNs && now<options.calibrationFixtureDeadlineElapsedNs;
+        return token.isFreshAt(now,options.maximumResultAgeMs);
     }
     private Admission publish(FrozenInput<T> input) {
         synchronized(lock) {
@@ -173,7 +179,7 @@ public final class FastSamRuntimeService<T> implements AutoCloseable {
                 }
                 boolean transferred=false;
                 try {
-                    if(!input.token.isFreshAt(clock.getAsLong(),options.maximumResultAgeMs)) {
+                    if(!isFresh(input.token)) {
                         synchronized(lock){stale++;}
                         listener.onDiscard(input.token,"stale_before_inference");continue;
                     }
@@ -238,7 +244,7 @@ public final class FastSamRuntimeService<T> implements AutoCloseable {
                         options.captureRawOutputs && job.input.token.source==FastSamFrameToken.Source.CALIBRATION_FIXTURE
                             ?new FastSamResult.RawOutputs(job.output.ownedTensors):null);
                     boolean deliver;synchronized(lock){completed++;deliver=!stopping;}
-                    if(deliver && job.input.token.isFreshAt(clock.getAsLong(),options.maximumResultAgeMs)) {
+                    if(deliver && isFresh(job.input.token)) {
                         listener.onResult(result); // Frozen depth/named-result processing is inside this flight.
                         synchronized(lock){cpuPostCompleted++;}
                     } else {

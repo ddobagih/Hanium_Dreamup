@@ -7,6 +7,8 @@ import kr.co.hanium.dreamup.walksafe.inference.RuntimeCandidate
 import kr.co.hanium.dreamup.walksafe.inference.RuntimeFeatureScope
 import kr.co.hanium.dreamup.walksafe.inference.TfliteAndroidFrameDetector
 import kr.co.hanium.dreamup.walksafe.inference.TwoModelRuntimeConfig
+import kr.co.hanium.dreamup.walksafe.inference.composite.ValidatedJointRuntimeChoice
+import kr.co.hanium.dreamup.walksafe.inference.composite.JointCameraMode
 import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamFrameToken
 import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamResult
 import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamRuntimeOptions
@@ -17,6 +19,10 @@ import kr.co.hanium.dreamup.walksafe.inference.unknown.tuning.UnknownRuntimeProf
 import kr.co.hanium.dreamup.walksafe.inference.unknown.tuning.UnknownRuntimeSelection
 
 internal interface UnknownRuntimeProfileRepository {
+    val requiresJointChoice: Boolean get() = false
+    fun loadJoint(config: TwoModelRuntimeConfig, primary: RuntimeCandidate,
+        scope: RuntimeFeatureScope, mode: JointCameraMode?): ValidatedJointRuntimeChoice? = null
+    fun invalidateJointChoice(choice: ValidatedJointRuntimeChoice): Boolean = false
     fun createBinding(config: TwoModelRuntimeConfig, primary: RuntimeCandidate, scope: RuntimeFeatureScope): UnknownRuntimeBinding?
     fun load(binding: UnknownRuntimeBinding): UnknownRuntimeProfile?
     fun needsRecheck(binding: UnknownRuntimeBinding, manual: Boolean): Boolean

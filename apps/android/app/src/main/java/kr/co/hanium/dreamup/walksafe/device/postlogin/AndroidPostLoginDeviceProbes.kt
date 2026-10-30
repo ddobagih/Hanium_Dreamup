@@ -33,8 +33,15 @@ import kr.co.hanium.dreamup.walksafe.voice.*
 
 internal enum class PostLoginCameraPipelineFailure {
     PERMISSION_OR_MODEL_UNAVAILABLE, CAMERA_RESOURCE_BUSY, BIND_FAILED,
-    NO_VALID_FRAME, DETECTOR_FAILED, RELEASE_TIMED_OUT, TIMED_OUT,
+    NO_VALID_FRAME, DETECTOR_FAILED, COMPOSITE_RUNTIME_UNAVAILABLE, RELEASE_TIMED_OUT, TIMED_OUT,
 }
+
+/** Completion is delivered only after the joint choice is saved/applied and native camera work drained. */
+internal data class PostLoginCompositeCameraCheckResult(
+    val success: Boolean,
+    val metricDepth: PostLoginMetricDepthState? = null,
+    val reason: String = "",
+)
 
 internal enum class PostLoginLocationFixTerminalFailure { REQUEST_FAILED, TIMED_OUT }
 
@@ -118,6 +125,9 @@ internal interface PostLoginProbeRuntimeSupport {
     fun prepareVoiceModelAndDetector()
     fun startAutomaticProbes(binding: PostLoginDeviceCheckBinding)
     fun startMetricPreflight(binding: PostLoginDeviceCheckBinding)
+    fun startCompositeCameraCheck(binding: PostLoginDeviceCheckBinding,
+        onFinished: (PostLoginCompositeCameraCheckResult) -> Unit): Boolean = false
+    fun cancelCompositeCameraCheck(reason: String) {}
     fun cancelCalibration(reason: String)
     fun cancelMetricPreflight(reason: String)
     fun closeCapabilityAndResetResources()
@@ -195,13 +205,20 @@ internal class AndroidPostLoginDeviceProbes(
         private set
     var cameraCleanupPending = false
         private set
-    val hasCamera get() = cameraResources?.hasCamera == true
+    val hasCamera get() = compositeCameraRun != null || cameraResources?.hasCamera == true
     var cameraFailure: PostLoginCameraPipelineFailure? = null
         private set
     private var cameraResources: PostLoginCameraResources? = null
     private var cameraTimeout: DeviceCheckScheduledTask? = null
     private var cameraTerminalClaim: AtomicBoolean? = null
     private var cameraReleaseGeneration = 0L
+    private var compositeCameraRun: CompositeCameraRun? = null
+    private class CompositeCameraRun(val binding: PostLoginDeviceCheckBinding, val generation: Long) {
+        var handled: Boolean? = null
+        var completion: PostLoginCompositeCameraCheckResult? = null
+        var completionDispatched = false
+        var retired = false
+    }
 
     private var wakeProbe: PostLoginWakeProbe? = null
     val wakeActive get() = wakeProbe != null
@@ -234,7 +251,10 @@ internal class AndroidPostLoginDeviceProbes(
     override fun prepareVoiceModelAndDetector() = support.prepareVoiceModelAndDetector()
     override fun startAutomaticProbes(binding: PostLoginDeviceCheckBinding) = support.startAutomaticProbes(binding)
     override fun startMetricPreflight(binding: PostLoginDeviceCheckBinding) = support.startMetricPreflight(binding)
-    override fun cancelCalibration(reason: String) = support.cancelCalibration(reason)
+    override fun cancelCalibration(reason: String) {
+        retireCompositeCamera(reason)
+        support.cancelCalibration(reason)
+    }
     override fun cancelMetricPreflight(reason: String) {
         support.cancelMetricPreflight(reason)
         metricPreflightStarted = false
@@ -465,6 +485,7 @@ internal class AndroidPostLoginDeviceProbes(
         cameraFailure = null
         val terminalClaim = AtomicBoolean(false)
         cameraTerminalClaim = terminalClaim
+        if (startCompositeCamera(binding, generation)) return
         cameraTimeout = dispatcher.schedule(CAMERA_TIMEOUT_MS, Runnable {
             if (cameraCurrent(binding, generation) && terminalClaim.compareAndSet(false, true))
                 finishCamera(binding, generation, false, PostLoginCameraPipelineFailure.TIMED_OUT)
@@ -515,6 +536,82 @@ internal class AndroidPostLoginDeviceProbes(
         )
     }
 
+    /** The production support replaces the legacy short CameraX sample with the whole workload. */
+    private fun startCompositeCamera(binding: PostLoginDeviceCheckBinding, generation: Long): Boolean {
+        val run = CompositeCameraRun(binding, generation)
+        compositeCameraRun = run
+        val handled = try {
+            support.startCompositeCameraCheck(binding) { result ->
+                synchronized(run) {
+                    if (run.completion == null) run.completion = result
+                }
+                dispatchCompositeCompletion(run)
+            }
+        } catch (_: RuntimeException) {
+            // A throwing source may already own native resources. Do not fall through to another
+            // camera; cancellation and its eventual completion retain the release barrier.
+            synchronized(run) { run.handled = true }
+            cameraFailure = PostLoginCameraPipelineFailure.COMPOSITE_RUNTIME_UNAVAILABLE
+            retireCompositeCamera("composite_start_failed")
+            observer.navigationDiagnostic("postLoginDeviceCheck=composite_camera_start_failed_cleanup_pending")
+            true
+        }
+        synchronized(run) { run.handled = handled }
+        if (!handled) {
+            run.retired = true
+            if (compositeCameraRun === run) compositeCameraRun = null
+            return false
+        }
+        dispatchCompositeCompletion(run)
+        return true
+    }
+
+    private fun dispatchCompositeCompletion(run: CompositeCameraRun) {
+        val result = synchronized(run) {
+            if (run.handled != true || run.completionDispatched) return
+            val completed = run.completion ?: return
+            run.completionDispatched = true
+            completed
+        }
+        dispatcher.post(Runnable {
+            if (compositeCameraRun !== run) return@Runnable
+            compositeCameraRun = null
+            cameraCleanupPending = false
+            val current = !run.retired && cameraCurrent(run.binding, run.generation)
+            cameraActive = false
+            cameraTerminalClaim?.set(true)
+            cameraTerminalClaim = null
+            if (current) {
+                cameraFailure = if (result.success) null else PostLoginCameraPipelineFailure.COMPOSITE_RUNTIME_UNAVAILABLE
+                cameraSignal = if (result.success) PostLoginDeviceCheckSignal.READY else PostLoginDeviceCheckSignal.UNAVAILABLE
+                if (result.success) result.metricDepth?.let { metricDepth = it }
+                observer.navigationDiagnostic("postLoginDeviceCheck=composite_camera_${if (result.success) "ready" else "unavailable"} reason=${result.reason}")
+            }
+            // A retired completion proves release only. It may let a newer current attempt start,
+            // but can never publish READY or metric evidence from the old attempt.
+            currentBinding()?.let { binding -> if (isCurrent(binding)) observer.continueCheck(binding) }
+            if (uiAlive()) observer.changed()
+        })
+    }
+
+    private fun retireCompositeCamera(reason: String): Boolean {
+        val run = compositeCameraRun ?: return false
+        if (!run.retired) {
+            run.retired = true
+            cameraActive = false
+            ++cameraGeneration
+            cameraTerminalClaim?.set(true)
+            cameraTerminalClaim = null
+            cameraCleanupPending = true
+            try { support.cancelCompositeCameraCheck(reason) }
+            catch (_: RuntimeException) {
+                markSharedReleaseBlocked()
+                observer.navigationDiagnostic("postLoginDeviceCheck=composite_camera_cancel_failed_cleanup_pending")
+            }
+        }
+        return true
+    }
+
     private fun cameraCurrent(binding: PostLoginDeviceCheckBinding, generation: Long) =
         cameraActive && cameraGeneration == generation && isCurrent(binding)
 
@@ -534,6 +631,7 @@ internal class AndroidPostLoginDeviceProbes(
     }
 
     override fun stopCamera() {
+        if (retireCompositeCamera("camera_stopped")) return
         if (!cameraActive && cameraResources == null) return
         cameraTerminalClaim?.set(true)
         cameraTerminalClaim = null

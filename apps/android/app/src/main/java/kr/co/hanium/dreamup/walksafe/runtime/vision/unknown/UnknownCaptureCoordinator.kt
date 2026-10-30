@@ -88,6 +88,7 @@ internal class UnknownCaptureCoordinator(
         val imageQuarterTurns: Int,
         stepLengthM: Float,
         clock: UnknownCaptureClock,
+        minimumIntervalMs: Long?,
     ) {
         val pipeline = UnknownObjectDepthPipeline(
             maximumSourceAgeMs = MAX_DEPTH_DETECTION_SOURCE_AGE_MS,
@@ -97,7 +98,9 @@ internal class UnknownCaptureCoordinator(
         val materialPointTracker = UnknownMaterialPointTracker(materialPointTrackingConfig)
         val frameQueue = UnknownLumaFrameQueue<UnknownQueuedLumaFrame>(materialPointTrackingConfig.maxHistoryFrames)
         val feedback = UnknownObjectFeedbackPolicy(stepLengthM)
-        val pacing = AdaptiveInferencePacingPolicy(MAX_DEPTH_DETECTION_SOURCE_AGE_MS)
+        val pacing = AdaptiveInferencePacingPolicy(MAX_DEPTH_DETECTION_SOURCE_AGE_MS).also { pacing ->
+            minimumIntervalMs?.let(pacing::configureMinimumInterval)
+        }
         @Volatile var activeAttempt: UnknownCaptureAttempt? = null
         var tactileJoin: UnknownTactileJoin? = null
     }
@@ -180,7 +183,8 @@ internal class UnknownCaptureCoordinator(
             } ?: run {
                 invalidateUnknownObjectObservations()
                 UnknownProcessingContext(unknownContextSequence.incrementAndGet(), bound.service, generation,
-                    epoch, arGeneration, token.geometryId, input.imageQuarterTurns, scopeReader.runtime().stepLengthM, clock)
+                    epoch, arGeneration, token.geometryId, input.imageQuarterTurns, scopeReader.runtime().stepLengthM,
+                    clock, services.minimumAuxiliaryIntervalMs(bound.service))
                     .also { unknownProcessingContext = it; latestUnknownFeedback = null }
             }
         }

@@ -460,6 +460,124 @@ class AdaptiveInferencePacingPolicyTest {
         assertEquals(1.0, policy.snapshot().workHeadroomMultiplier, 0.001)
     }
 
+    @Test
+    fun configuredMeasuredCadenceSurvivesFastSamplesAndSessionReset() {
+        for (floorMs in listOf(100L, 200L, 400L, 600L)) {
+            val policy = AdaptiveInferencePacingPolicy()
+            policy.configureMinimumInterval(floorMs)
+            assertEquals(floorMs, policy.snapshot().targetIntervalMs)
+            repeat(40) {
+                completeNext(policy, endToEndMs = 40L)
+                assertTrue(policy.snapshot().targetIntervalMs >= floorMs)
+            }
+            policy.reset()
+            assertEquals(floorMs, policy.snapshot().targetIntervalMs)
+            assertEquals(0L, policy.snapshot().completedSamples)
+            repeat(12) { completeNext(policy, endToEndMs = 40L) }
+            assertEquals(floorMs, policy.snapshot().targetIntervalMs)
+        }
+    }
+
+    @Test
+    fun thermalBackoffAndRecoveryCannotReduceTheMeasuredCadenceFloor() {
+        val policy = AdaptiveInferencePacingPolicy()
+        policy.configureMinimumInterval(400L)
+        completeNext(policy, endToEndMs = 40L, thermalThrottled = true)
+        assertEquals(500L, policy.snapshot().targetIntervalMs)
+        policy.reset()
+        repeat(12) { completeNext(policy, endToEndMs = 40L, thermalThrottled = null) }
+        assertEquals(500L, policy.snapshot().targetIntervalMs)
+        assertTrue(policy.snapshot().thermalHoldActive)
+        repeat(40) {
+            completeNext(policy, endToEndMs = 40L, thermalThrottled = false)
+            assertTrue(policy.snapshot().targetIntervalMs >= 400L)
+        }
+        assertEquals(400L, policy.snapshot().targetIntervalMs)
+        assertFalse(policy.snapshot().thermalHoldActive)
+
+        // A device-tested 600 ms cadence is stricter than the generic 500 ms thermal floor.
+        policy.configureMinimumInterval(600L)
+        completeNext(policy, endToEndMs = 40L, thermalThrottled = true)
+        assertEquals(600L, policy.snapshot().targetIntervalMs)
+        repeat(20) { completeNext(policy, endToEndMs = 40L, thermalThrottled = false) }
+        assertEquals(600L, policy.snapshot().targetIntervalMs)
+    }
+
+    @Test
+    fun earlyDetectionRequestAfterCompletionCannotBypassTheMeasuredCadence() {
+        val policy = AdaptiveInferencePacingPolicy()
+        policy.configureMinimumInterval(400L)
+        val ticket = checkNotNull(policy.tryStart(1_000L))
+        assertTrue(policy.complete(ticket, 1_040L))
+
+        assertFalse(policy.requestEarlyStart(1_040L))
+        assertEquals(1_400L, policy.snapshot().nextEligibleAtElapsedRealtimeMs)
+        assertNull(policy.tryStart(1_399L))
+        assertNotNull(policy.tryStart(1_400L))
+    }
+
+    @Test
+    fun earlyDetectionCanRecoverAdaptiveBackoffOnlyAsFarAsTheMeasuredFloor() {
+        val policy = AdaptiveInferencePacingPolicy()
+        policy.configureMinimumInterval(400L)
+        completeNext(policy, endToEndMs = 480L)
+        assertEquals(600L, policy.snapshot().targetIntervalMs)
+        val ticket = checkNotNull(policy.tryStart(policy.snapshot().nextEligibleAtElapsedRealtimeMs))
+        assertTrue(policy.complete(ticket, ticket.startedAtElapsedRealtimeMs + 40L))
+        assertTrue(policy.snapshot().targetIntervalMs > 400L)
+
+        assertTrue(policy.requestEarlyStart(ticket.startedAtElapsedRealtimeMs + 40L))
+        val permittedAtMs = ticket.startedAtElapsedRealtimeMs + 400L
+        assertEquals(permittedAtMs, policy.snapshot().nextEligibleAtElapsedRealtimeMs)
+        assertNull(policy.tryStart(permittedAtMs - 1L))
+        assertNotNull(policy.tryStart(permittedAtMs))
+    }
+
+    @Test
+    fun configuringMeasuredFloorInvalidatesOldTicketWithoutReleasingPhysicalWorkerEarly() {
+        val policy = AdaptiveInferencePacingPolicy()
+        val oldTicket = checkNotNull(policy.tryStart(1_000L))
+        assertTrue(policy.ownsSlot(oldTicket))
+        policy.configureMinimumInterval(400L)
+
+        assertFalse(policy.ownsSlot(oldTicket))
+        assertTrue(policy.snapshot().inFlight)
+        assertNull(policy.tryStart(10_000L))
+        assertFalse(policy.complete(oldTicket, 1_040L, thermalThrottled = true))
+        assertEquals(0L, policy.snapshot().completedSamples)
+        assertEquals(400L, policy.snapshot().targetIntervalMs)
+        assertFalse(policy.snapshot().thermalHoldActive)
+        val currentTicket = checkNotNull(policy.tryStart(2_000L))
+        assertTrue(policy.ownsSlot(currentTicket))
+
+        // Duplicate old callbacks cannot release the current generation's task or change evidence.
+        assertFalse(policy.complete(oldTicket, 3_000L, thermalThrottled = true))
+        assertFalse(policy.cancel(oldTicket))
+        assertFalse(policy.ownsSlot(oldTicket))
+        assertTrue(policy.ownsSlot(currentTicket))
+        assertTrue(policy.snapshot().inFlight)
+        assertTrue(policy.complete(currentTicket, 2_040L))
+        assertEquals(1L, policy.snapshot().completedSamples)
+        assertEquals(400L, policy.snapshot().targetIntervalMs)
+    }
+
+    @Test
+    fun observedLoadRecoveryCannotReplaceTheMeasuredFloorWithGenericFastDeviceDefaults() {
+        val policy = AdaptiveInferencePacingPolicy()
+        policy.configureMinimumInterval(400L)
+        completeWithLoad(policy) { now ->
+            InferenceLoadObservation(now, uiDispatchDelayMs = 90L, uiDispatchBudgetMs = 20L)
+        }
+        repeat(60) {
+            completeWithLoad(policy) { now ->
+                InferenceLoadObservation(now, uiDispatchDelayMs = 1L, uiDispatchBudgetMs = 20L)
+            }
+            assertTrue(policy.snapshot().targetIntervalMs >= 400L)
+        }
+        assertEquals(0.0, policy.snapshot().observedLoadPressure, 0.001)
+        assertEquals(400L, policy.snapshot().targetIntervalMs)
+    }
+
     private fun completeWithLoad(
         policy: AdaptiveInferencePacingPolicy,
         observation: (Long) -> InferenceLoadObservation,

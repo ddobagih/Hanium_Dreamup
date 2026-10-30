@@ -32,7 +32,7 @@ class CameraRuntimePreparationContractTest {
         assertTrue(main.contains("!primaryDetectorLifecycleController.metadata().loadAttempted || primaryDetectorLifecycleController.metadata().loadInFlight -> PostLoginDeviceCheckSignal.PENDING"))
         assertTrue(load.contains("scheduleVerification(instance,"))
         assertTrue(load.contains("requestGeneration != loadRequestGeneration"))
-        assertTrue(load.contains("load.detector?.let(platform::close)"))
+        assertTrue(load.contains("load.detector?.let(::closeRetiredLoad)"))
     }
 
     @Test fun homeDoesNotReplaceTheSavedChoiceWithUnconditionalGpu() {
@@ -42,10 +42,11 @@ class CameraRuntimePreparationContractTest {
     }
 
     @Test fun cameraIsCacheOnlyAndStartsAuxiliaryAfterPrimaryWarmup() {
-        val prepare = body(camera, "private fun prepareCameraDetector(scope: RuntimeFeatureScope)")
-        assertTrue(prepare.contains("allowComparison = false"))
+        val prepare = body(camera, "private fun prepareCameraDetector(scope: RuntimeFeatureScope, mode: JointCameraMode)")
+        assertTrue(prepare.contains("AndroidJointRuntimeLoader.restore("))
         assertTrue(prepare.contains("resumeUnknownAfterPrimaryLiveAttempt()"))
         assertTrue(prepare.contains("if (detector == null)"))
+        assertFalse(prepare.contains("AndroidFixedFixtureRuntimeSelector"))
         val resume = body(camera, "private fun resumeUnknownAfterPrimaryLiveAttempt()")
         assertTrue(resume.indexOf("auxiliaryStartup.mayStart(generation, busy.get())") < resume.indexOf("unknownRuntime.resume()"))
         assertTrue(resume.contains("unknownRuntime.retry()"))
@@ -69,24 +70,26 @@ class CameraRuntimePreparationContractTest {
         assertTrue(start.indexOf("if (cameraRelease.failure != null)") in 0 until start.indexOf("cameraWorker.execute"))
     }
 
-    @Test fun cameraEntryIsImmediateAndHasOnlyTheCurrentTestActivityPreparationOwner() {
+    @Test fun cameraEntryReleasesTheMainOwnerBeforeTheTestActivityAllocates() {
         val open = body(main, "private fun openLiveCameraScreen()")
         assertTrue(open.contains("if (!shouldShowNativeHome() || !isActivityForeground) return"))
         assertTrue(open.contains("if (!BuildConfig.DEBUG) return"))
         assertTrue(open.contains("cancelDeviceRuntimeCalibration(\"live_camera_requested\")"))
-        assertTrue(open.indexOf("primaryDetectorLifecycleController.cancelPendingLoad()") < open.indexOf("startActivity("))
+        assertTrue(open.indexOf("primaryDetectorLifecycleController.cancelPendingLoadAfterDrain") < open.indexOf("startActivity("))
         assertTrue(open.contains("startActivity("))
+        assertTrue(open.indexOf("releaseForCompositeCheck(current)") < open.indexOf("startActivity("))
+        assertTrue(open.contains("releaseBeforePrimaryCalibration()"))
         assertFalse(open.contains("loadDetectorForCurrentProcess()"))
         assertFalse(open.contains("detectorLoadInFlight"))
         assertFalse(main.contains("cameraTestLaunchPending"))
         val create = body(camera, "override fun onCreate(")
         assertFalse("The real depth scope must be known before choosing a live profile",
             create.contains("AndroidFixedFixtureRuntimeSelector.load("))
-        val prepare = body(camera, "private fun prepareCameraDetector(scope: RuntimeFeatureScope)")
-        assertTrue(prepare.indexOf("worker.execute") < prepare.indexOf("AndroidFixedFixtureRuntimeSelector.load("))
-        assertTrue(prepare.contains("allowComparison = false"))
-        assertTrue(prepare.contains("AndroidDeviceTuningProfileStore.createBinding(applicationContext, config, scope)"))
-        assertTrue(body(camera, "private fun startCamera()").contains("prepareCameraDetector(scope)"))
+        val prepare = body(camera, "private fun prepareCameraDetector(scope: RuntimeFeatureScope, mode: JointCameraMode)")
+        assertTrue(prepare.indexOf("worker.execute") < prepare.indexOf("AndroidJointRuntimeLoader.restore("))
+        assertTrue(prepare.contains("AndroidJointRuntimeLoader.restore("))
+        assertTrue(prepare.contains("config, scope, mode"))
+        assertTrue(body(camera, "private fun startCamera()").contains("prepareCameraDetector(scope, mode)"))
     }
 
     @Test fun recheckDuringLoadingCannotResetAttemptAndLeaveSuccessPending() {
@@ -97,4 +100,16 @@ class CameraRuntimePreparationContractTest {
         val complete = load.substringAfter("loadInFlight = false")
         assertTrue(complete.indexOf("loadAttempted = true") < complete.indexOf("preparation.loaded()"))
     }
+    @Test fun existingDeviceCheckOwnsCompositeWorkAndSettingsHaveNoSeparateAction() {
+        val support = body(main, "override fun startCompositeCameraCheck(")
+        assertTrue(support.contains("startDeviceCompositeCameraCheck(binding, onFinished)"))
+        assertTrue(main.contains("runtimeDeadlineMs"))
+        assertFalse(main.contains("startCameraPerformanceCheck"))
+        val settings = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/SettingsPrivacyPanel.kt").readText()
+        assertFalse(settings.contains("onCameraPerformanceCheck"))
+        val apply = body(main, "private fun finishDeviceCompositeApplicationIfReady()")
+        assertTrue(apply.contains("RunningDetectorVerificationState.VERIFIED"))
+        assertTrue(apply.contains("DeviceCheckJointRuntimeChoice"))
+    }
+
 }

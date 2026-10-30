@@ -285,6 +285,8 @@ import kr.co.hanium.dreamup.walksafe.device.DeviceTuningRecheckReason
 import kr.co.hanium.dreamup.walksafe.device.RuntimeCalibrationSelection
 import kr.co.hanium.dreamup.walksafe.runtime.vision.ar.RuntimeArSessionOwner
 import kr.co.hanium.dreamup.walksafe.inference.RuntimeCandidate
+import kr.co.hanium.dreamup.walksafe.inference.composite.*
+import kr.co.hanium.dreamup.walksafe.inference.RunningDetectorVerificationState
 import kr.co.hanium.dreamup.walksafe.inference.RuntimeFeatureScope
 import kr.co.hanium.dreamup.walksafe.inference.RuntimeTuningProfile
 import kr.co.hanium.dreamup.walksafe.inference.RuntimeLoadMonitor
@@ -1112,6 +1114,10 @@ open class MainActivity @JvmOverloads constructor(
                 statusPresentationOwner = Any()
             }
         }
+    private var cameraEntryReleasePending = false
+    private var primaryRestoreAfterCameraScreen = false
+    private var awaitedCameraRuntimeRelease: java.util.concurrent.CompletableFuture<Unit>? = null
+    private var detectorComparisonAfterCameraRelease = false
     private var cameraScreenOwnsWalk = false
     private lateinit var cameraScreenControls: LinearLayout
     private lateinit var cameraScreenStatus: TextView
@@ -4274,7 +4280,12 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
         )
         return PostLoginDeviceCheckController(
             facts = reader,
-            savedResults = AndroidPostLoginDeviceCheckSavedResults { if (::postLoginDeviceCheckResultStore.isInitialized) postLoginDeviceCheckResultStore else null },
+            savedResults = AndroidPostLoginDeviceCheckSavedResults(
+                store = { if (::postLoginDeviceCheckResultStore.isInitialized) postLoginDeviceCheckResultStore else null },
+                acceptsRuntimeChoice = { result ->
+                    PostLoginDeviceCheckFeature.OBSTACLE_DETECTION in result.disabledFeatures ||
+                        hasStoredJointRuntimeChoice()
+                }),
             probes = postLoginDeviceProbes,
             permissions = object : PostLoginDeviceCheckPermissionPort {
                 override fun acknowledgeVoiceDisclosure() = acknowledgeHandsFreeVoiceDisclosure()
@@ -4348,6 +4359,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                     return DeviceCheckScheduledTask { if (nativeUiPublication.isPublished(NativeUiPublication.Target.STARTUP_CAPABILITY_TEXT)) firstRunOnboardingPresenter.readinessBinding().startupCapabilityText.removeCallbacks(scheduled) }
                 }
             },
+            elapsedRealtimeMs = SystemClock::elapsedRealtime,
             config = PostLoginDeviceCheckController.Config(POST_LOGIN_DEVICE_CHECK_TIMEOUT_MS,
                 developmentQuickStartEnabled, developmentPostLoginDeviceCheckBypassed),
         )
@@ -4416,8 +4428,14 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                 override fun startAutomaticProbes(binding: PostLoginDeviceCheckBinding) {
                     maybeStartFirstRunDeviceCheckProbes()
                 }
+                override fun startCompositeCameraCheck(binding: PostLoginDeviceCheckBinding,
+                    onFinished: (PostLoginCompositeCameraCheckResult) -> Unit): Boolean {
+                    startDeviceCompositeCameraCheck(binding, onFinished)
+                    return true
+                }
+                override fun cancelCompositeCameraCheck(reason: String) = cancelDeviceCompositeCameraCheck(reason)
                 override fun startMetricPreflight(binding: PostLoginDeviceCheckBinding) {
-                    beginRuntimeMetricPreflight()
+                    if (deviceCompositeAttempt == null) beginRuntimeMetricPreflight()
                 }
                 override fun cancelCalibration(reason: String) { cancelDeviceRuntimeCalibration(reason) }
                 override fun cancelMetricPreflight(reason: String) {
@@ -5337,8 +5355,8 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                     runtimeObstacleDetectionCapabilityOverride = false
                     if (metricDistanceWasEnabled) runtimeMetricSession.restoreCapability(false)
                 }
-                override fun modelVerified() { maybeContinuePostLoginDeviceCheck(); refreshStartupCapabilityUi() }
-                override fun loaded() { maybeContinuePostLoginDeviceCheck(); refreshStartupCapabilityUi(); prepareRuntimeServices() }
+                override fun modelVerified() { finishDeviceCompositeApplicationIfReady(); maybeContinuePostLoginDeviceCheck(); refreshStartupCapabilityUi() }
+                override fun loaded() { finishDeviceCompositeApplicationIfReady(); maybeContinuePostLoginDeviceCheck(); refreshStartupCapabilityUi(); prepareRuntimeServices() }
                 override fun disableUnverifiedCapabilities() {
                     if (postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE)) runtimeMetricSession.restoreCapability(false)
                     runtimeObstacleDetectionCapabilityOverride = false
@@ -7498,6 +7516,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
             completePrivacyStartupReadyIfForeground()
             return
         }
+        restorePrimaryAfterCameraScreenIfReady()
         resumeWalkSafeRuntimeAfterPrivacyStartupInspection()
     }
 
@@ -10142,7 +10161,6 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                 reportPrivacyDisclosure = REPORT_PRIVACY_DISCLOSURE_KO,
             ),
             actions = SettingsPrivacyPanel.Actions(
-                onCameraPerformanceCheck = ::startCameraPerformanceCheck,
                 onGuidanceDiagnostics = ::toggleGuidanceDiagnostics,
                 onVoiceDataSettings = ::openVoiceDataInstallSettings,
                 onReportConsent = { onReportPrivacyConsentButtonClicked() },
@@ -13146,7 +13164,7 @@ private fun handleStartupCapabilityConfirmAction() = startupConfirmationInteract
     // FastSAM load/release owns its inference engine, not the camera. Its readiness must not
     // consume a camera start request; calibration and camera cleanup still retain their leases.
     private fun runtimeCameraStartBlockedByAnotherOwner(): Boolean =
-        runtimeArSessionCleanupPending() || primaryRuntimeCalibrationOwner.projection().session != null || (unknownServiceOwnerLazy.isInitialized() && unknownServiceOwner.hasCalibration) ||
+        CameraRuntimeHandoff.pendingRelease() != null || cameraEntryReleasePending || deviceCompositeAttempt != null || runtimeArSessionCleanupPending() || primaryRuntimeCalibrationOwner.projection().session != null || (unknownServiceOwnerLazy.isInitialized() && unknownServiceOwner.hasCalibration) ||
             primaryRuntimeCalibrationOwner.projection().preparing || primaryRuntimeCalibrationOwner.projection().oldDetectorReleasePending ||
             cameraXReleaseBlocked ||
             officialEnvironmentCameraPreflightActive ||
@@ -13791,9 +13809,16 @@ generation != cameraFallbackGeneration
         val source = captureAutomaticUnknownWalkingSource()
         if (source == null && !unknownServiceOwnerLazy.isInitialized()) return
         unknownServiceOwner.startForWalk(source, { reportRuntimeConfig },
-            { primaryRuntimeCalibrationOwner.projection().activeCandidate }) {
+            { primaryRuntimeCalibrationOwner.projection().activeCandidate }, currentMode = {
+                val ar = arSessionOwner.observe()
+                if (ar.purpose != ArSessionPurpose.RUNTIME) null else ar.session?.cameraConfig?.let { camera ->
+                    window.decorView.display?.refreshRate?.toDouble()?.let { refresh ->
+                        JointCameraMode(camera.imageSize.width, camera.imageSize.height, camera.fpsRange.lower, refresh)
+                    }
+                }
+            }) {
             if (postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE))
-                RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH else RuntimeFeatureScope.CAMERA_TRACKING
+                RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH else RuntimeFeatureScope.ARCORE_CAMERA_TRACKING
         }
     }
 
@@ -13817,11 +13842,44 @@ generation != cameraFallbackGeneration
 
     private fun loadDetectorForPostLoginDeviceCheck() {
         if (postLoginDeviceCheckSnapshot.state != PostLoginDeviceCheckState.RUNNING) return
+        if (deferPrimaryForCameraRelease(allowComparison = true)) return
         primaryDetectorLifecycleController.loadForCurrentProcess(allowComparison = true)
     }
 
     private fun loadDetectorForCurrentProcess() {
+        if (cameraEntryReleasePending || deferPrimaryForCameraRelease()) return
         primaryDetectorLifecycleController.loadForCurrentProcess()
+    }
+
+    private fun deferPrimaryForCameraRelease(allowComparison: Boolean = false): Boolean {
+        val release = CameraRuntimeHandoff.pendingRelease() ?: return false
+        detectorComparisonAfterCameraRelease = detectorComparisonAfterCameraRelease || allowComparison
+        if (awaitedCameraRuntimeRelease !== release) {
+            awaitedCameraRuntimeRelease = release
+            release.whenComplete { _, error -> runOnUiThread {
+                if (isDestroyed || awaitedCameraRuntimeRelease !== release) return@runOnUiThread
+                if (error != null) {
+                    updateStatus("카메라 종료 확인 필요", "카메라 모델의 종료를 확인하지 못했습니다. 앱을 다시 열어 주세요.")
+                    return@runOnUiThread
+                }
+                awaitedCameraRuntimeRelease = null
+                if (!isActivityForeground || cameraEntryReleasePending) return@runOnUiThread
+                restorePrimaryAfterCameraScreenIfReady()
+                val compare = detectorComparisonAfterCameraRelease
+                detectorComparisonAfterCameraRelease = false
+                if (compare && postLoginDeviceCheckSnapshot.state == PostLoginDeviceCheckState.RUNNING)
+                    loadDetectorForPostLoginDeviceCheck()
+                else loadDetectorForCurrentProcess()
+            } }
+        }
+        return true
+    }
+
+    private fun restorePrimaryAfterCameraScreenIfReady() {
+        if (!primaryRestoreAfterCameraScreen || cameraEntryReleasePending || !isActivityForeground ||
+            isFinishing || isDestroyed || !firstRunOnboardingComplete() || deferPrimaryForCameraRelease()) return
+        primaryRestoreAfterCameraScreen = false
+        primaryDetectorLifecycleController.finishCompositeCheck(reload = true)
     }
 
     /**
@@ -13879,48 +13937,57 @@ generation != cameraFallbackGeneration
         return primaryDetectorLifecycleController.verifiedForOutput()
     }
 
-    /** Explicit user check: the live primary comparison is followed by the combined FastSAM check. */
-    private fun startCameraPerformanceCheck() {
-        if (!BuildConfig.DEBUG) return
-        if (!deviceRuntimeCalibrationContextAvailable()) {
-            updateStatus("카메라 성능 점검 준비 필요", "기기 기능 점검을 완료한 뒤 설정에서 다시 시작하세요.")
-            return
-        }
-        if (postLoginDeviceProbes.signals.metricDepth !in setOf(
-                PostLoginMetricDepthState.SUPPORTED, PostLoginMetricDepthState.EXPLICITLY_UNSUPPORTED)) {
-            updateStatus("카메라 지원 확인 필요", "거리 측정 지원 여부가 아직 확인되지 않았습니다. 기기 기능을 다시 점검한 뒤 시작하세요.")
-            return
-        }
-        val calibration = primaryRuntimeCalibrationOwner.projection()
-        if (!calibrationCameraOwnerAvailable() || calibration.preparing || calibration.session != null ||
-            calibration.oldDetectorReleasePending ||
-            (unknownServiceOwnerLazy.isInitialized() && unknownServiceOwner.hasCalibration)) {
-            updateStatus("카메라 성능 점검 대기", "실행 중인 카메라나 점검을 끝낸 뒤 다시 시작하세요.")
-            return
-        }
-        if (!primaryDetectorOwner.projection().available) {
-            loadDetectorForCurrentProcess()
-            updateStatus("카메라 성능 점검 준비 중", "인식 모델 준비가 끝나면 다시 눌러 주세요.")
-            return
-        }
-        scheduleDeviceRuntimeCalibration(manual = true)
-    }
-
 
     private fun openLiveCameraScreen() {
         if (!shouldShowNativeHome() || !isActivityForeground) return
         if (!BuildConfig.DEBUG) return
-        // The test Activity owns its cache-only model preparation. Opening it does
-        // not prepare and validate another production detector first.
+        if (CameraRuntimeHandoff.pendingRelease() != null) {
+            updateStatus("카메라 종료 중", "이전 카메라와 모델의 종료가 끝난 뒤 다시 열어 주세요.")
+            return
+        }
+        if (cameraEntryReleasePending || primaryRestoreAfterCameraScreen || deviceCompositeAttempt != null) return
+        // Transfer the native budget only after the production primary/auxiliary have released.
         if (unknownServiceOwnerLazy.isInitialized() &&
             (unknownServiceOwner.closing || unknownServiceOwner.hasCalibration)) {
             updateStatus("카메라 성능 점검 정리 중", "점검용 모델의 종료를 확인한 뒤 카메라를 다시 열어 주세요.")
             return
         }
         cancelDeviceRuntimeCalibration("live_camera_requested")
-        primaryDetectorLifecycleController.cancelPendingLoad()
-        startActivity(Intent().setClassName(
-            this, "$packageName.CameraTestActivity"))
+        cameraEntryReleasePending = true
+        val requestedLifecycle = feedbackLifecycleGeneration
+        val requestedPage = statusPresentationOwner
+        val requestedActor = GatewaySessionProcessCoordinator.snapshot().generation
+        val current = { isActivityForeground && !isFinishing && !isDestroyed && shouldShowNativeHome() &&
+            feedbackLifecycleGeneration == requestedLifecycle && statusPresentationOwner === requestedPage &&
+            GatewaySessionProcessCoordinator.snapshot().generation == requestedActor }
+        primaryDetectorLifecycleController.cancelPendingLoadAfterDrain { drained ->
+            if (!drained) {
+                updateStatus("카메라 준비 확인 필요", "기존 모델의 종료를 확인하지 못했습니다. 앱을 다시 열어 주세요.")
+                return@cancelPendingLoadAfterDrain
+            }
+            primaryDetectorLifecycleController.releaseForCompositeCheck(current) { released ->
+                if (!released) {
+                    cameraEntryReleasePending = primaryDetectorOwner.projection().closing
+                    if (!cameraEntryReleasePending) {
+                        primaryDetectorLifecycleController.finishCompositeCheck(reload = false)
+                        primaryRestoreAfterCameraScreen = true
+                        restorePrimaryAfterCameraScreenIfReady()
+                    }
+                    return@releaseForCompositeCheck
+                }
+                primaryRestoreAfterCameraScreen = true
+                primaryDetectorOwner.tuningLane.execute {
+                    val auxiliaryReleased = !unknownServiceOwnerLazy.isInitialized() || unknownServiceOwner.releaseBeforePrimaryCalibration()
+                    runOnUiThread {
+                        if (!auxiliaryReleased) return@runOnUiThread
+                        cameraEntryReleasePending = false
+                        primaryDetectorLifecycleController.finishCompositeCheck(reload = false)
+                        if (current()) startActivity(Intent().setClassName(this, "$packageName.CameraTestActivity"))
+                        else restorePrimaryAfterCameraScreenIfReady()
+                    }
+                }
+            }
+        }
     }
 
     private fun closeLiveCameraScreen() {
@@ -13944,6 +14011,171 @@ generation != cameraFallbackGeneration
         controlsScroll.visibility = if (cameraScreenVisible) View.GONE else View.VISIBLE
         cameraScreenControls.visibility = if (cameraScreenVisible) View.VISIBLE else View.GONE
         debugBboxOverlay.visibility = if (cameraScreenVisible) View.VISIBLE else View.GONE
+    }
+
+    private class DeviceCompositeAttempt(
+        val binding: PostLoginDeviceCheckBinding,
+        val config: TwoModelRuntimeConfig,
+        val deadlineMs: Long,
+        val finished: (PostLoginCompositeCameraCheckResult) -> Unit,
+    ) {
+        @Volatile var cancelled = false
+        var runner: AndroidJointRuntimeCheck? = null
+        var choice: ValidatedJointRuntimeChoice? = null
+        var applying = false
+        var saving = false
+    }
+    @Volatile private var deviceCompositeAttempt: DeviceCompositeAttempt? = null
+
+    /** Metadata lookup only; model bytes are verified again by the worker before actual adoption. */
+    private fun hasStoredJointRuntimeChoice(): Boolean = runCatching {
+        val config = reportRuntimeConfig ?: assets.open("model-config/two_model_runtime.json")
+            .bufferedReader().use { TwoModelRuntimeConfig.parse(it.readText()) }
+        AndroidJointRuntimeChoiceStore(applicationContext).load(config) != null
+    }.getOrDefault(false)
+
+    private fun compositeAttemptCurrent(attempt: DeviceCompositeAttempt): Boolean =
+        deviceCompositeAttempt === attempt && !attempt.cancelled && isActivityForeground &&
+            !isFinishing && !isDestroyed && hasCameraPermission() &&
+            SystemClock.elapsedRealtime() < attempt.deadlineMs &&
+            postLoginDeviceCheckController.isRunningBindingCurrent(attempt.binding)
+
+    private fun startDeviceCompositeCameraCheck(binding: PostLoginDeviceCheckBinding,
+        finished: (PostLoginCompositeCameraCheckResult) -> Unit) {
+        val config = reportRuntimeConfig
+        val candidate = primaryRuntimeCalibrationOwner.projection().activeCandidate
+        val deadline = postLoginDeviceCheckController.runtimeDeadlineMs
+        // Probe camera flags belong to this same attempt; only other physical owners block it.
+        val otherOwner = CameraRuntimeHandoff.pendingRelease() != null || cameraEntryReleasePending || deviceCompositeAttempt != null || runtimeArSessionCleanupPending() ||
+            cameraXReleaseBlocked || officialEnvironmentCameraPreflightActive || officialEnvironmentCameraCleanupPending ||
+            cameraFallbackRequested || cameraFallbackRunning || cameraFallbackHasCamera || cameraFallbackCleanupPending ||
+            arSessionOwner.observe().session != null || arSessionOwner.observe().purpose != ArSessionPurpose.NONE ||
+            metricPreflightOwner != RuntimeMetricPreflightOwner.NONE ||
+            primaryRuntimeCalibrationOwner.projection().session != null || primaryRuntimeCalibrationOwner.projection().preparing ||
+            (unknownServiceOwnerLazy.isInitialized() && unknownServiceOwner.hasCalibration)
+        if (config == null || candidate == null || deadline == null || otherOwner ||
+            !postLoginDeviceCheckController.isRunningBindingCurrent(binding) || !isActivityForeground) {
+            finished(PostLoginCompositeCameraCheckResult(false, reason = "joint_runtime_start_unavailable"))
+            return
+        }
+        val attempt = DeviceCompositeAttempt(binding, config, deadline, finished)
+        deviceCompositeAttempt = attempt
+        stopHandsFreeVoiceService()
+        updateStatus("카메라와 객체 인식 성능 점검", "밝은 곳의 물체를 비춰 주세요. 기본 인식·추가 인식·거리 계산을 함께 확인합니다.")
+        primaryDetectorLifecycleController.releaseForCompositeCheck({ compositeAttemptCurrent(attempt) }) { released ->
+            if (!released) {
+                if (!primaryDetectorOwner.projection().closing)
+                    completeDeviceCompositeAttempt(attempt, false, "primary_release_retired")
+                else updateNavigationStatus("deviceComposite=primary_release_unconfirmed")
+                return@releaseForCompositeCheck
+            }
+            // Retire an idle walking auxiliary on its existing native owner before trials allocate.
+            primaryDetectorOwner.tuningLane.execute {
+                val auxiliaryReleased = !unknownServiceOwnerLazy.isInitialized() || unknownServiceOwner.releaseBeforePrimaryCalibration()
+                runOnUiThread {
+                    if (!auxiliaryReleased) {
+                        updateNavigationStatus("deviceComposite=auxiliary_release_unconfirmed")
+                        return@runOnUiThread
+                    }
+                    if (!compositeAttemptCurrent(attempt)) {
+                        completeDeviceCompositeAttempt(attempt, false, "joint_runtime_retired")
+                        return@runOnUiThread
+                    }
+                    val runner = AndroidJointRuntimeCheck(this, config, candidate, deadline,
+                        isCurrent = { compositeAttemptCurrent(attempt) }, speechActive = ::isHandsFreeVoiceOutputActive) { result ->
+                        if (!result.releaseConfirmed) {
+                            updateNavigationStatus("deviceComposite=release_unconfirmed reason=${result.reason}")
+                        } else if (!compositeAttemptCurrent(attempt) || result.choice == null) {
+                            completeDeviceCompositeAttempt(attempt, false, result.reason)
+                        } else {
+                            val choice = result.choice
+                            attempt.saving = true
+                            primaryDetectorOwner.tuningLane.execute {
+                                val store = AndroidJointRuntimeChoiceStore(applicationContext)
+                                val saved = compositeAttemptCurrent(attempt) && store.save(config, choice)
+                                if (saved && !compositeAttemptCurrent(attempt)) store.invalidateIfMatches(choice)
+                                runOnUiThread {
+                                    attempt.saving = false
+                                    if (!saved || !compositeAttemptCurrent(attempt)) {
+                                        completeDeviceCompositeAttempt(attempt, false, "joint_runtime_save_retired_or_failed")
+                                    } else {
+                                        attempt.choice = choice
+                                        attempt.applying = true
+                                        primaryDetectorLifecycleController.finishCompositeCheck(reload = true)
+                                        finishDeviceCompositeApplicationIfReady()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    attempt.runner = runner
+                    if (!runner.start()) completeDeviceCompositeAttempt(attempt, false, "joint_runtime_start_failed")
+                }
+            }
+        }
+    }
+
+    private fun finishDeviceCompositeApplicationIfReady() {
+        val attempt = deviceCompositeAttempt ?: return
+        if (!attempt.applying) return
+        val metadata = primaryDetectorLifecycleController.metadata()
+        if (metadata.loadInFlight) return
+        val choice = attempt.choice ?: return
+        val detector = primaryDetectorOwner.projection()
+        val verified = primaryDetectorLifecycleController.verificationState(detector.detector)
+        if (detector.available && verified in setOf(RunningDetectorVerificationState.NONE, RunningDetectorVerificationState.PENDING)) return
+        val applied = compositeAttemptCurrent(attempt) && detector.available &&
+            verified == RunningDetectorVerificationState.VERIFIED && !metadata.fallbackUsed &&
+            metadata.loadReason == "DeviceCheckJointRuntimeChoice" &&
+            primaryRuntimeCalibrationOwner.projection().activeCandidate == choice.candidate.primary
+        if (applied) completeDeviceCompositeAttempt(attempt, true, "joint_runtime_measured_saved_applied")
+        else {
+            attempt.applying = false
+            attempt.saving = true
+            primaryDetectorOwner.tuningLane.execute {
+                AndroidJointRuntimeChoiceStore(applicationContext).invalidateIfMatches(choice)
+                runOnUiThread {
+                    attempt.saving = false
+                    completeDeviceCompositeAttempt(attempt, false, "joint_runtime_application_failed")
+                }
+            }
+        }
+    }
+
+    private fun completeDeviceCompositeAttempt(attempt: DeviceCompositeAttempt, success: Boolean, reason: String) {
+        if (deviceCompositeAttempt !== attempt) return
+        val accepted = success && compositeAttemptCurrent(attempt)
+        deviceCompositeAttempt = null
+        if (!attempt.applying) primaryDetectorLifecycleController.finishCompositeCheck(reload = false)
+        val metric = if (accepted) {
+            if (attempt.choice?.scope == RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH) PostLoginMetricDepthState.SUPPORTED
+            else PostLoginMetricDepthState.EXPLICITLY_UNSUPPORTED
+        } else null
+        attempt.finished(PostLoginCompositeCameraCheckResult(accepted, metric, reason))
+    }
+
+    private fun cancelDeviceCompositeCameraCheck(reason: String) {
+        val attempt = deviceCompositeAttempt ?: return
+        attempt.cancelled = true
+        attempt.runner?.cancel(reason)
+        if (attempt.applying) {
+            attempt.applying = false
+            attempt.saving = true
+            primaryDetectorLifecycleController.cancelPendingLoadAfterDrain { released ->
+                if (!released) {
+                    updateNavigationStatus("deviceComposite=application_release_unconfirmed")
+                    return@cancelPendingLoadAfterDrain
+                }
+                primaryDetectorOwner.tuningLane.execute {
+                    attempt.choice?.let { AndroidJointRuntimeChoiceStore(applicationContext).invalidateIfMatches(it) }
+                    runOnUiThread {
+                        attempt.saving = false
+                        completeDeviceCompositeAttempt(attempt, false, "joint_runtime_application_cancelled")
+                    }
+                }
+            }
+        }
+        // During retirement/save the owning callback acknowledges cleanup. Never free its slot early.
     }
 
     private fun deviceRuntimeCalibrationContextAvailable(): Boolean =
@@ -13980,6 +14212,7 @@ generation != cameraFallbackGeneration
     }
 
     private fun cancelDeviceRuntimeCalibration(reason: String) {
+        cancelDeviceCompositeCameraCheck(reason)
         primaryRuntimeCalibrationOwner.cancel(reason)
         if (unknownServiceOwnerLazy.isInitialized()) {
             unknownServiceOwner.cancelCalibration(reason)
@@ -17278,7 +17511,7 @@ private fun performWalkSessionSafetyStopCleanup(
 
         const val PERMISSION_REQUEST_CODE_MIN = 3_201
         const val PERMISSION_REQUEST_CODE_MAX = 65_534
-        const val POST_LOGIN_DEVICE_CHECK_TIMEOUT_MS = 180_000L
+        const val POST_LOGIN_DEVICE_CHECK_TIMEOUT_MS = 300_000L
         const val POST_LOGIN_LOCATION_FIX_TIMEOUT_MS = 30_000L
         const val POST_LOGIN_LOCATION_FIX_CALLBACK_GRACE_MS = 2_000L
         const val POST_LOGIN_LOCATION_FIX_INTERVAL_MS = 1_000L

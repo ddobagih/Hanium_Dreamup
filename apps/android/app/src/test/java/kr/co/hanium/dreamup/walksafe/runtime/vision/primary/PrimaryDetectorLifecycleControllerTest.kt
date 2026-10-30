@@ -374,6 +374,162 @@ class PrimaryDetectorLifecycleControllerTest {
         } finally { release.countDown(); tuning.join(3_000); if (camera.isAlive) camera.join(3_000) }
     }
 
+    @Test fun compositeReleaseWaitsForPriorNativeWorkAndCloseAcknowledgementBeforeCallback() {
+        val f = Fixture(); f.completeLoad()
+        val released = mutableListOf<Boolean>(); val order = mutableListOf<String>()
+        f.closeHook = {
+            assertFalse(Thread.holdsLock(f.lock))
+            assertTrue(f.execution.projection().closing)
+            assertFalse(f.execution.projection().available)
+            assertTrue(released.isEmpty()); assertEquals(0, f.ui.pending)
+            assertEquals(0, f.tuning.pending)
+            order += "close acknowledged"
+        }
+        f.execution.nativeLane.execute { order += "prior native work drained" }
+        f.lifecycle.releaseForCompositeCheck({ true }) { released += it }
+        assertTrue(f.lifecycle.metadata().loadInFlight)
+        assertTrue(released.isEmpty()); assertTrue(f.closed.isEmpty())
+        f.native.next()
+        assertEquals(listOf("prior native work drained"), order)
+        assertTrue(f.closed.isEmpty()); assertTrue(released.isEmpty())
+        f.native.next()
+        assertEquals(listOf("prior native work drained", "close acknowledged"), order)
+        assertEquals(listOf(f.instance), f.closed)
+        assertTrue(released.isEmpty()); assertEquals(1, f.ui.pending)
+        assertNull(f.lifecycle.verifiedIdentity()); assertFalse(f.lifecycle.verifiedForOutput())
+        f.ui.next()
+        assertEquals(listOf(true), released)
+        // The existing device check continues to own the pending state until explicit finish.
+        assertTrue(f.lifecycle.metadata().loadInFlight)
+        assertFalse(f.execution.projection().available)
+        f.lifecycle.loadForCurrentProcess()
+        assertEquals(0, f.tuning.pending); assertEquals(0, f.native.pending)
+    }
+
+    @Test fun cancelledCompositeReleaseCannotCloseTheRetainedPrimaryAtTheNativeBarrier() {
+        val f = Fixture(); f.completeLoad(); val generation = f.execution.projection().loadGeneration
+        var current = true; val released = mutableListOf<Boolean>()
+        f.lifecycle.releaseForCompositeCheck({ current }) { released += it }
+        current = false
+        f.native.next(); f.ui.next()
+        assertEquals(listOf(false), released)
+        assertTrue(f.closed.isEmpty()); assertSame(f.instance, f.execution.projection().detector)
+        assertEquals(generation, f.execution.projection().loadGeneration)
+        assertFalse(f.execution.projection().closing); assertTrue(f.execution.projection().available)
+        assertEquals(0, f.tuning.pending)
+
+        val alreadyCancelled = Fixture(); alreadyCancelled.completeLoad()
+        val earlyRelease = mutableListOf<Boolean>()
+        alreadyCancelled.lifecycle.releaseForCompositeCheck({ false }) { earlyRelease += it }
+        assertEquals(0, alreadyCancelled.native.pending)
+        alreadyCancelled.ui.next()
+        assertEquals(listOf(false), earlyRelease); assertTrue(alreadyCancelled.closed.isEmpty())
+    }
+
+    @Test fun compositeCloseFailureKeepsTheFenceAndCannotReloadEvenWhenFinishRequestsIt() {
+        val f = Fixture(); f.completeLoad(); f.closeFailure = IllegalStateException("native release")
+        val released = mutableListOf<Boolean>()
+        f.lifecycle.releaseForCompositeCheck({ true }) { released += it }
+        f.native.next(); assertTrue(released.isEmpty()); f.ui.next()
+        assertEquals(listOf(false), released)
+        assertTrue(f.execution.projection().closing); assertFalse(f.execution.projection().available)
+        assertNull(f.lifecycle.verifiedIdentity()); assertFalse(f.lifecycle.verifiedForOutput())
+        f.events.clear()
+        f.lifecycle.finishCompositeCheck(reload = true)
+        f.lifecycle.allowLoadRetryIfUnavailable(); f.lifecycle.loadForCurrentProcess()
+        assertEquals(0, f.tuning.pending); assertEquals(0, f.native.pending)
+        assertTrue(f.execution.projection().closing)
+        assertFalse(f.lifecycle.metadata().configLoaded)
+        assertFalse(f.events.any { it.startsWith("select:") })
+        assertEquals(listOf(f.instance), f.closed)
+    }
+
+    @Test fun compositeFinishRestoresObservedRuntimeAndCadenceButWaitsForNewInstanceVerification() {
+        val f = Fixture(); f.completeLoad()
+        f.lifecycle.releaseForCompositeCheck({ true }) { assertTrue(it) }
+        f.native.next(); f.ui.next()
+        val replacement = unsafe.allocateInstance(TfliteAndroidFrameDetector::class.java) as TfliteAndroidFrameDetector
+        val observed = RuntimeCandidate(RuntimeBackend.GPU, 3)
+        assertEquals(2, f.config!!.unifiedWalksafe!!.runtime.numThreads)
+        f.observedCandidate = observed; f.measuredIntervalMs = 400L
+        f.selectWork = { AndroidDetectorLoadResult(replacement, true, true, "unified_walksafe", false, "joint measured") }
+        f.events.clear()
+        f.lifecycle.finishCompositeCheck(reload = true)
+        assertTrue(f.lifecycle.metadata().loadInFlight)
+        assertFalse(f.lifecycle.verifiedForOutput()); assertFalse(f.execution.projection().available)
+        f.tuning.next(); assertFalse(f.execution.projection().available)
+        f.native.next()
+        assertSame(replacement, f.execution.projection().detector)
+        assertFalse(f.execution.projection().available); assertFalse(f.lifecycle.verifiedForOutput())
+        f.ui.next()
+        assertTrue(f.execution.projection().available)
+        assertEquals(observed, f.calibration.projection().activeCandidate)
+        assertEquals(400L, f.execution.pacingSnapshot().targetIntervalMs)
+        assertEquals(RunningDetectorVerificationState.PENDING, f.lifecycle.verificationState(replacement))
+        assertFalse(f.lifecycle.verifiedForOutput()); assertFalse(f.events.contains("verified"))
+        f.native.next(); f.ui.next()
+        assertEquals(RunningDetectorVerificationState.VERIFIED, f.lifecycle.verificationState(replacement))
+        assertTrue(f.lifecycle.verifiedForOutput()); assertTrue(f.events.contains("verified"))
+        assertEquals(listOf(f.instance), f.closed)
+    }
+
+    @Test fun cancelledLateAllocationDrainsItsRejectedAdoptionAndCloseBeforeCallbackOrAnotherLoad() {
+        val f = Fixture(); val drained = mutableListOf<Boolean>(); val order = mutableListOf<String>()
+        f.selectWork = {
+            // Simulate cancellation after native allocation began, before the selector can return it.
+            f.lifecycle.cancelPendingLoadAfterDrain { released ->
+                assertEquals(listOf("allocation completed", "native close", "close returned"), order)
+                drained += released
+            }
+            f.lifecycle.loadForCurrentProcess()
+            assertEquals(1, f.tuning.pending) // Only the drain barrier, never another allocation.
+            order += "allocation completed"
+            AndroidDetectorLoadResult(f.instance, true, true, "unified_walksafe", false, "late allocation")
+        }
+        f.closeHook = { assertTrue(drained.isEmpty()); assertEquals(0, f.ui.pending); order += "native close" }
+        f.lifecycle.loadForCurrentProcess(); f.tuning.next()
+        assertSame(f.original, f.execution.projection().detector)
+        assertTrue(drained.isEmpty()); assertEquals(1, f.native.pending)
+        f.tuning.next() // The tuning barrier queues behind the late native-adoption/close task.
+        assertEquals(2, f.native.pending)
+        f.lifecycle.loadForCurrentProcess(); assertEquals(0, f.tuning.pending)
+        f.native.next()
+        order += "close returned"
+        assertEquals(listOf(f.instance), f.closed); assertTrue(drained.isEmpty())
+        assertSame(f.original, f.execution.projection().detector)
+        f.lifecycle.loadForCurrentProcess(); assertEquals(0, f.tuning.pending)
+        f.native.next()
+        assertTrue(drained.isEmpty()); assertEquals(1, f.ui.pending)
+        f.lifecycle.loadForCurrentProcess(); assertEquals(0, f.tuning.pending)
+        f.ui.next()
+        assertEquals(listOf(true), drained)
+        f.lifecycle.loadForCurrentProcess()
+        assertEquals(1, f.tuning.pending) // Only successful drain delivery releases the load fence.
+    }
+
+    @Test fun failedCloseOfCancelledLateAllocationReportsUnconfirmedDrainAndKeepsNewLoadsFenced() {
+        val f = Fixture(); val drained = mutableListOf<Boolean>()
+        val failure = IllegalStateException("late allocation close")
+        f.closeFailure = failure
+        f.selectWork = {
+            f.lifecycle.cancelPendingLoadAfterDrain { drained += it }
+            AndroidDetectorLoadResult(f.instance, true, true, "unified_walksafe", false, "late allocation")
+        }
+        f.lifecycle.loadForCurrentProcess(); f.tuning.next(); f.tuning.next()
+        assertSame(failure, runCatching { f.native.next() }.exceptionOrNull())
+        assertTrue(drained.isEmpty()); assertEquals(listOf(f.instance), f.closed)
+        assertTrue(f.execution.projection().closing); assertFalse(f.execution.projection().available)
+        f.native.next(); f.ui.next()
+        assertEquals(listOf(false), drained)
+        f.closeFailure = null
+        f.lifecycle.finishCompositeCheck(reload = true)
+        f.lifecycle.allowLoadRetryIfUnavailable(); f.lifecycle.loadForCurrentProcess()
+        assertEquals(0, f.tuning.pending); assertEquals(0, f.native.pending)
+        assertTrue(f.execution.projection().closing)
+        assertSame(f.original, f.execution.projection().detector)
+        assertEquals(listOf(f.instance), f.closed)
+    }
+
     private class Lane : AbstractExecutorService() {
         val tasks = ArrayDeque<Runnable>(); var reject = false; var closed = false
         val pending get() = tasks.size
@@ -391,6 +547,8 @@ class PrimaryDetectorLifecycleControllerTest {
         val epoch = WalkRuntimeEpoch("r7", 1L); var authorized = true; var destroyed = false; var foreground = true
         var currentCalls = 0; var revokeAfterFirstCurrent = false; var bypass = false; var safetyHandled = false
         var walking = false; var calibrationPresent = false; var closeFailure: RuntimeException? = null
+        var closeHook: (() -> Unit)? = null
+        var observedCandidate: RuntimeCandidate? = null; var measuredIntervalMs: Long? = null
         val instance = unsafe.allocateInstance(TfliteAndroidFrameDetector::class.java) as TfliteAndroidFrameDetector
         val execution = PrimaryDetectorExecutionOwner(lock, native, tuning, { error("native watchdog clock") },
             object : PrimaryNativeFlightScheduler { override fun postDelayed(task: Runnable, delayMs: Long) = false; override fun remove(task: Runnable) = Unit },
@@ -432,8 +590,10 @@ class PrimaryDetectorLifecycleControllerTest {
                     events += "select:$allowComparison"; selectorCurrent = current; this@Fixture.progress = progress; return selectWork?.invoke(current) ?: load()
                 }
                 override fun logPreparationFailure(error: Throwable) { events += "log:${error.javaClass.simpleName}"; logFailure?.let { throw it } }
-                override fun close(detector: TfliteAndroidFrameDetector) { events += "close"; closed += detector; closeFailure?.let { throw it } }
+                override fun close(detector: TfliteAndroidFrameDetector) { events += "close"; closed += detector; closeHook?.invoke(); closeFailure?.let { throw it } }
                 override fun firstSuccessfulDelegate(detector: TfliteAndroidFrameDetector): String { events += "delegate"; return "gpu" }
+                override fun observedCandidate(detector: TfliteAndroidFrameDetector) = this@Fixture.observedCandidate
+                override fun measuredPrimaryIntervalMs(detector: TfliteAndroidFrameDetector) = measuredIntervalMs
                 override fun availableProcessors(): Int { events += "processors"; return 4 }
                 override fun sample(detector: TfliteAndroidFrameDetector): AndroidDetectionResult { events += "sample"; return sample }
                 override fun performance(detector: TfliteAndroidFrameDetector): PrimaryFixedFixtureResult { events += "performance"; return PrimaryFixedFixtureResult(4, 12, 25L, 20L, "gpu", 6) }

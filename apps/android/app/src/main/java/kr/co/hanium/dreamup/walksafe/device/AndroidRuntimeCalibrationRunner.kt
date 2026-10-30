@@ -26,6 +26,8 @@ data class RuntimeCalibrationLiveEvidence(
     val depthSnapshot: kr.co.hanium.dreamup.walksafe.depth.DepthFrameSnapshot? = null,
     val imageToDepthUv: DoubleArray? = null,
     val mapperFrameId: Long? = null,
+    /** Exact IMAGE_NORMALIZED corner/centre basis transformed to VIEW pixels on the source Frame. */
+    val viewBasis: FloatArray? = null,
 )
 
 enum class RuntimeCalibrationStage { PREPARING, OUTPUT_CHECK, COMPARING, LIVE_BASELINE, LIVE_CANDIDATE, SELECTING, DRAINING }

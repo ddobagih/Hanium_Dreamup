@@ -13,6 +13,8 @@ import kr.co.hanium.dreamup.walksafe.inference.RuntimeFeatureScope
 import kr.co.hanium.dreamup.walksafe.inference.RuntimeLoadCompletion
 import kr.co.hanium.dreamup.walksafe.inference.TfliteAndroidFrameDetector
 import kr.co.hanium.dreamup.walksafe.inference.TwoModelRuntimeConfig
+import kr.co.hanium.dreamup.walksafe.inference.composite.ValidatedJointRuntimeChoice
+import kr.co.hanium.dreamup.walksafe.inference.composite.JointCameraMode
 import kr.co.hanium.dreamup.walksafe.inference.unknown.tuning.UnknownRuntimeLoadControl
 import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamFrameToken
 import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamResult
@@ -37,7 +39,7 @@ internal class UnknownRuntimeServiceOwner(
     private val ownerLock = Any()
     private class WalkingRequest(val source: UnknownWalkingSource,
         val config: () -> TwoModelRuntimeConfig?, val candidate: () -> RuntimeCandidate?,
-        val scope: () -> RuntimeFeatureScope)
+        val mode: () -> JointCameraMode?, val scope: () -> RuntimeFeatureScope)
     @Volatile private var walkingRequest: WalkingRequest? = null
     private class WalkingService(val service: FastSamRuntimeService<UnknownRuntimeAttachment>, val request: WalkingRequest)
     private var activeWalkingService: WalkingService? = null
@@ -46,6 +48,7 @@ internal class UnknownRuntimeServiceOwner(
     private val unknownLoadingService get() = preparation?.service
     @Volatile private var unknownCalibration: UnknownCalibrationSession? = null
     @Volatile private var unknownRuntimeBinding: UnknownRuntimeBinding? = null
+    @Volatile private var unknownJointChoice: ValidatedJointRuntimeChoice? = null
     @Volatile private var release: ServiceReleaseAttempt? = null
     private val unknownRuntimeClosing get() = release != null
     @Volatile private var unknownRuntimeStatus = "추가 물체 인식 준비 전"
@@ -62,6 +65,7 @@ internal class UnknownRuntimeServiceOwner(
         val walkingRequest: WalkingRequest? = null,
     ) {
         @Volatile var service: FastSamRuntimeService<UnknownRuntimeAttachment>? = null
+        var jointChoice: ValidatedJointRuntimeChoice? = null
         val terminal = AtomicBoolean(false)
     }
 
@@ -150,12 +154,23 @@ internal class UnknownRuntimeServiceOwner(
     val hasCalibration get() = unknownCalibration != null
     val status get() = unknownRuntimeStatus
     val latestLoadObservation get() = latestUnknownLoadObservation
+    fun minimumAuxiliaryIntervalMs(service: FastSamRuntimeService<UnknownRuntimeAttachment>): Long? =
+        unknownJointChoice?.takeIf { unknownRuntimeService === service }?.candidate?.auxiliaryIntervalMs
     fun reportCaptureStatus(value: String) { unknownRuntimeStatus = value }
     fun recordLoadObservation(value: InferenceLoadObservation?) { latestUnknownLoadObservation = value }
     fun pauseLoadObservation() { unknownLoadControl.pause(); latestUnknownLoadObservation = null }
 
     private fun listener(epoch: Long, errorsOnMain: Boolean) = object : FastSamRuntimeService.Listener<UnknownRuntimeAttachment> {
-        override fun onResult(result: FastSamResult<UnknownRuntimeAttachment>) = this@UnknownRuntimeServiceOwner.onResult(result)
+        override fun onResult(result: FastSamResult<UnknownRuntimeAttachment>) {
+            val joint = unknownJointChoice?.takeIf { unknownRuntimeService?.sessionEpoch == epoch }
+            if (joint != null && (result.runtime.fallbackUsed ||
+                    result.runtime.actualBackend.name != joint.candidate.auxiliary.backend.name ||
+                    result.runtime.numThreads != joint.candidate.auxiliary.numThreads)) {
+                mainDispatcher { handleUnknownRuntimeError(epoch, IllegalStateException("joint_runtime_mismatch")) }
+                return
+            }
+            this@UnknownRuntimeServiceOwner.onResult(result)
+        }
         override fun onDiscard(token: FastSamFrameToken, reason: String) = this@UnknownRuntimeServiceOwner.onDiscard(token, reason)
         override fun onError(error: Throwable) {
             if (errorsOnMain) mainDispatcher {
@@ -166,9 +181,14 @@ internal class UnknownRuntimeServiceOwner(
 
     /** A null source retires only automatic preparation; explicit calibration keeps its own authority. */
     fun startForWalk(source: UnknownWalkingSource?, currentConfig: () -> TwoModelRuntimeConfig?,
-        currentCandidate: () -> RuntimeCandidate?, currentScope: () -> RuntimeFeatureScope) {
+        currentCandidate: () -> RuntimeCandidate?, currentMode: () -> JointCameraMode? = { null },
+        currentScope: () -> RuntimeFeatureScope) {
         val requested = if (source != null && source.isCurrent() && authority.mayStartWalkingService())
-            WalkingRequest(source, currentConfig, currentCandidate, currentScope) else null
+            WalkingRequest(source, currentConfig, currentCandidate, currentMode, currentScope) else null
+        val jointMatches = unknownJointChoice?.let {
+            requested != null && requested.candidate() == it.candidate.primary && requested.scope() == it.scope &&
+                requested.mode() == it.cameraMode
+        } ?: !profiles.requiresJointChoice
         var invalidate = false
         val closing = synchronized(ownerLock) {
             val retained = walkingRequest?.takeIf { requested != null && it.source.sameOwner(requested.source) }
@@ -176,7 +196,7 @@ internal class UnknownRuntimeServiceOwner(
             val active = activeWalkingService
             val loading = preparation?.takeIf { !it.composition }
             val loadingSource = loading?.walkingRequest
-            val keepActive = active != null && requested != null && active.request.source.sameOwner(requested.source)
+            val keepActive = active != null && requested != null && jointMatches && active.request.source.sameOwner(requested.source)
             val keepLoading = loadingSource != null && requested != null && loadingSource.source.sameOwner(requested.source)
             if (keepActive) activeWalkingService = WalkingService(active!!.service, requireNotNull(walkingRequest))
             val retired = when {
@@ -204,6 +224,14 @@ internal class UnknownRuntimeServiceOwner(
     private fun continueWalkingPreparation() {
         val request = walkingRequest ?: return
         if (!walkingCurrent(request)) return
+        val unmeasured = synchronized(ownerLock) {
+            unknownRuntimeService?.takeIf { profiles.requiresJointChoice && unknownJointChoice == null }?.let {
+                unknownRuntimeService = null
+                activeWalkingService = null
+                reserveRelease(it)
+            }
+        }
+        if (unmeasured != null) { startRelease(unmeasured); return }
         val attempt = synchronized(ownerLock) {
             if (walkingRequest !== request || preparation != null || release != null || unknownCalibration != null) return
             unknownRuntimeService?.let {
@@ -223,30 +251,49 @@ internal class UnknownRuntimeServiceOwner(
             }
             continueWalkingPreparation()
         }
-        try {
-            val config = request.config() ?: run { abandonEmpty(); return }
-            val candidate = request.candidate() ?: run { abandonEmpty(); return }
-            val binding = profiles.createBinding(config, candidate, request.scope())
-            val selected = binding?.let { profiles.load(it) }?.candidate
-            if (!ownsPreparation(attempt) || !walkingCurrent(request)) { abandonEmpty(); return }
+        deviceTuningExecutor.execute { try {
+            if (!ownsPreparation(attempt) || !walkingCurrent(request)) { abandonEmpty(); return@execute }
+            val config = request.config() ?: run { abandonEmpty(); return@execute }
+            val candidate = request.candidate() ?: run { abandonEmpty(); return@execute }
+            val scope = request.scope()
+            val mode = request.mode()
+            val joint = profiles.loadJoint(config, candidate, scope, mode)?.takeIf {
+                it.candidate.primary == candidate && it.scope == scope && it.cameraMode == mode
+            }
+            if (profiles.requiresJointChoice && joint == null) {
+                unknownRuntimeStatus = "기기 점검 필요 · 저장된 인식 조합을 확인하지 못했습니다."
+                abandonEmpty()
+                return@execute
+            }
+            val binding = profiles.createBinding(config, candidate, scope)
+            val selected = joint?.candidate?.auxiliary ?: binding?.let { profiles.load(it) }?.candidate
+            if (!ownsPreparation(attempt) || !walkingCurrent(request)) { abandonEmpty(); return@execute }
             attempt.binding = binding
+            attempt.jointChoice = joint
             val epoch = unknownServiceSequence.incrementAndGet()
             val service = factory.createService(epoch, FastSamRuntimeOptions(
                 if (selected?.backend == RuntimeBackend.CPU) FastSamRuntimeOptions.Backend.CPU else FastSamRuntimeOptions.Backend.GPU,
-                (selected?.numThreads ?: candidate.numThreads).coerceIn(1, Runtime.getRuntime().availableProcessors().coerceAtLeast(1)),
-                true, clock.elapsedRealtimeNanos() + 60_000_000_000L, MAX_SOURCE_AGE_MS, false, false, true),
+                joint?.candidate?.auxiliary?.numThreads ?:
+                    (selected?.numThreads ?: candidate.numThreads).coerceIn(1, Runtime.getRuntime().availableProcessors().coerceAtLeast(1)),
+                joint == null, clock.elapsedRealtimeNanos() + 60_000_000_000L, MAX_SOURCE_AGE_MS, false, false, true),
                 listener(epoch, errorsOnMain = true))
             attempt.service = service
-            if (!ownsPreparation(attempt) || !walkingCurrent(request)) { requestRelease(service); return }
+            if (!ownsPreparation(attempt) || !walkingCurrent(request)) { requestRelease(service); return@execute }
             unknownRuntimeStatus = "이름 없는 물체 인식 준비 중"
             service.start().whenComplete { info, error -> mainDispatcher {
                 if (!ownsPreparation(attempt)) return@mainDispatcher
-                val current = error == null && info != null && walkingCurrent(request)
+                val matches = joint == null || info != null && !info.fallbackUsed &&
+                    info.actualBackend.name == joint.candidate.auxiliary.backend.name &&
+                    info.numThreads == joint.candidate.auxiliary.numThreads
+                val workloadMatches = joint == null || request.candidate() == joint.candidate.primary &&
+                    request.scope() == joint.scope && request.mode() == joint.cameraMode
+                val current = error == null && info != null && matches && walkingCurrent(request) && workloadMatches
                 val adopted = synchronized(ownerLock) {
                     if (current && preparation === attempt && !attempt.terminal.get() && walkingRequest === request) {
                         unknownRuntimeService = service
                         activeWalkingService = WalkingService(service, request)
                         unknownRuntimeBinding = attempt.binding
+                        unknownJointChoice = joint
                         unknownLoadControl.reset()
                         unknownRuntimeStatus = "이름 없는 물체 인식 · ${info!!.actualBackend}"
                         true
@@ -255,7 +302,11 @@ internal class UnknownRuntimeServiceOwner(
                 if (adopted) finishPreparation(attempt) else {
                     synchronized(ownerLock) { if (walkingRequest === request) walkingRequest = null }
                     releaseUnknownLoadingService(service)
-                    unknownRuntimeStatus = if (error != null) "이름 없는 물체 준비 실패: ${error.javaClass.simpleName}"
+                    if (joint != null && (!matches || error != null)) deviceTuningExecutor.execute {
+                        profiles.invalidateJointChoice(joint)
+                    }
+                    unknownRuntimeStatus = if (joint != null && (!matches || error != null || !workloadMatches)) "기기 점검 필요 · 인식 실행 설정을 확인하지 못했습니다."
+                        else if (error != null) "이름 없는 물체 준비 실패: ${error.javaClass.simpleName}"
                         else "추가 물체 인식 준비 전"
                 }
             } }
@@ -264,7 +315,7 @@ internal class UnknownRuntimeServiceOwner(
             attempt.service?.let(::releaseUnknownLoadingService) ?: abandonEmpty()
             unknownRuntimeStatus = "추가 물체 인식 준비 실패: ${error.javaClass.simpleName}"
             throw error
-        }
+        } }
     }
 
     /** Cancel intent before native close can synchronously acknowledge while Activity is still foreground. */
@@ -276,6 +327,7 @@ internal class UnknownRuntimeServiceOwner(
         deadlineMs: Long, current: () -> Boolean,
     ) {
         clearWalkingIntent()
+        unknownJointChoice = null
         fun finishWithoutWork() = mainDispatcher {
             if (current()) onEvent(UnknownRuntimeServiceEvent.PreparationFinished)
         }
@@ -400,6 +452,10 @@ internal class UnknownRuntimeServiceOwner(
                     }
                 },
             ))
+            if (!ownsPreparation(attempt) || !current()) {
+                calibration.cancel("primary_release_request_retired")
+                return@mainDispatcher
+            }
             unknownCalibration = calibration
             if (!calibration.start() && unknownCalibration === calibration) unknownCalibration = null
             finishPreparation(attempt)
@@ -408,9 +464,12 @@ internal class UnknownRuntimeServiceOwner(
 
     fun handleUnknownRuntimeError(serviceEpoch: Long, error: Throwable) {
         val failedBinding: UnknownRuntimeBinding?
+        val failedJoint: ValidatedJointRuntimeChoice?
         val releaseAttempt = synchronized(ownerLock) {
             val failed = unknownRuntimeService?.takeIf { it.sessionEpoch == serviceEpoch } ?: return
             failedBinding = unknownRuntimeBinding
+            failedJoint = unknownJointChoice
+            unknownJointChoice = null
             activeWalkingService?.takeIf { it.service === failed }?.let {
                 if (walkingRequest === it.request) walkingRequest = null
                 activeWalkingService = null
@@ -420,10 +479,12 @@ internal class UnknownRuntimeServiceOwner(
         }
         try {
             invalidateObservations()
-            if (failedBinding != null) deviceTuningExecutor.execute {
-                profiles.markPending(failedBinding, DeviceTuningRecheckReason.EXECUTION_RECOVERY)
+            if (failedJoint != null || failedBinding != null) deviceTuningExecutor.execute {
+                if (failedJoint != null) profiles.invalidateJointChoice(failedJoint)
+                else if (failedBinding != null) profiles.markPending(failedBinding, DeviceTuningRecheckReason.EXECUTION_RECOVERY)
             }
-            unknownRuntimeStatus = "추가 물체 인식 중지 · ${error.javaClass.simpleName}"
+            unknownRuntimeStatus = if (failedJoint != null) "기기 점검 필요 · 추가 물체 인식 실행이 중지되었습니다."
+                else "추가 물체 인식 중지 · ${error.javaClass.simpleName}"
         } finally { startRelease(releaseAttempt) }
     }
 
@@ -460,9 +521,13 @@ internal class UnknownRuntimeServiceOwner(
     fun releaseBeforePrimaryCalibration(): Boolean {
         val releaseAttempt = synchronized(ownerLock) {
             walkingRequest = null
-            if (preparation != null || release != null) return false
             activeWalkingService = null
-            unknownRuntimeService?.also { unknownRuntimeService = null }?.let(::reserveRelease)
+            val loading = preparation
+            loading?.terminal?.set(true)
+            if (loading?.service == null) preparation = null
+            val active = unknownRuntimeService
+            unknownRuntimeService = null
+            release ?: (active ?: loading?.service)?.let(::reserveRelease)
         }
         try { invalidateObservations() } finally { releaseAttempt?.let(::startRelease) }
         return releaseAttempt == null || awaitReleaseOnTuningOwner(releaseAttempt)

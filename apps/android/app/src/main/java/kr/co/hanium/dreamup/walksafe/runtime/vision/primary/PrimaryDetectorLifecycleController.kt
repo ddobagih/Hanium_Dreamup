@@ -39,9 +39,53 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
     private var comparisonRequested = false
     @Volatile private var statusText = "detector=load_pending_after_camera_gate"
     private var fixedFixtureRunning = false
+    @Volatile private var compositeLoadDrainPending = false
+    private var failedRetiredLoad: TfliteAndroidFrameDetector? = null
 
     fun metadata() = PrimaryLifecycleMetadata(configLoaded, reportModelKey, loadedModelKey, fallbackUsed,
         loadReason, loadAttempted, loadInFlight, statusText, fixedFixtureRunning)
+
+    /** Keep readiness pending while the existing device check borrows the camera/native budget. */
+    fun releaseForCompositeCheck(current: () -> Boolean, onReleased: (Boolean) -> Unit) {
+        val claim: PrimaryDetectorLoadClaim
+        synchronized(frameStateLock) {
+            if (loadInFlight || detector.projection().closing || !current()) {
+                presentation.onUi { onReleased(false) }
+                return
+            }
+            loadRequestGeneration += 1L
+            loadInFlight = true
+            loadAttempted = true
+            comparisonRequested = false
+            comparisonAttempted = false
+            claim = detector.beginLoad()
+        }
+        try {
+            detector.nativeLane.execute {
+                val released = runCatching {
+                    detector.retireLoadedForReloadOnNativeLane(claim, current) { previous ->
+                        if (previous is TfliteAndroidFrameDetector) platform.close(previous)
+                        else (previous as? Closeable)?.close()
+                    } != null
+                }.onFailure(platform::logPreparationFailure).getOrDefault(false)
+                synchronized(frameStateLock) {
+                    verification.invalidate()
+                    frame().clearDetectionSnapshot()
+                }
+                presentation.onUi { onReleased(released) }
+            }
+        } catch (_: RejectedExecutionException) { presentation.onUi { onReleased(false) } }
+    }
+
+    fun finishCompositeCheck(reload: Boolean) {
+        synchronized(frameStateLock) {
+            loadInFlight = false
+            loadAttempted = false
+            configLoaded = false
+            comparisonAttempted = false
+        }
+        if (reload) loadForCurrentProcess()
+    }
     fun measuredProfileStatus(profile: RuntimeTuningProfile) {
         statusText = "detector=measured_profile runtime=${profile.candidate.backend} threads=${profile.candidate.numThreads}"
     }
@@ -62,6 +106,34 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
         comparisonAttempted = false
     }
 
+    /** Both lanes are serial: the tuning barrier follows creation, then native follows adoption/close. */
+    fun cancelPendingLoadAfterDrain(onDrained: (Boolean) -> Unit) {
+        compositeLoadDrainPending = true
+        cancelPendingLoad()
+        try {
+            detector.tuningLane.execute {
+                try {
+                    detector.nativeLane.execute {
+                        val released = !detector.projection().closing && failedRetiredLoad == null
+                        presentation.onUi {
+                            if (released) compositeLoadDrainPending = false
+                            onDrained(released)
+                        }
+                    }
+                } catch (_: RejectedExecutionException) { presentation.onUi { onDrained(false) } }
+            }
+        } catch (_: RejectedExecutionException) { presentation.onUi { onDrained(false) } }
+    }
+
+    private fun closeRetiredLoad(instance: TfliteAndroidFrameDetector) {
+        try { platform.close(instance) }
+        catch (error: Throwable) {
+            failedRetiredLoad = instance
+            detector.fenceForClose()
+            throw error
+        }
+    }
+
     private fun loadIsCurrent(request: Long, detectorGeneration: Long) = request == loadRequestGeneration &&
         !currentness.destroyed() && !detector.projection().closing && detector.projection().loadGeneration == detectorGeneration
 
@@ -80,7 +152,7 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
                 if (allowComparison) comparisonRequested = true
                 return
             }
-            if (loadInFlight || detector.projection().closing || currentness.destroyed()) return
+            if (loadInFlight || compositeLoadDrainPending || detector.projection().closing || currentness.destroyed()) return
             reload = detector.projection().detector !is NoopAndroidFrameDetector
             if (reload && !reloadIsAllowed()) return
             metricDistanceWasEnabled = preparation.metricDistanceEnabled()
@@ -128,7 +200,7 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
                         }
                     }
                     if (!adopted) {
-                        load.detector?.let(platform::close)
+                        load.detector?.let(::closeRetiredLoad)
                         return@nativeAdoption
                     }
                     presentation.onUi {
@@ -145,10 +217,11 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
                         statusText = "detector=${load.reason} model=${load.modelKey ?: "-"}"
                         load.detector?.let { instance ->
                             val runtime = platform.firstSuccessfulDelegate(instance)
-                            calibration.retainActiveCandidate(RuntimeCandidate(
+                            calibration.retainActiveCandidate(platform.observedCandidate(instance) ?: RuntimeCandidate(
                                 if (runtime == "gpu") RuntimeBackend.GPU else RuntimeBackend.CPU,
                                 (configuration.current()?.unifiedWalksafe?.runtime?.numThreads ?: 1)
                                     .coerceIn(1, platform.availableProcessors().coerceAtLeast(1))))
+                            platform.measuredPrimaryIntervalMs(instance)?.let(detector::configurePacingMinimum)
                             scheduleVerification(instance, load.modelKey, load.fallbackUsed)
                         }
                         if (preparation.featureGatePassed() && !detector.projection().available) preparation.modelUnavailable(metricDistanceWasEnabled)
@@ -158,7 +231,7 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
                         preparation.loaded()
                     }
                 }
-            } catch (_: RejectedExecutionException) { load.detector?.let(platform::close) }
+            } catch (_: RejectedExecutionException) { load.detector?.let(::closeRetiredLoad) }
         }
         if (!reload) {
             detector.tuningLane.execute(loadTask)

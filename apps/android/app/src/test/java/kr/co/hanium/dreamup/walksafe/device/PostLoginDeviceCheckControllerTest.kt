@@ -27,7 +27,7 @@ class PostLoginDeviceCheckControllerTest {
         val f = Fixture().running()
         val binding = f.controller.snapshot.bindingOrNull!!
         assertEquals(PostLoginDeviceCheckState.RUNNING, f.controller.snapshot.state)
-        assertEquals(180_000L, f.scheduler.tasks.single().delay)
+        assertEquals(300_000L, f.scheduler.tasks.single().delay)
         f.ready()
         f.controller.maybeContinue(binding)
         assertEquals(PostLoginDeviceCheckState.FULL, f.controller.snapshot.state)
@@ -36,6 +36,56 @@ class PostLoginDeviceCheckControllerTest {
         f.controller.maybeContinue(binding)
         assertEquals(1, f.store.saves)
         assertTrue(f.scheduler.tasks.single().cancelled)
+        assertNull(f.controller.runtimeDeadlineMs)
+    }
+
+    @Test fun repeatedRuntimeStartUsesTheOriginalAttemptDeadlineAndDoesNotRestartProbes() {
+        val f = Fixture().running()
+        val binding = f.controller.snapshot.bindingOrNull!!
+        assertEquals(400_000L, f.controller.runtimeDeadlineMs)
+        val callsBefore = f.calls.toList()
+        f.nowMs += 30_000L
+        f.controller.startRuntime(binding)
+        assertEquals(400_000L, f.controller.runtimeDeadlineMs)
+        assertEquals(1, f.scheduler.tasks.size)
+        assertEquals(callsBefore, f.calls)
+
+        f.controller.enteredBackground()
+        assertNull(f.controller.runtimeDeadlineMs)
+        f.nowMs += 10_000L
+        f.controller.beginFromPrimaryAction()
+        assertEquals(440_000L, f.controller.runtimeDeadlineMs)
+        assertEquals(2, f.scheduler.tasks.size)
+        assertTrue(f.scheduler.tasks.first().cancelled)
+    }
+
+    @Test fun cameraPipelinePendingBlocksPassingAndSavingUntilCompositeCompletion() {
+        val f = Fixture().running()
+        f.ready()
+        f.probes.value = f.probes.value.copy(cameraPipeline = PostLoginDeviceCheckSignal.PENDING)
+        val binding = f.controller.snapshot.bindingOrNull!!
+        f.controller.maybeContinue(binding)
+        assertEquals(PostLoginDeviceCheckState.RUNNING, f.controller.snapshot.state)
+        assertEquals(0, f.store.saves)
+        assertEquals(0, f.effects.passes)
+
+        f.probes.value = f.probes.value.copy(cameraPipeline = PostLoginDeviceCheckSignal.READY)
+        f.controller.maybeContinue(binding)
+        assertEquals(PostLoginDeviceCheckState.FULL, f.controller.snapshot.state)
+        assertEquals(1, f.store.saves)
+        assertEquals(1, f.effects.passes)
+    }
+
+    @Test fun failedCameraExecutionCannotBecomeFullWhenOtherSignalsAreReady() {
+        val f = Fixture().running()
+        f.ready()
+        f.probes.value = f.probes.value.copy(cameraPipeline = PostLoginDeviceCheckSignal.UNAVAILABLE)
+        f.controller.maybeContinue(f.controller.snapshot.bindingOrNull!!)
+        assertEquals(PostLoginDeviceCheckState.FAIL, f.controller.snapshot.state)
+        assertEquals(PostLoginDeviceCheckFailure.CAMERA_PIPELINE_UNAVAILABLE, f.controller.snapshot.failure)
+        assertEquals(0, f.store.saves)
+        assertEquals(0, f.effects.passes)
+        assertFalse(f.controller.passesFeatureGate())
     }
 
     @Test fun aLateResultFromThePreviousActorCannotPassOrSave() {
@@ -259,6 +309,7 @@ class PostLoginDeviceCheckControllerTest {
     }
 
     private class Fixture {
+        var nowMs = 100_000L
         val calls = mutableListOf<String>()
         val reader = Reader()
         val store = Store()
@@ -266,7 +317,8 @@ class PostLoginDeviceCheckControllerTest {
         val permissions = Permissions()
         val scheduler = Scheduler()
         val effects = Effects(calls)
-        val controller = PostLoginDeviceCheckController(reader, store, probes, permissions, effects, scheduler, PostLoginDeviceCheckController.Config())
+        val controller = PostLoginDeviceCheckController(reader, store, probes, permissions, effects, scheduler,
+            PostLoginDeviceCheckController.Config(), elapsedRealtimeMs = { nowMs })
         init { effects.snapshot = { controller.snapshot } }
         fun running() = apply { controller.bindSession("actor", 1L); controller.beginFromPrimaryAction() }
         fun ready() { probes.value = PostLoginDeviceCheckProbeSignals(PostLoginDeviceCheckSignal.READY, PostLoginDeviceCheckSignal.READY, PostLoginDeviceCheckSignal.READY, PostLoginMetricDepthState.SUPPORTED) }

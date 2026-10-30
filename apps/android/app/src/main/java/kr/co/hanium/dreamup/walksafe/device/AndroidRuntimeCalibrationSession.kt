@@ -3,6 +3,7 @@ package kr.co.hanium.dreamup.walksafe.device
 import android.app.Activity
 import android.app.Dialog
 import android.graphics.Color
+import android.graphics.RectF
 import android.media.Image
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
@@ -14,6 +15,7 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Size
 import android.view.KeyEvent
+import android.view.Gravity
 import android.view.Surface
 import android.view.View
 import android.view.ViewGroup
@@ -46,8 +48,12 @@ import com.google.ar.core.Config
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import kr.co.hanium.dreamup.walksafe.CameraBackgroundRenderer
+import kr.co.hanium.dreamup.walksafe.CameraObjectPresentation
+import kr.co.hanium.dreamup.walksafe.CameraScenePresentation
+import kr.co.hanium.dreamup.walksafe.DebugBboxOverlayView
 import kr.co.hanium.dreamup.walksafe.depth.ArCoreFrameProvider
 import kr.co.hanium.dreamup.walksafe.depth.DepthFrameSnapshot
+import kr.co.hanium.dreamup.walksafe.depth.TrackedObjectDepth
 import kr.co.hanium.dreamup.walksafe.inference.AdaptiveInferencePacingPolicy
 import kr.co.hanium.dreamup.walksafe.inference.AndroidDetectionResult
 import kr.co.hanium.dreamup.walksafe.inference.RuntimeComparisonEnvironment
@@ -58,6 +64,7 @@ import kr.co.hanium.dreamup.walksafe.inference.tracking.InterFrameDetectionTrack
 import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualFrameKey
 import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualTrackingConfig
 import java.util.concurrent.Executors
+import java.util.Locale
 import java.util.concurrent.ScheduledThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -85,7 +92,15 @@ class AndroidRuntimeCalibrationSession(
     private val cadenceMs: Long = AdaptiveInferencePacingPolicy.INITIAL_INTERVAL_MS,
     private val budgetMs: Long = AndroidRuntimeCalibrationRunner.MAXIMUM_BUDGET_MS,
     private val startRunnerBeforeCameraReady: Boolean = false,
+    private val fullCameraPreview: Boolean = false,
+    private val onReleaseBlocked: (String) -> Unit = {},
 ) {
+    data class CameraMode(val width: Int, val height: Int, val fps: Int)
+    @Volatile private var observedCameraMode: CameraMode? = null
+    private val releaseBlockedReported = AtomicBoolean(false)
+
+    /** Actual configured ARCore CPU image mode; never inferred from display/preview dimensions. */
+    fun cameraModeSnapshot(): CameraMode? = observedCameraMode
     init {
         require(bindingHash.isNotBlank() && cadenceMs > 0L)
         require(budgetMs in 1L..AndroidRuntimeCalibrationRunner.MAXIMUM_BUDGET_MS)
@@ -131,6 +146,15 @@ class AndroidRuntimeCalibrationSession(
     private lateinit var progressBar: ProgressBar
     private lateinit var cancelButton: Button
     private lateinit var previewContainer: FrameLayout
+    private val jointPresentation = CameraObjectPresentation()
+    private var jointPrimaryBoxes: DebugBboxOverlayView? = null
+    private var jointUnknownBoxes: DebugBboxOverlayView? = null
+    private var jointPrimaryText: TextView? = null
+    private var jointUnknownText: TextView? = null
+    private var jointPrimaryCapture: CameraObjectPresentation.Capture? = null
+    private var jointUnknownFrame: JointUnknownFrame? = null
+    private data class JointUnknownFrame(val snapshot: CameraScenePresentation.UnknownSnapshot,
+        val rawCount: Int, val candidateCount: Int, val inferenceMs: Double)
     private var glView: GLSurfaceView? = null
     private var arSession: Session? = null
     private var arProvider: ArCoreFrameProvider? = null
@@ -224,6 +248,16 @@ class AndroidRuntimeCalibrationSession(
             setPadding(0, dp(12), 0, dp(8))
         }
         content.addView(progressText)
+        if (fullCameraPreview) {
+            jointPrimaryText = TextView(activity).apply {
+                textSize = 16f; setTextColor(Color.BLACK); maxLines = 3
+                text = "학습 객체 인식 준비 중"
+            }.also { content.addView(it) }
+            jointUnknownText = TextView(activity).apply {
+                textSize = 16f; setTextColor(Color.BLACK); maxLines = 3
+                text = "이름 없는 물체 인식 준비 중"
+            }.also { content.addView(it) }
+        }
         progressBar = ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal).apply {
             max = ((budgetMs + 999L) / 1_000L).toInt()
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -237,11 +271,17 @@ class AndroidRuntimeCalibrationSession(
             setOnClickListener { cancel("user_cancelled") }
         }
         content.addView(cancelButton)
+        val dialogContent: View = if (fullCameraPreview) FrameLayout(activity).apply {
+            content.removeView(previewContainer)
+            addView(previewContainer, FrameLayout.LayoutParams(-1, -1))
+            content.setBackgroundColor(Color.argb(235, 255, 255, 255))
+            addView(content, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
+        } else content
         dialog = Dialog(activity).apply {
             requestWindowFeature(Window.FEATURE_NO_TITLE)
             setCancelable(false)
             setCanceledOnTouchOutside(false)
-            setContentView(content)
+            setContentView(dialogContent)
             setOnKeyListener { _, key, event ->
                 if (key == KeyEvent.KEYCODE_BACK) {
                     if (event.action == KeyEvent.ACTION_UP) cancel("user_cancelled")
@@ -306,6 +346,14 @@ class AndroidRuntimeCalibrationSession(
             })
         }
         previewContainer.addView(glView, FrameLayout.LayoutParams(-1, -1))
+        if (fullCameraPreview) {
+            jointPrimaryBoxes = DebugBboxOverlayView(activity).also {
+                previewContainer.addView(it, FrameLayout.LayoutParams(-1, -1))
+            }
+            jointUnknownBoxes = DebugBboxOverlayView(activity).also {
+                previewContainer.addView(it, FrameLayout.LayoutParams(-1, -1))
+            }
+        }
         arSetupPending = true
         cameraWorker.execute {
             var prepared = false
@@ -322,6 +370,9 @@ class AndroidRuntimeCalibrationSession(
                             updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                             if (featureScope == RuntimeFeatureScope.ARCORE_CAMERA_TRACKING) depthMode = Config.DepthMode.DISABLED
                         })
+                        val actual = session.cameraConfig
+                        observedCameraMode = CameraMode(actual.imageSize.width, actual.imageSize.height,
+                            actual.fpsRange.lower)
                     }
                 }
             } catch (_: Exception) {
@@ -386,9 +437,16 @@ class AndroidRuntimeCalibrationSession(
                         frame.timestamp, points.take(4), points[4],
                     )?.imagePixelsToDepthUvMatrix(image.width, image.height)
                 }.getOrNull()
+                val viewBasis = runCatching {
+                    val basis = floatArrayOf(0f, 0f, 1f, 0f, 0f, 1f, 1f, 1f, .5f, .5f)
+                    FloatArray(10).also { output ->
+                        frame.transformCoordinates2d(com.google.ar.core.Coordinates2d.IMAGE_NORMALIZED, basis,
+                            com.google.ar.core.Coordinates2d.VIEW, output)
+                    }.takeIf { it.all(Float::isFinite) }
+                }.getOrNull()
                 handedToRunner = true // offerImage owns every success, rejection and exception from here.
                 offerImage(image, frame.timestamp, capturedAt, snapshot, poseValid, image::close,
-                    imageToDepth, frame.timestamp)
+                    imageToDepth, frame.timestamp, viewBasis)
             } finally {
                 if (!handedToRunner) image.close()
             }
@@ -458,6 +516,7 @@ class AndroidRuntimeCalibrationSession(
         releaseImage: () -> Unit,
         imageToDepthUv: DoubleArray? = null,
         mapperFrameId: Long? = null,
+        viewBasis: FloatArray? = null,
     ) {
         var transferred = false
         try {
@@ -520,6 +579,7 @@ class AndroidRuntimeCalibrationSession(
                 depthSnapshot = alignedDepth,
                 imageToDepthUv = imageToDepthUv?.copyOf(),
                 mapperFrameId = mapperFrameId,
+                viewBasis = viewBasis?.copyOf(),
             )
             // A phase/geometry reset deliberately has no predecessor. Do not submit that missing
             // interval as a zero or let it invalidate an otherwise measurable live window.
@@ -591,6 +651,76 @@ class AndroidRuntimeCalibrationSession(
         }
     }
 
+    internal fun resetJointPresentation() {
+        check(Looper.myLooper() == Looper.getMainLooper())
+        jointPresentation.clear()
+        jointPrimaryCapture = null
+        jointUnknownFrame = null
+        jointPrimaryBoxes?.clear()
+        jointUnknownBoxes?.clear()
+    }
+
+    /** Returns after actual View/text publication; this is not a Canvas draw-completion signal. */
+    internal fun publishJointPrimary(capture: CameraObjectPresentation.Capture,
+        result: AndroidDetectionResult, evidence: RuntimeCalibrationLiveEvidence,
+        outputs: List<TrackedObjectDepth>): Boolean {
+        check(Looper.myLooper() == Looper.getMainLooper())
+        val overlay = jointPrimaryBoxes ?: return false
+        val basis = evidence.viewBasis?.takeIf { it.size == 10 && it.all(Float::isFinite) } ?: return false
+        if (closing.get() || closed || capture.frameId != evidence.sourceFrameTimestampNs) return false
+        fun matched(index: Int) = result.detections[index].let { detection ->
+            outputs.firstOrNull { it.className == detection.className && it.bboxNorm == detection.bboxNorm }
+        }
+        val regions = result.detections.mapIndexed { index, detection ->
+            val output = matched(index)
+            CameraObjectPresentation.Region(detection.bboxNorm, output?.trackId,
+                output?.takeIf { it.source.metric && it.confidence.hardGate > 0f && it.confidence.freshnessQuality > 0f }
+                    ?.riskDistanceM?.takeIf { it.isFinite() && it > 0f }?.toDouble(), detection.detectionConfidence)
+        }
+        if (!jointPresentation.recordPrimary(capture, regions)) return false
+        jointPrimaryCapture = capture
+        fun point(x: Float, y: Float) = Pair(basis[0] + x * (basis[2] - basis[0]) + y * (basis[4] - basis[0]),
+            basis[1] + x * (basis[3] - basis[1]) + y * (basis[5] - basis[1]))
+        val boxes = result.detections.mapIndexed { index, item ->
+            val rect = item.bboxNorm
+            val corners = listOf(point(rect.x, rect.y), point(rect.x + rect.width, rect.y),
+                point(rect.x, rect.y + rect.height), point(rect.x + rect.width, rect.y + rect.height))
+            val label = "분류 ${item.className} " + String.format(Locale.US, "%.0f%%", item.detectionConfidence * 100) +
+                (matched(index)?.riskDistanceM?.let { String.format(Locale.US, " · 위험 거리 %.2fm", it) } ?: " · 거리 미확인")
+            DebugBboxOverlayView.DebugOverlayBox(RectF(corners.minOf { it.first }, corners.minOf { it.second },
+                corners.maxOf { it.first }, corners.maxOf { it.second }), label, false, item.className)
+        }
+        overlay.updateMapped(boxes, capture.frameId, capture.capturedAtMs, sourceComplete = true, animate = false)
+        jointPrimaryText?.text = "학습 객체 ${result.detections.size}개 · 추론 ${result.timing.modelInferenceMs}ms\n" +
+            boxes.take(2).joinToString("\n") { it.label }
+        jointUnknownFrame?.let { frame ->
+            if (frame.snapshot.capture.geometryId == capture.geometryId) renderJointUnknown(frame)
+            else { jointUnknownFrame = null; jointUnknownBoxes?.clear() }
+        }
+        return true
+    }
+
+    internal fun publishJointUnknown(snapshot: CameraScenePresentation.UnknownSnapshot, rawCount: Int,
+        candidateCount: Int, inferenceMs: Double): Boolean {
+        check(Looper.myLooper() == Looper.getMainLooper())
+        if (closing.get() || closed) return false
+        if (jointPrimaryCapture?.let { it.geometryId != snapshot.capture.geometryId &&
+                it.frameId >= snapshot.capture.frameId } == true ||
+            jointUnknownFrame?.snapshot?.capture?.frameId?.let { it >= snapshot.capture.frameId } == true) return false
+        val frame = JointUnknownFrame(snapshot, rawCount, candidateCount, inferenceMs)
+        jointUnknownFrame = frame
+        return renderJointUnknown(frame)
+    }
+
+    private fun renderJointUnknown(frame: JointUnknownFrame): Boolean {
+        val overlay = jointUnknownBoxes ?: return false
+        val rendered = CameraScenePresentation.renderUnknown(jointPresentation, frame.snapshot, nowMs(), overlay)
+        jointUnknownText?.text = "FastSAM ${frame.rawCount}개 → 보행 후보 ${frame.candidateCount}개 · " +
+            "학습 객체와 통합 ${rendered.merged.size}개 · 추가 표시 ${rendered.visibleIndices.size}개\n" +
+            "추론 ${frame.inferenceMs.toLong()}ms"
+        return rendered.updated
+    }
+
     private fun receiveFinished(completed: RuntimeCalibrationResult) = onMain {
         result = completed
         runnerDrained = true
@@ -644,6 +774,7 @@ class AndroidRuntimeCalibrationSession(
                     arSession?.close()
                     arSession = null
                     arProvider = null
+                    observedCameraMode = null
                     resetTracking()
                     onMain { finishClosed() }
                 } catch (_: Exception) { onMain { showCleanupBlocked() } }
@@ -693,6 +824,7 @@ class AndroidRuntimeCalibrationSession(
         main.removeCallbacks(tick)
         deadlineWorker.shutdown()
         cameraWorker.shutdown()
+        if (releaseBlockedReported.compareAndSet(false, true)) onReleaseBlocked("camera_release_unconfirmed")
         // No onClosed: a failed native close must not unlock another camera owner.
     }
 

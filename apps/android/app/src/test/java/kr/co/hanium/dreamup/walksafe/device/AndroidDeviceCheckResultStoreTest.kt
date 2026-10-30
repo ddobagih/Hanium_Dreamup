@@ -9,6 +9,41 @@ import org.junit.Test
 
 class AndroidDeviceCheckResultStoreTest {
     @Test
+    fun runtimeChoiceGuardRejectsRestoreWithoutDeletingAccountOrMeasuredResult() {
+        val preferences = FakeSharedPreferences(mapOf("account_education_marker" to "preserved"))
+        val store = AndroidDeviceCheckResultStore(preferences)
+        assertTrue(store.save(snapshot(PostLoginDeviceCheckState.FULL), binding()))
+        val savedValues = preferences.all.toMap()
+        var inspected: PersistedPostLoginDeviceCheckResult? = null
+        val guarded = AndroidPostLoginDeviceCheckSavedResults({ store }, {
+            inspected = it
+            false
+        })
+
+        assertNull(guarded.restore(binding()))
+        assertEquals(PostLoginDeviceCheckState.FULL, inspected?.state)
+        assertTrue(store.restore(binding()) != null)
+        assertEquals(savedValues, preferences.all)
+        assertEquals(1, preferences.commitCount)
+        assertEquals("preserved", preferences.getString("account_education_marker", null))
+        assertTrue(AndroidPostLoginDeviceCheckSavedResults { store }.restore(binding()) != null)
+        assertTrue(AndroidPostLoginDeviceCheckSavedResults({ store }, { true }).restore(binding()) != null)
+    }
+
+    @Test
+    fun basicModelOnlyProbePolicyCannotRestoreAsTheCompositePolicy() {
+        val preferences = FakeSharedPreferences()
+        val store = AndroidDeviceCheckResultStore(preferences)
+        assertTrue(store.save(snapshot(PostLoginDeviceCheckState.FULL),
+            binding(probePolicyVersion = "20260912-device-function-v1")))
+        val savedValues = preferences.all.toMap()
+
+        assertNull(store.restore(binding()))
+        assertEquals(savedValues, preferences.all)
+        assertEquals(1, preferences.commitCount)
+    }
+
+    @Test
     fun currentPolicyCandidateRequiresEveryStoredResultField() {
         assertFalse(
             AndroidDeviceCheckResultStore(FakeSharedPreferences())

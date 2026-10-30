@@ -87,6 +87,108 @@ class AndroidPostLoginDeviceProbesTest {
         assertEquals(PostLoginDeviceCheckSignal.READY, f.probes.signals.locationFix)
     }
 
+    @Test fun compositeCameraKeepsPendingUntilAppliedAndReleasedWithoutStartingLegacyCameraOrTimeout() {
+        val f = Fixture()
+        f.support.compositeHandled = true
+        f.probes.startCamera(f.binding)
+        assertTrue(f.camera.requests.isEmpty())
+        assertTrue(f.probes.cameraActive)
+        assertTrue(f.probes.hasCamera)
+        assertEquals(PostLoginDeviceCheckSignal.PENDING, f.probes.signals.cameraPipeline)
+        f.ui.fire(15_000L)
+        f.ui.drain()
+        assertEquals(PostLoginDeviceCheckSignal.PENDING, f.probes.signals.cameraPipeline)
+        assertTrue(f.continued.isEmpty())
+
+        f.support.compositeRequests.single().finished(PostLoginCompositeCameraCheckResult(
+            true, PostLoginMetricDepthState.SUPPORTED))
+        assertEquals(PostLoginDeviceCheckSignal.PENDING, f.probes.signals.cameraPipeline)
+        f.ui.drain()
+        assertEquals(PostLoginDeviceCheckSignal.READY, f.probes.signals.cameraPipeline)
+        assertEquals(PostLoginMetricDepthState.SUPPORTED, f.probes.signals.metricDepth)
+        assertFalse(f.probes.cameraActive)
+        assertFalse(f.probes.cameraCleanupPending)
+        assertFalse(f.probes.hasCamera)
+        assertEquals(listOf(f.binding), f.continued)
+    }
+
+    @Test fun cancelledCompositeRunWaitsForReleaseAndCannotPublishOldEvidenceOrReleaseANewerRun() {
+        val f = Fixture()
+        f.support.compositeHandled = true
+        f.probes.startCamera(f.binding)
+        val old = f.support.compositeRequests.single()
+        f.probes.cancelCalibration("new_attempt")
+        f.probes.stopCamera()
+        f.binding = f.binding.copy(attemptGeneration = 2)
+        f.probes.resetForAttempt(f.binding)
+        f.probes.startCamera(f.binding)
+        assertEquals(listOf("new_attempt"), f.support.compositeCancellations)
+        assertTrue(f.probes.cameraCleanupPending)
+        assertTrue(f.probes.hasCamera)
+        assertEquals(1, f.support.compositeRequests.size)
+
+        old.finished(PostLoginCompositeCameraCheckResult(true, PostLoginMetricDepthState.SUPPORTED))
+        f.ui.drain()
+        assertEquals(PostLoginDeviceCheckSignal.PENDING, f.probes.signals.cameraPipeline)
+        assertEquals(PostLoginMetricDepthState.PENDING, f.probes.signals.metricDepth)
+        assertFalse(f.probes.cameraCleanupPending)
+        assertFalse(f.probes.hasCamera)
+        assertEquals(listOf(f.binding), f.continued)
+
+        f.probes.startCamera(f.binding)
+        assertEquals(2, f.support.compositeRequests.size)
+        old.finished(PostLoginCompositeCameraCheckResult(false))
+        f.ui.drain()
+        assertTrue(f.probes.cameraActive)
+        assertTrue(f.probes.hasCamera)
+        assertEquals(PostLoginDeviceCheckSignal.PENDING, f.probes.signals.cameraPipeline)
+        assertEquals(listOf(f.binding), f.continued)
+    }
+
+    @Test fun aQueuedCompositeCompletionIsRetiredBeforeItCanPublishReady() {
+        val f = Fixture()
+        f.support.compositeHandled = true
+        f.probes.startCamera(f.binding)
+        f.support.compositeRequests.single().finished(PostLoginCompositeCameraCheckResult(
+            true, PostLoginMetricDepthState.SUPPORTED))
+        f.probes.stopCamera()
+        assertTrue(f.probes.cameraCleanupPending)
+        f.ui.drain()
+        assertEquals(PostLoginDeviceCheckSignal.PENDING, f.probes.signals.cameraPipeline)
+        assertEquals(PostLoginMetricDepthState.PENDING, f.probes.signals.metricDepth)
+        assertFalse(f.probes.cameraCleanupPending)
+        assertFalse(f.probes.hasCamera)
+    }
+
+    @Test fun compositeFailurePublishesOnceAndDoesNotForgeMetricSupport() {
+        val f = Fixture()
+        f.support.compositeHandled = true
+        f.probes.startCamera(f.binding)
+        val run = f.support.compositeRequests.single()
+        run.finished(PostLoginCompositeCameraCheckResult(false, reason = "no_joint_candidate"))
+        run.finished(PostLoginCompositeCameraCheckResult(true, PostLoginMetricDepthState.SUPPORTED))
+        f.ui.drain()
+        assertEquals(PostLoginDeviceCheckSignal.UNAVAILABLE, f.probes.signals.cameraPipeline)
+        assertEquals(PostLoginCameraPipelineFailure.COMPOSITE_RUNTIME_UNAVAILABLE, f.probes.cameraFailure)
+        assertEquals(PostLoginMetricDepthState.PENDING, f.probes.signals.metricDepth)
+        assertFalse(f.probes.hasCamera)
+        assertEquals(listOf(f.binding), f.continued)
+    }
+
+    @Test fun synchronouslyFinishedCompositeRunStillUsesTheCompositeReleaseContract() {
+        val f = Fixture()
+        f.support.compositeHandled = true
+        f.support.compositeSynchronousResult = PostLoginCompositeCameraCheckResult(true,
+            PostLoginMetricDepthState.EXPLICITLY_UNSUPPORTED)
+        f.probes.startCamera(f.binding)
+        assertTrue(f.camera.requests.isEmpty())
+        assertEquals(PostLoginDeviceCheckSignal.PENDING, f.probes.signals.cameraPipeline)
+        f.ui.drain()
+        assertEquals(PostLoginDeviceCheckSignal.READY, f.probes.signals.cameraPipeline)
+        assertEquals(PostLoginMetricDepthState.EXPLICITLY_UNSUPPORTED, f.probes.signals.metricDepth)
+        assertEquals(listOf(f.binding), f.continued)
+    }
+
     @Test fun eightCompletedEmptyInferencesCloseImagesBeforeDetectAndWaitForRelease() {
         val f = Fixture()
         val resources = f.bindCamera()
@@ -339,12 +441,26 @@ class AndroidPostLoginDeviceProbesTest {
         override fun close() { ++closed }
     }
     private class FakeSupport : PostLoginProbeRuntimeSupport {
+        data class CompositeRequest(val binding: PostLoginDeviceCheckBinding,
+            val finished: (PostLoginCompositeCameraCheckResult) -> Unit)
         var calls = 0
+        var compositeHandled = false
+        var compositeSynchronousResult: PostLoginCompositeCameraCheckResult? = null
+        val compositeRequests = mutableListOf<CompositeRequest>()
+        val compositeCancellations = mutableListOf<String>()
         override val capabilityProbeStarted = false
         override fun restartCapabilityAndResources(binding: PostLoginDeviceCheckBinding, onChanged: () -> Unit) { ++calls }
         override fun prepareVoiceModelAndDetector() { ++calls }
         override fun startAutomaticProbes(binding: PostLoginDeviceCheckBinding) { ++calls }
         override fun startMetricPreflight(binding: PostLoginDeviceCheckBinding) { ++calls }
+        override fun startCompositeCameraCheck(binding: PostLoginDeviceCheckBinding,
+            onFinished: (PostLoginCompositeCameraCheckResult) -> Unit): Boolean {
+            if (!compositeHandled) return false
+            compositeRequests += CompositeRequest(binding, onFinished)
+            compositeSynchronousResult?.let(onFinished)
+            return true
+        }
+        override fun cancelCompositeCameraCheck(reason: String) { compositeCancellations += reason }
         override fun cancelCalibration(reason: String) { ++calls }
         override fun cancelMetricPreflight(reason: String) { ++calls }
         override fun closeCapabilityAndResetResources() { ++calls }

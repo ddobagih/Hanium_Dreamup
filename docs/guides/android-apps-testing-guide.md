@@ -57,14 +57,15 @@ adb install -r "$VISUAL_TEST_WORKSPACE/apps/android/app/build/outputs/apk/visual
 
 별도 로컬 기능 시험에서 `developmentQuickStart=true`를 사용하는 경우에도 계정 정보는 APK에 넣지 않습니다. 앱의 기존 로그인 화면에서 직접 로그인한 뒤 개발 기능 테스트를 시작합니다. 이전 `developmentQuickStartEmail`과 `WALKSAFE_DEVELOPMENT_TEST_PASSWORD` 빌드 입력은 더 이상 사용하지 않습니다. 이 옵션은 실외 보행 검증용이 아니며, 시험 계정 권한·수명 관리는 별도로 적용해야 합니다.
 
-## 카메라 전체 성능 점검
+## 기존 기기점검의 카메라 성능 확인
 
-- debug 앱에서 기기 기능 점검을 완료하고 거리 측정 지원 여부를 확인한 뒤, **설정 → 카메라 전체 성능 점검**을 누릅니다. 렌즈를 가리지 않고 밝은 곳의 물체·무늬를 비추며 점검합니다. 홈 진입이나 카메라 열기만으로 전체 비교를 자동 실행하지 않습니다.
-- 기본 모델의 실제 카메라 비교 뒤 FastSAM을 함께 실행하며 CPU/GPU·스레드 후보와 기본 인식의 성능 저하 여부를 확인합니다. 같은 전체 제한 시간 안에 유효한 비교를 끝내지 못하면 미확정으로 남습니다. 내장 이미지 비교나 기능 점검 통과만으로 전체 성능 확인을 표시하지 않습니다.
-- 홈 카메라는 모델·실제 기본 실행 설정·기기·카메라 처리 범위가 일치하는 저장 결과를 복원합니다. CameraX, 거리 없는 ARCore, ARCore와 거리 측정은 서로 다른 범위입니다. 저장 결과가 없으면 임시 설정임을 표시하고 기본·추가 모델의 실행 간격을 실제 지연과 발열에 따라 조절합니다.
-- 점검이 끝나면 시험용 추가 모델의 실제 종료를 확인합니다. 카메라 열기·닫기·다시 열기에서도 자원 해제와 두 모델의 실제 영상 실행을 확인해야 합니다. 앱 데이터 삭제·로그인 상태·교육·동의 상태의 임의 변경은 필요하지 않습니다.
-- `CameraHomeReopenDiagnosticDeviceTest`는 `allowCameraHomeReopenDiagnostic=true`로 실행합니다. `cameraDiagnosticEntry=restoredHome`은 실제 복원된 홈 버튼 경로이며, `directCamera`는 카메라 구성요소만 시험합니다. 두 결과를 구분합니다.
-- `CameraCompositionCalibrationDeviceTest`는 `allowCameraCompositionCalibration=true`로 실제 기본 모델·FastSAM·ARCore·Raw Depth의 조합과 종료를 시험합니다. 로그인·홈 상태를 만들어내지 않으며, 조합 실행 관측과 설정 확정 여부를 별도로 출력합니다. 실제 보행·거리 정확도·팀원 기기의 성능을 대신 증명하지 않습니다.
+- 기존 **기기점검**에서 카메라를 열어 기본 객체 인식·FastSAM·ARCore 추적·지원되는 Depth 계산을 함께 측정합니다. 별도의 설정 버튼은 없습니다. 밝은 곳에서 물체·무늬를 비추며 점검하고, 정상 로그인·동의·교육 상태는 그대로 유지합니다.
+- CPU1 내장 이미지 결과는 출력 동등성의 참조로만 사용합니다. 실제 CPU/GPU·스레드 조합은 각각 시험하며, 느린 CPU 후보가 GPU 후보의 시험을 막지 않습니다. 하나의 전체 제한 시간에 준비·측정·종료·적용 확인이 포함됩니다.
+- 유효한 영상과 추적, 해당 범위의 거리 자료, 두 모델의 실제 실행 방식·처리 지연·완료 수, 화면·카메라 지연과 발열 조건을 확인한 조합만 사용할 수 있는 설정으로 저장합니다. 이는 모든 기기의 최적값이나 실외 보행 안전성의 증명이 아닙니다.
+- 시험 모델과 카메라가 실제로 닫힌 뒤 저장 설정으로 기본 모델을 다시 불러와 예제 추론을 검증해야 기존 기기점검이 통과할 수 있습니다. 모델·앱 처리 계약·기기·카메라 범위·해상도·FPS·화면 주사율이 맞지 않으면 저장 결과를 사용하지 않습니다. 계정·동의·교육 데이터는 무효화하지 않습니다.
+- 홈 카메라와 실제 보행은 같은 설정 기록에서 기본 모델·추가 모델·각 처리 간격을 함께 복원합니다. 추가 모델이 없거나 실제 실행값이 달라지면 임의의 CPU/GPU 기본값으로 통과 처리하지 않고 재점검이 필요함을 알립니다.
+- `CameraHomeReopenDiagnosticDeviceTest`는 `allowCameraHomeReopenDiagnostic=true`로 실행합니다. `cameraDiagnosticEntry=restoredHome`은 실제 복원된 홈 버튼 경로이며, `directCamera`는 카메라 구성요소 시험입니다. 두 결과를 구분합니다.
+- `CameraCompositionCalibrationDeviceTest`는 `allowCameraCompositionCalibration=true`로 실제 두 모델·ARCore·지원 Depth의 측정과 해제, 실제 유효 설정의 저장·복원을 시험합니다. Main의 기존 모델을 먼저 해제하고 시험하므로 중복 기본 모델을 올리지 않습니다. 로그인·홈 게이트를 만들어내지 않으며 실제 홈 버튼·거리 정확도·팀원 구형 기기의 성능 시험을 대신하지 않습니다.
 
 ## 관리자 앱
 

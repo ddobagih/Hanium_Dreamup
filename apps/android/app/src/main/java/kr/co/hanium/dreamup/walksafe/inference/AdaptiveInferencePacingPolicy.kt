@@ -85,6 +85,7 @@ class AdaptiveInferencePacingPolicy(
     }
 
     private var generation = 0L
+    private var configuredMinimumIntervalMs: Long? = null
     private var activeTicket: InferencePacingTicket? = null
     private var targetIntervalMs = INITIAL_INTERVAL_MS
     private var cooldownMs = MINIMUM_COOLDOWN_MS
@@ -119,7 +120,8 @@ class AdaptiveInferencePacingPolicy(
         return InferencePacingTicket(nowElapsedRealtimeMs, generation).also {
             activeTicket = it
             nextEligibleAtElapsedRealtimeMs = addSaturated(nowElapsedRealtimeMs, targetIntervalMs)
-            earliestEarlyStartAtElapsedRealtimeMs = addSaturated(nowElapsedRealtimeMs, MINIMUM_INTERVAL_MS)
+            earliestEarlyStartAtElapsedRealtimeMs = addSaturated(nowElapsedRealtimeMs,
+                configuredMinimumIntervalMs ?: MINIMUM_INTERVAL_MS)
         }
     }
 
@@ -187,7 +189,8 @@ class AdaptiveInferencePacingPolicy(
         )
         val desiredIntervalMs = max(
             quantizedInterval(measuredWorkMs * workHeadroomMultiplier() / TARGET_BUSY_FRACTION),
-            if (thermalHoldActive) THERMAL_MINIMUM_INTERVAL_MS else MINIMUM_INTERVAL_MS,
+            max(configuredMinimumIntervalMs ?: MINIMUM_INTERVAL_MS,
+                if (thermalHoldActive) THERMAL_MINIMUM_INTERVAL_MS else MINIMUM_INTERVAL_MS),
         )
         val previousIntervalMs = targetIntervalMs
         when {
@@ -219,7 +222,7 @@ class AdaptiveInferencePacingPolicy(
             addSaturated(completedAtElapsedRealtimeMs, cooldownMs),
         )
         earliestEarlyStartAtElapsedRealtimeMs = max(
-            addSaturated(ticket.startedAtElapsedRealtimeMs, MINIMUM_INTERVAL_MS),
+            addSaturated(ticket.startedAtElapsedRealtimeMs, configuredMinimumIntervalMs ?: MINIMUM_INTERVAL_MS),
             addSaturated(completedAtElapsedRealtimeMs, cooldownMs),
         )
         return true
@@ -246,10 +249,19 @@ class AdaptiveInferencePacingPolicy(
      * task still owns its ticket until complete/cancel; resetting cannot admit a concurrent frame.
      * Known thermal throttling outlives a detector/session change until an explicit false sample.
      */
+    /** A jointly tested cadence is a floor: recovery must not create a heavier untested workload. */
+    @Synchronized
+    fun configureMinimumInterval(intervalMs: Long) {
+        require(intervalMs in MINIMUM_INTERVAL_MS..MAXIMUM_INTERVAL_MS)
+        configuredMinimumIntervalMs = intervalMs
+        reset()
+    }
+
     @Synchronized
     fun reset() {
         generation += 1L
-        targetIntervalMs = if (thermalHoldActive) THERMAL_MINIMUM_INTERVAL_MS else INITIAL_INTERVAL_MS
+        targetIntervalMs = max(configuredMinimumIntervalMs ?: INITIAL_INTERVAL_MS,
+            if (thermalHoldActive) THERMAL_MINIMUM_INTERVAL_MS else MINIMUM_INTERVAL_MS)
         cooldownMs = MINIMUM_COOLDOWN_MS
         nextEligibleAtElapsedRealtimeMs = 0L
         earliestEarlyStartAtElapsedRealtimeMs = 0L

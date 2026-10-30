@@ -58,9 +58,12 @@ internal interface PostLoginDeviceCheckSavedResults {
 /** Adapts the existing durable store without changing its validation or persistence format. */
 internal class AndroidPostLoginDeviceCheckSavedResults(
     private val store: () -> AndroidDeviceCheckResultStore?,
+    private val acceptsRuntimeChoice: (PersistedPostLoginDeviceCheckResult) -> Boolean,
 ) : PostLoginDeviceCheckSavedResults {
+    constructor(store: () -> AndroidDeviceCheckResultStore?) : this(store, { true })
     override fun candidatePresent() = store()?.hasCurrentPolicyResultCandidate() == true
-    override fun restore(binding: PostLoginDeviceCheckResultBinding) = store()?.restore(binding)
+    override fun restore(binding: PostLoginDeviceCheckResultBinding) =
+        store()?.restore(binding)?.takeIf(acceptsRuntimeChoice)
     override fun save(
         snapshot: PostLoginDeviceCheckSnapshot,
         binding: PostLoginDeviceCheckResultBinding,

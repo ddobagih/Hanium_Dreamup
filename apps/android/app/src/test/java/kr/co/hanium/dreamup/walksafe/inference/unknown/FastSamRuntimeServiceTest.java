@@ -111,4 +111,90 @@ public final class FastSamRuntimeServiceTest {
         FastSamRuntimeService<Void> dirty=new FastSamRuntimeService<>(12,o,r->fail(),()->{throw uncertain;},System::nanoTime);
         failed(dirty.start(),uncertain);failed(dirty.releasedFuture(),uncertain);failed(dirty.closeAsync(),uncertain);assertFalse(dirty.stats().nativeReleaseConfirmed);
     }
+
+    private static FastSamFrameToken timedToken(long id,FastSamFrameToken.Source source,long captured) {
+        return new FastSamFrameToken(source,12,id,source==FastSamFrameToken.Source.LIVE_CAMERA?id*100:0,
+            source==FastSamFrameToken.Source.LIVE_CAMERA?id*100:0,captured,"geometry",2,1);
+    }
+
+    @Test public void slowUntimedCpuReferenceCanFinishBeforeNextGpuLiveCandidate()throws Exception {
+        AtomicLong clock=new AtomicLong(TimeUnit.SECONDS.toNanos(1));
+        long loadDeadline=TimeUnit.SECONDS.toNanos(120),fixtureDeadline=TimeUnit.SECONDS.toNanos(100);
+        FastSamRuntimeOptions cpu=new FastSamRuntimeOptions(FastSamRuntimeOptions.Backend.CPU,1,false,
+            loadDeadline,800,true,false,true,fixtureDeadline);
+        CountDownLatch referenceSeen=new CountDownLatch(1);AtomicReference<FastSamResult<Void>> reference=new AtomicReference<>();
+        FastSamFrameToken original=timedToken(1,FastSamFrameToken.Source.CALIBRATION_FIXTURE,clock.get());
+        FastSamRuntimeService<Void> baseline=new FastSamRuntimeService<>(12,cpu,r->{reference.set(r);referenceSeen.countDown();},
+            ()->new Engine(cpu){public Output invoke(int[] pixels,int w,int h){
+                Output output=super.invoke(pixels,w,h);clock.addAndGet(TimeUnit.SECONDS.toNanos(6));return output;
+            }},clock::get);
+        baseline.start().get(3,TimeUnit.SECONDS);
+        assertEquals(FastSamRuntimeService.Admission.ACCEPTED,baseline.submitArgb(2,1,new int[2],original,null));
+        await(referenceSeen);assertSame(original,reference.get().token);assertEquals(TimeUnit.SECONDS.toNanos(1),original.capturedElapsedNs);
+        assertNotNull(reference.get().rawOutputs);assertTrue(reference.get().captureToDecodeCompleteMs>5000);
+        baseline.closeAsync().get(3,TimeUnit.SECONDS);assertTrue(baseline.stats().nativeReleaseConfirmed);
+
+        FastSamRuntimeOptions gpu=new FastSamRuntimeOptions(FastSamRuntimeOptions.Backend.GPU,1,false,
+            loadDeadline,800,false,false,true,fixtureDeadline);
+        CountDownLatch liveSeen=new CountDownLatch(1);
+        FastSamRuntimeService<Void> next=new FastSamRuntimeService<>(12,gpu,r->{
+            assertEquals(FastSamRuntimeOptions.Backend.GPU,r.runtime.actualBackend);
+            assertTrue(r.captureToDecodeCompleteMs<=800);assertNull(r.rawOutputs);liveSeen.countDown();
+        },()->new Engine(gpu){
+            public FastSamRuntimeInfo runtime(){return new FastSamRuntimeInfo(gpu,FastSamRuntimeOptions.Backend.GPU,null,owner,0);}
+            public Output invoke(int[] pixels,int w,int h){Output output=super.invoke(pixels,w,h);clock.addAndGet(TimeUnit.MILLISECONDS.toNanos(500));return output;}
+        },clock::get);
+        next.start().get(3,TimeUnit.SECONDS);
+        assertEquals(FastSamRuntimeService.Admission.ACCEPTED,next.submitArgb(2,1,new int[2],
+            timedToken(1,FastSamFrameToken.Source.LIVE_CAMERA,clock.get()),null));
+        await(liveSeen);next.closeAsync().get(3,TimeUnit.SECONDS);assertTrue(next.stats().nativeReleaseConfirmed);
+    }
+
+    @Test public void fixtureDeadlineRejectsExpiredAdmissionAndPendingInference()throws Exception {
+        AtomicLong clock=new AtomicLong(TimeUnit.SECONDS.toNanos(1));long deadline=TimeUnit.SECONDS.toNanos(10);
+        FastSamRuntimeOptions o=new FastSamRuntimeOptions(FastSamRuntimeOptions.Backend.CPU,1,false,
+            TimeUnit.SECONDS.toNanos(30),800,true,false,true,deadline);
+        CountDownLatch firstSeen=new CountDownLatch(1),release=new CountDownLatch(1),discarded=new CountDownLatch(1);
+        AtomicReference<Engine> engine=new AtomicReference<>();AtomicInteger results=new AtomicInteger();
+        FastSamRuntimeService<Void> s=new FastSamRuntimeService<>(12,o,new FastSamRuntimeService.Listener<Void>(){
+            public void onResult(FastSamResult<Void> r)throws Exception{results.incrementAndGet();firstSeen.countDown();await(release);}
+            public void onDiscard(FastSamFrameToken token,String reason){assertEquals(2,token.frameId);assertEquals("stale_before_inference",reason);discarded.countDown();}
+        },()->{Engine e=new Engine(o);engine.set(e);return e;},clock::get);
+        s.start().get(3,TimeUnit.SECONDS);
+        s.submitArgb(2,1,new int[2],timedToken(1,FastSamFrameToken.Source.CALIBRATION_FIXTURE,clock.get()),null);await(firstSeen);
+        assertEquals(FastSamRuntimeService.Admission.ACCEPTED,s.submitArgb(2,1,new int[2],
+            timedToken(2,FastSamFrameToken.Source.CALIBRATION_FIXTURE,clock.get()),null));
+        clock.set(deadline);release.countDown();await(discarded);
+        assertEquals(FastSamRuntimeService.Admission.STALE,s.submitArgb(2,1,new int[2],
+            timedToken(3,FastSamFrameToken.Source.CALIBRATION_FIXTURE,clock.get()),null));
+        assertEquals(1,results.get());assertEquals(1,engine.get().calls.get());s.closeAsync().get(3,TimeUnit.SECONDS);
+    }
+
+    @Test public void fixtureDeadlineStillRejectsCompletionAtWorkDeadline()throws Exception {
+        AtomicLong clock=new AtomicLong(TimeUnit.SECONDS.toNanos(1));long deadline=TimeUnit.SECONDS.toNanos(10);
+        FastSamRuntimeOptions o=new FastSamRuntimeOptions(FastSamRuntimeOptions.Backend.CPU,1,false,
+            TimeUnit.SECONDS.toNanos(30),800,true,false,true,deadline);
+        CountDownLatch discarded=new CountDownLatch(1);AtomicInteger results=new AtomicInteger();
+        FastSamRuntimeService<Void> s=new FastSamRuntimeService<>(12,o,new FastSamRuntimeService.Listener<Void>(){
+            public void onResult(FastSamResult<Void> r){results.incrementAndGet();}
+            public void onDiscard(FastSamFrameToken token,String reason){assertEquals("stale_after_decode",reason);discarded.countDown();}
+        },()->new Engine(o){public Output invoke(int[] pixels,int w,int h){Output output=super.invoke(pixels,w,h);clock.set(deadline);return output;}},clock::get);
+        s.start().get(3,TimeUnit.SECONDS);s.submitArgb(2,1,new int[2],timedToken(1,FastSamFrameToken.Source.CALIBRATION_FIXTURE,clock.get()),null);
+        await(discarded);assertEquals(0,results.get());s.closeAsync().get(3,TimeUnit.SECONDS);assertTrue(s.stats().nativeReleaseConfirmed);
+    }
+
+    @Test public void extendedFixtureDeadlineNeverExtendsLiveEightHundredMillisecondAge()throws Exception {
+        AtomicLong clock=new AtomicLong(TimeUnit.SECONDS.toNanos(1));
+        FastSamRuntimeOptions o=new FastSamRuntimeOptions(FastSamRuntimeOptions.Backend.CPU,1,false,
+            TimeUnit.SECONDS.toNanos(120),800,true,false,true,TimeUnit.SECONDS.toNanos(100));
+        CountDownLatch discarded=new CountDownLatch(1);AtomicInteger results=new AtomicInteger();
+        FastSamRuntimeService<Void> s=new FastSamRuntimeService<>(12,o,new FastSamRuntimeService.Listener<Void>(){
+            public void onResult(FastSamResult<Void> r){results.incrementAndGet();}
+            public void onDiscard(FastSamFrameToken token,String reason){assertEquals("stale_after_decode",reason);discarded.countDown();}
+        },()->new Engine(o){public Output invoke(int[] pixels,int w,int h){
+            Output output=super.invoke(pixels,w,h);clock.addAndGet(TimeUnit.MILLISECONDS.toNanos(801));return output;
+        }},clock::get);
+        s.start().get(3,TimeUnit.SECONDS);s.submitArgb(2,1,new int[2],timedToken(1,FastSamFrameToken.Source.LIVE_CAMERA,clock.get()),null);
+        await(discarded);assertEquals(0,results.get());s.closeAsync().get(3,TimeUnit.SECONDS);assertTrue(s.stats().nativeReleaseConfirmed);
+    }
 }

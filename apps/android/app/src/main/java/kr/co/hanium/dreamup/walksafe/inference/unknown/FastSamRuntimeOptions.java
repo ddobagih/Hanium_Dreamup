@@ -9,7 +9,7 @@ public final class FastSamRuntimeOptions {
     public final int numThreads;
     public final boolean allowCpuFallback, captureRawOutputs;
     public final boolean gpuPrecisionLossAllowed, gpuSerializationCacheEnabled;
-    public final long loadDeadlineElapsedNs, maximumResultAgeMs;
+    public final long loadDeadlineElapsedNs, maximumResultAgeMs, calibrationFixtureDeadlineElapsedNs;
 
     public FastSamRuntimeOptions(Backend requestedBackend,int numThreads,boolean allowCpuFallback,
             long loadDeadlineElapsedNs,long maximumResultAgeMs,boolean captureRawOutputs) {
@@ -22,13 +22,25 @@ public final class FastSamRuntimeOptions {
     public FastSamRuntimeOptions(Backend requestedBackend,int numThreads,boolean allowCpuFallback,
             long loadDeadlineElapsedNs,long maximumResultAgeMs,boolean captureRawOutputs,
             boolean gpuPrecisionLossAllowed,boolean gpuSerializationCacheEnabled) {
+        this(requestedBackend,numThreads,allowCpuFallback,loadDeadlineElapsedNs,maximumResultAgeMs,
+            captureRawOutputs,gpuPrecisionLossAllowed,gpuSerializationCacheEnabled,0L);
+    }
+
+    /** Static numerical references use the caller's absolute work deadline, never a live-age budget.
+     * Zero preserves the existing fixture/live freshness contract. Live tokens always retain their TTL. */
+    public FastSamRuntimeOptions(Backend requestedBackend,int numThreads,boolean allowCpuFallback,
+            long loadDeadlineElapsedNs,long maximumResultAgeMs,boolean captureRawOutputs,
+            boolean gpuPrecisionLossAllowed,boolean gpuSerializationCacheEnabled,
+            long calibrationFixtureDeadlineElapsedNs) {
         this.requestedBackend=Objects.requireNonNull(requestedBackend,"backend");
         if(numThreads<1 || numThreads>Math.max(1,Runtime.getRuntime().availableProcessors()))
             throw new IllegalArgumentException("threads must be within 1..availableProcessors");
-        if(loadDeadlineElapsedNs<=0 || maximumResultAgeMs<1 || maximumResultAgeMs>5000)
+        if(loadDeadlineElapsedNs<=0 || maximumResultAgeMs<1 || maximumResultAgeMs>5000 ||
+                calibrationFixtureDeadlineElapsedNs<0 || calibrationFixtureDeadlineElapsedNs>loadDeadlineElapsedNs)
             throw new IllegalArgumentException("Invalid load deadline or result age");
         this.numThreads=numThreads;this.allowCpuFallback=allowCpuFallback;
         this.loadDeadlineElapsedNs=loadDeadlineElapsedNs;this.maximumResultAgeMs=maximumResultAgeMs;
+        this.calibrationFixtureDeadlineElapsedNs=calibrationFixtureDeadlineElapsedNs;
         this.captureRawOutputs=captureRawOutputs;
         this.gpuPrecisionLossAllowed=gpuPrecisionLossAllowed;
         this.gpuSerializationCacheEnabled=gpuSerializationCacheEnabled;

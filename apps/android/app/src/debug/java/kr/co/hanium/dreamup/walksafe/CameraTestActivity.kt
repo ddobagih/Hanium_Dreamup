@@ -40,14 +40,12 @@ import kr.co.hanium.dreamup.walksafe.depth.ObjectTracker
 import kr.co.hanium.dreamup.walksafe.depth.Point2
 import kr.co.hanium.dreamup.walksafe.inference.AdaptiveInferencePacingPolicy
 import kr.co.hanium.dreamup.walksafe.inference.AndroidRuntimeLoadObservationSource
-import kr.co.hanium.dreamup.walksafe.inference.AndroidDetectorLoadResult
-import kr.co.hanium.dreamup.walksafe.inference.DetectorNativeCleanupFailure
 import kr.co.hanium.dreamup.walksafe.inference.RuntimeCandidate
-import kr.co.hanium.dreamup.walksafe.inference.RuntimeBackend
 import kr.co.hanium.dreamup.walksafe.inference.RuntimeFeatureScope
-import kr.co.hanium.dreamup.walksafe.inference.RuntimeSelectionPolicy
-import kr.co.hanium.dreamup.walksafe.inference.RuntimeCalibrationFixtures
-import kr.co.hanium.dreamup.walksafe.inference.YuvPreprocessingStrategy
+import kr.co.hanium.dreamup.walksafe.inference.composite.AndroidJointRuntimeChoiceStore
+import kr.co.hanium.dreamup.walksafe.inference.composite.AndroidJointRuntimeLoader
+import kr.co.hanium.dreamup.walksafe.inference.composite.JointCameraMode
+import kr.co.hanium.dreamup.walksafe.inference.composite.ValidatedJointRuntimeChoice
 import kr.co.hanium.dreamup.walksafe.depth.TrackedObjectDepth
 import kr.co.hanium.dreamup.walksafe.inference.AndroidDetectorLoadTiming
 import kr.co.hanium.dreamup.walksafe.inference.AndroidDetectorLoadPhase
@@ -58,9 +56,6 @@ import kr.co.hanium.dreamup.walksafe.navigation.FrozenImageToDepthTransform
 import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
 import kr.co.hanium.dreamup.walksafe.inference.TfliteAndroidFrameDetector
 import kr.co.hanium.dreamup.walksafe.inference.TwoModelRuntimeConfig
-import kr.co.hanium.dreamup.walksafe.device.AndroidFixedFixtureRuntimeSelector
-import kr.co.hanium.dreamup.walksafe.device.AndroidDeviceTuningProfileStore
-import kr.co.hanium.dreamup.walksafe.inference.unknown.tuning.AndroidUnknownRuntimeProfileStore
 import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamRuntimeService
 import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamRuntimeOptions
 import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamFrameToken
@@ -70,10 +65,33 @@ import kr.co.hanium.dreamup.walksafe.depth.unknown.UnknownObjectDepthPipeline
 import java.util.Locale
 import kr.co.hanium.dreamup.walksafe.depth.DepthPredictionPresentation
 import java.util.concurrent.Executors
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+
+/** A primary reload may resume only after the preceding auxiliary native owner actually closed. */
+internal fun deferCameraRuntimeUntilAuxiliaryReleased(
+    service: FastSamRuntimeService<*>?,
+    dispatch: (() -> Unit) -> Unit,
+    isCurrent: () -> Boolean,
+    onReleased: () -> Unit,
+    onReleaseFailure: () -> Unit,
+): Boolean {
+    val previous = service ?: return false
+    val state = previous.stats()
+    if (!state.stopping || state.nativeReleaseConfirmed) return false
+    previous.releasedFuture().whenComplete { _, error -> dispatch {
+        if (isCurrent()) {
+            if (error == null && previous.stats().nativeReleaseConfirmed) onReleased() else onReleaseFailure()
+        }
+    } }
+    return true
+}
 
 /** Local debug camera and hazard feedback; no account, route, walk lease or report is opened. */
 class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
@@ -88,15 +106,15 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
     private var primaryOverlayCapture: CameraObjectPresentation.Capture? = null
     private var unknownOverlay: UnknownOverlay? = null
     private data class UnknownOverlay(
-        val capture: CameraObjectPresentation.Capture,
+        val scene: CameraScenePresentation.UnknownSnapshot,
         val trackingScope: CameraUnknownMaterialPointScope,
-        val regions: List<CameraObjectPresentation.Region>,
-        val boxes: List<DebugBboxOverlayView.DebugOverlayBox>,
-        val predictionDeadlinesMs: List<Long?>,
         val rawCount: Int,
         val candidateCount: Int,
         val detail: String,
-    )
+    ) {
+        val capture get() = scene.capture
+        val predictionDeadlinesMs get() = scene.predictionDeadlinesMs
+    }
     private val feedbackHandler = Handler(Looper.getMainLooper())
     private val primaryUiPresentation = CameraUiPresentationCoordinator<List<Int>>(
         { callback, delayMs -> feedbackHandler.postDelayed(callback, delayMs) },
@@ -146,7 +164,8 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
     private data class UnknownCapture(val epoch: Int, val view: FloatArray,
         val depth: FrozenUnknownDepthCapture, val trackingScope: CameraUnknownMaterialPointScope,
         val imageQuarterTurns: Int, val trackingFlight: CameraUnknownMaterialPointFlight,
-        val feedbackPolicy: UnknownObjectFeedbackPolicy)
+        val feedbackPolicy: UnknownObjectFeedbackPolicy,
+        val runtimeChoice: ValidatedJointRuntimeChoice, val primaryModel: TfliteAndroidFrameDetector)
     private lateinit var status: TextView
     private val worker = Executors.newSingleThreadExecutor()
     private val cameraWorker = Executors.newSingleThreadExecutor { task -> Thread(task, "WalkSafeCameraSetup") }
@@ -163,10 +182,15 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
     }
     @Volatile private var preparedScope: RuntimeFeatureScope? = null
     @Volatile private var cameraScope: RuntimeFeatureScope? = null
+    @Volatile private var preparedMode: JointCameraMode? = null
+    @Volatile private var preparedCameraGeneration = -1
+    @Volatile private var cameraMode: JointCameraMode? = null
+    private val jointChoiceLock = Any()
+    @Volatile private var jointChoice: ValidatedJointRuntimeChoice? = null
     @Volatile private var primaryCandidate: RuntimeCandidate? = null
     @Volatile private var auxiliaryCandidate: RuntimeCandidate? = null
-    @Volatile private var primarySetting = "실시간 성능 점검 미확정"
-    @Volatile private var auxiliarySetting = "보수적 CPU 임시 설정 · 조합 점검 미확정"
+    @Volatile private var primarySetting = "기기 점검 필요"
+    @Volatile private var auxiliarySetting = "기기 점검 필요"
     @Volatile private var foreground = false
     @Volatile private var generation = 0
     @Volatile private var session: Session? = null
@@ -174,6 +198,12 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
     @Volatile private var provider: ArCoreFrameProvider? = null
     @Volatile private var detector: TfliteAndroidFrameDetector? = null
     private val cameraRelease = CameraSessionRelease()
+    private var runtimeHandoff: CameraRuntimeHandoff.Claim? = null
+    private var handoffWaitSerial = 0L
+    private var waitingHandoff: CompletableFuture<Unit>? = null
+    private val cameraNativeReleases = ConcurrentHashMap<Long, CompletableFuture<Unit>>()
+    private val retiredPrimaryReleases = ConcurrentLinkedQueue<CompletableFuture<Unit>>()
+    private var failedPrimaryRelease: TfliteAndroidFrameDetector? = null
     private val closingCamera get() = cameraRelease.blocksStart
     private var startingCamera = false
     private var installRequested = false
@@ -194,6 +224,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        runtimeHandoff = CameraRuntimeHandoff.begin()
         surface = GLSurfaceView(this).apply {
             setEGLContextClientVersion(2)
             setRenderer(this@CameraTestActivity)
@@ -254,77 +285,61 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         })
     }
 
-    /** The AR session supplies the feature scope before a persisted live profile can be restored. */
-    private fun prepareCameraDetector(scope: RuntimeFeatureScope) {
-        if (detector != null && preparedScope == scope) return
+    /** Admit only the complete choice measured with this actual AR camera/display mode. */
+    private fun prepareCameraDetector(scope: RuntimeFeatureScope, mode: JointCameraMode) {
+        if (detector != null && preparedCameraGeneration == generation && preparedScope == scope &&
+            preparedMode == mode && jointChoice != null) return
+        val epoch = generation
+        if (deferCameraRuntimeUntilAuxiliaryReleased(unknownRuntime.service,
+                dispatch = { action -> feedbackHandler.post { action() } },
+                isCurrent = { foreground && !isDestroyed && !isFinishing && generation == epoch &&
+                    cameraScope == scope && cameraMode == mode },
+                onReleased = { prepareCameraDetector(scope, mode) },
+                onReleaseFailure = {
+                    status.text = "이전 추가 인식 모델의 해제가 확인되지 않아 시작할 수 없습니다. 화면을 닫아 주세요."
+                })) {
+            status.text = "이전 추가 인식 모델의 종료를 기다리는 중"
+            return
+        }
         val modelQueuedNs = System.nanoTime()
         worker.execute {
-            if (detector != null && preparedScope == scope) return@execute
+            fun current() = foreground && !isDestroyed && !isFinishing && epoch == generation &&
+                cameraScope == scope && cameraMode == mode && runtimeHandoff?.released?.isCompletedExceptionally != true
+            if (!current()) return@execute
+            if (detector != null && preparedCameraGeneration == epoch && preparedScope == scope &&
+                preparedMode == mode && jointChoice != null) return@execute
             logCameraQueue("model_load_queue", generation, modelQueuedNs)
             val previous = detector
             detector = null
             var owned: TfliteAndroidFrameDetector? = null
             val loaded = runCatching {
-                previous?.close()
+                closePrimaryNative(previous)
                 val config = TwoModelRuntimeConfig.load(applicationContext)
-                val binding = AndroidDeviceTuningProfileStore.createBinding(applicationContext, config, scope)
-                val profile = binding?.let { AndroidDeviceTuningProfileStore(applicationContext).load(it) }
-                val fixtures = RuntimeCalibrationFixtures(applicationContext)
-                val fixture = fixtures.loadArgb(fixtures.loadManifest().fixtures.first { it.required })
-                fun warm(load: AndroidDetectorLoadResult): Pair<AndroidDetectorLoadResult, RuntimeCandidate> {
-                    if (load.reason == "DetectorNativeCleanupFailure")
-                        throw DetectorNativeCleanupFailure(IllegalStateException("Previous native allocation did not release"))
-                    val model = requireNotNull(load.detector)
-                    owned = model
-                    val result = model.detectCalibrationImage(fixture)
-                    check(result.inferenceCompleted && !result.partial)
-                    val runtime = requireNotNull(result.timing.modelRuntime)
-                    val backend = when (runtime.activeDelegate) {
-                        "cpu" -> RuntimeBackend.CPU
-                        "gpu" -> RuntimeBackend.GPU
-                        else -> error("Unverified camera runtime")
-                    }
-                    return load to RuntimeCandidate(backend, runtime.numThreads)
-                }
-                val restored = profile?.let { measured ->
-                    runCatching {
-                        val options = requireNotNull(config.unifiedWalksafe).runtime.copy(
-                            delegate = measured.candidate.backend.delegate, numThreads = measured.candidate.numThreads,
-                            fallbackToCpu = false)
-                        warm(TfliteAndroidFrameDetector.createWithStatus(applicationContext, config, options,
-                            YuvPreprocessingStrategy.FUSED_YUV_TO_TENSOR)).also {
-                            check(it.second == measured.candidate) { "Stored camera runtime changed" }
-                        }
-                    }.onFailure {
-                        if (it is DetectorNativeCleanupFailure) throw it
-                        owned?.close()
-                        owned = null
-                        Log.w("WalkSafeCameraTest", "Stored live runtime unavailable; using cache-only preparation", it)
-                    }.getOrNull()
-                }
-                val selected = restored ?: warm(AndroidFixedFixtureRuntimeSelector.load(
-                    applicationContext, config, allowComparison = false,
-                    isCurrent = { !isDestroyed && !isFinishing },
-                    onProgress = { message -> runOnUiThread {
-                        if (!isDestroyed && !isFinishing) status.text = message
-                    } },
-                ))
-                check(!isDestroyed && !isFinishing)
-                primaryCandidate = selected.second
-                primarySetting = if (restored != null) "저장된 실시간 점검 설정" else "고정 자료 설정 · 실시간 점검 미확정"
-                val auxiliaryBinding = AndroidUnknownRuntimeProfileStore.createBinding(applicationContext,
-                    config, selected.second, scope)
-                auxiliaryCandidate = auxiliaryBinding?.let { AndroidUnknownRuntimeProfileStore(applicationContext).load(it) }?.candidate
-                auxiliarySetting = if (auxiliaryCandidate != null) "저장된 조합 점검 설정"
-                    else "보수적 CPU 임시 설정 · 조합 점검 미확정"
+                val prepared = requireNotNull(AndroidJointRuntimeLoader.restore(applicationContext,
+                    config, scope, mode, ::current)) { "Device check joint runtime required" }
+                owned = prepared.load.detector
+                check(current())
+                synchronized(jointChoiceLock) { jointChoice = prepared.choice }
+                primaryCandidate = prepared.choice.candidate.primary
+                auxiliaryCandidate = prepared.choice.candidate.auxiliary
+                primarySetting = "기기 점검 설정 · ${prepared.choice.candidate.primaryIntervalMs}ms 간격"
+                auxiliarySetting = "기기 점검 설정 · ${prepared.choice.candidate.auxiliaryIntervalMs}ms 간격"
+                primaryInferencePacing.configureMinimumInterval(prepared.choice.candidate.primaryIntervalMs)
                 preparedScope = scope
-                selected.first
+                preparedMode = mode
+                preparedCameraGeneration = epoch
+                prepared.load
             }.onFailure {
-                owned?.close()
+                runCatching { closePrimaryNative(owned) }
+                if (it is kr.co.hanium.dreamup.walksafe.inference.DetectorNativeCleanupFailure || it.suppressed.isNotEmpty())
+                    runtimeHandoff?.fail(it)
                 owned = null
                 primaryCandidate = null
                 auxiliaryCandidate = null
                 preparedScope = null
+                preparedMode = null
+                preparedCameraGeneration = -1
+                synchronized(jointChoiceLock) { jointChoice = null }
                 Log.e("WalkSafeCameraTest", "Model initialization failed", it)
             }.getOrNull()
             primaryInferencePacing.reset()
@@ -334,7 +349,10 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
             logDetectorTiming("model_load", loaded?.loadTiming)
             runOnUiThread {
                 if (isDestroyed || isFinishing) return@runOnUiThread
-                if (detector == null) status.text = "카메라 테스트 · 객체 모델 로드 실패: ${loaded?.reason ?: "exception"}"
+                if (detector == null) {
+                    status.text = "기기 점검 필요 · 홈에서 기기 점검을 다시 진행해 주세요."
+                    unknownStatus.text = "기기 점검 설정을 확인하지 못해 추가 인식을 시작하지 않았습니다."
+                }
                 else if (foreground) {
                     status.text = "객체 인식 준비 완료 · $primarySetting"
                     resumeUnknownAfterPrimaryLiveAttempt()
@@ -344,19 +362,27 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun createUnknownService(epoch: Long): FastSamRuntimeService<UnknownCapture> {
+        val choice = requireNotNull(jointChoice) { "Device check joint runtime required" }
+        check(choice.scope == cameraScope && choice.cameraMode == cameraMode)
         // Publish fresh tracker/policy state before the new service becomes visible to the GL worker.
         unknownMaterialPoints.invalidate()
         unknownPipeline = UnknownObjectDepthPipeline(SystemClock::elapsedRealtime)
         unknownFeedbackPolicy = UnknownObjectFeedbackPolicy()
-        auxiliaryPacing.begin(epoch)
-        val selected = auxiliaryCandidate ?: RuntimeSelectionPolicy.initialCpuCandidate(Runtime.getRuntime().availableProcessors())
+        auxiliaryPacing.begin(epoch, choice.candidate.auxiliaryIntervalMs)
+        val selected = choice.candidate.auxiliary
         Log.i("WalkSafeCameraTest", "FastSAM preparation: candidate=$selected setting=$auxiliarySetting primary=$primaryCandidate")
         return FastSamRuntimeService(applicationContext, epoch,
             FastSamRuntimeOptions(FastSamRuntimeOptions.Backend.valueOf(selected.backend.name),
-                selected.numThreads, auxiliaryCandidate == null,
-                SystemClock.elapsedRealtimeNanos() + 60_000_000_000L, 1_000L, false, false, true),
+                selected.numThreads, false,
+                SystemClock.elapsedRealtimeNanos() + 60_000_000_000L, 800L, false, false, true),
             object : FastSamRuntimeService.Listener<UnknownCapture> {
                 override fun onResult(result: FastSamResult<UnknownCapture>) {
+                    if (jointChoice !== choice) return
+                    if (result.runtime.fallbackUsed || result.runtime.actualBackend.name != selected.backend.name ||
+                        result.runtime.numThreads != selected.numThreads) {
+                        invalidateJointRuntime(choice, "auxiliary_runtime_mismatch")
+                        return
+                    }
                     try { showUnknownResult(result) }
                     finally {
                         val token = result.token
@@ -372,6 +398,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                     Log.e("WalkSafeCameraTest", "FastSAM failed", error)
                     unknownMaterialPoints.invalidate(epoch)
                     unknownRuntime.failed(epoch)
+                    invalidateJointRuntime(choice, "auxiliary_execution_failed")
                 }
                 override fun onDiscard(token: FastSamFrameToken, reason: String) {
                     if (reason.startsWith("stale") && foreground && unknownRuntime.accepts(token.sessionEpoch)) {
@@ -385,9 +412,67 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
             })
     }
 
+    private fun invalidateJointRuntime(expected: ValidatedJointRuntimeChoice, reason: String) {
+        val (retired, releaseReceipt) = synchronized(jointChoiceLock) {
+            if (jointChoice !== expected) return
+            val receipt = CompletableFuture<Unit>()
+            retiredPrimaryReleases.add(receipt)
+            unknownGeometryGeneration.incrementAndGet()
+            jointChoice = null
+            detector.also {
+                detector = null; preparedScope = null; preparedMode = null; preparedCameraGeneration = -1
+            } to receipt
+        }
+        try { worker.execute {
+            try {
+                try { AndroidJointRuntimeChoiceStore(applicationContext).invalidateIfMatches(expected) }
+                finally { closePrimaryNative(retired) }
+                releaseReceipt.complete(Unit)
+            } catch (error: Throwable) {
+                releaseReceipt.completeExceptionally(error)
+                runtimeHandoff?.fail(error)
+                Log.e("WalkSafeCameraTest", "Runtime release failed", error)
+            }
+        } } catch (error: RuntimeException) {
+            releaseReceipt.completeExceptionally(error)
+            runtimeHandoff?.fail(error)
+        }
+        runOnUiThread {
+            if (isDestroyed || isFinishing) return@runOnUiThread
+            unknownRuntime.pauseAndRelease()
+            unknownMaterialPoints.invalidate()
+            primaryOverlayCapture = null
+            unknownOverlay = null
+            objectPresentation.clear()
+            primaryUiPresentation.clear()
+            unknownUiPresentation.clear()
+            boxes.clear()
+            unknownBoxes.clear()
+            feedback.clear(CameraTestFeedbackCoordinator.Source.PRIMARY)
+            feedback.clear(CameraTestFeedbackCoordinator.Source.UNKNOWN)
+            status.text = "기기 점검 필요 · 실행 설정이 달라졌습니다. 홈에서 다시 점검해 주세요."
+            unknownStatus.text = "기기 점검 필요 · 추가 인식을 중지했습니다."
+        }
+        Log.w("WalkSafeCameraTest", "Joint runtime retired: $reason")
+    }
+
+    @Suppress("DEPRECATION")
+    private fun actualCameraMode(camera: Session): JointCameraMode = JointCameraMode(
+        camera.cameraConfig.imageSize.width, camera.cameraConfig.imageSize.height,
+        camera.cameraConfig.fpsRange.lower, windowManager.defaultDisplay.refreshRate.toDouble())
+
     private fun showUnknownRuntimeStatus() {
         if (!foreground || isDestroyed || isFinishing) return
         val state = unknownRuntime.status
+        val choice = jointChoice ?: run {
+            unknownStatus.setTextIfChanged("기기 점검 필요 · 추가 인식을 중지했습니다.")
+            return
+        }
+        if (state == CameraUnknownRuntime.Status.READY &&
+            unknownRuntime.backendName != choice.candidate.auxiliary.backend.name) {
+            invalidateJointRuntime(choice, "auxiliary_ready_runtime_mismatch")
+            return
+        }
         if (state != CameraUnknownRuntime.Status.READY) {
             unknownOverlay = null
             unknownUiPresentation.clear()
@@ -412,7 +497,10 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun resumeUnknownAfterPrimaryLiveAttempt() {
-        if (!foreground || isDestroyed || isFinishing || detector == null ||
+        val choice = jointChoice ?: return
+        if (!foreground || isDestroyed || isFinishing || session == null || detector == null ||
+            choice.scope != cameraScope || choice.cameraMode != cameraMode || preparedMode != cameraMode ||
+            preparedCameraGeneration != generation ||
             !auxiliaryStartup.mayStart(generation, busy.get())
         ) return
         unknownRuntime.resume()
@@ -424,6 +512,14 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun startCamera() {
         if (!foreground || isDestroyed || isFinishing) return
+        if (runtimeHandoff == null) {
+            runtimeHandoff = CameraRuntimeHandoff.begin()
+            if (runtimeHandoff == null) { awaitPreviousRuntimeHandoff(); return }
+        }
+        if (runtimeHandoff?.released?.isCompletedExceptionally == true) {
+            status.text = "이전 카메라 실행의 해제가 확인되지 않아 시작할 수 없습니다. 화면을 닫아 주세요."
+            return
+        }
         if (cameraRelease.failure != null) {
             status.text = "이전 카메라 해제가 확인되지 않아 다시 연결할 수 없습니다. 화면을 종료해 주세요."
             return
@@ -442,8 +538,10 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
             startingCamera = true
             val startGeneration = generation
             status.text = "카메라 연결 중 · 성능 재시험 없음"
-            cameraWorker.execute {
-                val sessionEpoch = nextCameraSessionEpoch.incrementAndGet()
+            val sessionEpoch = nextCameraSessionEpoch.incrementAndGet()
+            val cameraNativeRelease = CompletableFuture<Unit>()
+            cameraNativeReleases[sessionEpoch] = cameraNativeRelease
+            try { cameraWorker.execute {
                 var owned: Session? = null
                 var ownedSource: ArCoreFrameProvider? = null
                 val prepared = runCatching {
@@ -490,7 +588,9 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                         val scope = if (value.third) RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH
                             else RuntimeFeatureScope.ARCORE_CAMERA_TRACKING
                         cameraScope = scope
-                        prepareCameraDetector(scope)
+                        val mode = actualCameraMode(value.first)
+                        cameraMode = mode
+                        prepareCameraDetector(scope, mode)
                         surface.onResume()
                         status.text = if (value.third) "Depth 지원 · 실제 프레임을 기다리는 중"
                             else "Depth 미지원 · 카메라와 객체 인식만 표시합니다."
@@ -509,11 +609,37 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                         status.text = "카메라 시작 실패: ${error.javaClass.simpleName}"
                     }
                 }
+            } } catch (error: RuntimeException) {
+                // Rejection proves the setup task never acquired a camera.
+                cameraNativeRelease.complete(Unit)
+                throw error
             }
         } catch (error: Exception) {
             startingCamera = false
             status.text = "카메라 시작 실패: ${error.javaClass.simpleName}\n카메라를 사용하는 다른 앱과 AR 서비스 설치 상태를 확인하세요."
         }
+    }
+
+    private fun awaitPreviousRuntimeHandoff() {
+        val pending = CameraRuntimeHandoff.pendingRelease() ?: run { startCamera(); return }
+        if (waitingHandoff === pending) return
+        waitingHandoff = pending
+        val serial = ++handoffWaitSerial
+        val epoch = generation
+        status.text = "이전 카메라 실행의 종료를 기다리는 중"
+        val owner = WeakReference(this)
+        pending.whenComplete { _, error -> owner.get()?.let { activity ->
+            activity.feedbackHandler.post {
+                if (activity.waitingHandoff !== pending || activity.handoffWaitSerial != serial) return@post
+                activity.waitingHandoff = null
+                if (!activity.foreground || activity.generation != epoch || activity.isDestroyed || activity.isFinishing) return@post
+                if (error != null) activity.status.text = "이전 카메라 실행의 해제가 확인되지 않아 시작할 수 없습니다. 화면을 닫아 주세요."
+                else {
+                    activity.runtimeHandoff = CameraRuntimeHandoff.begin()
+                    activity.startCamera()
+                }
+            }
+        } }
     }
 
     private fun releasePreparedCamera(camera: Session?, source: ArCoreFrameProvider?, epoch: Long, retry: Boolean) {
@@ -533,7 +659,18 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         try {
             lane.execute {
                 logCameraQueue("camera_close_queue", closingEpoch, closeQueuedNs, epoch)
-                val released = cameraRelease.execute(attempt)
+                val nativeRelease = epoch?.let(cameraNativeReleases::get)
+                val released = try {
+                    check(cameraRelease.execute(attempt)) {
+                        cameraRelease.failure?.toString() ?: "Camera native release unconfirmed"
+                    }
+                    nativeRelease?.complete(Unit)
+                    true
+                } catch (error: Throwable) {
+                    nativeRelease?.completeExceptionally(error)
+                    runtimeHandoff?.fail(error)
+                    false
+                }
                 runOnUiThread {
                     if (isDestroyed || isFinishing) cameraWorker.shutdown()
                     else if (!released) status.text = "이전 카메라 해제가 확인되지 않아 다시 연결할 수 없습니다. 화면을 종료해 주세요."
@@ -542,6 +679,8 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
             }
         } catch (failure: RuntimeException) {
             cameraRelease.schedulingFailed(attempt, failure)
+            epoch?.let(cameraNativeReleases::get)?.completeExceptionally(failure)
+            runtimeHandoff?.fail(failure)
             if (!isDestroyed && !isFinishing) status.text = "카메라 종료 작업을 시작하지 못했습니다. 다시 연결할 수 없습니다."
         }
     }
@@ -554,6 +693,8 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
 
     override fun onPause() {
         foreground = false
+        ++handoffWaitSerial
+        waitingHandoff = null
         generation++
         primaryInferencePacing.reset()
         auxiliaryPacing.reset()
@@ -590,23 +731,48 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
     override fun onDestroy() {
         stopFeedback()
         foreground = false
+        ++handoffWaitSerial
+        waitingHandoff = null
         generation++
         primaryInferencePacing.reset()
         auxiliaryPacing.reset()
         loadObservations.close()
         unknownMaterialPoints.invalidate()
-        unknownRuntime.destroy()
+        val auxiliary = unknownRuntime.service
+        val auxiliaryRelease = CompletableFuture<Unit>()
+        try { unknownRuntime.destroy() }
+        catch (error: Throwable) { auxiliaryRelease.completeExceptionally(error); runtimeHandoff?.fail(error) }
+        if (auxiliary == null) auxiliaryRelease.complete(Unit) else {
+            auxiliary.releasedFuture().whenComplete { _, error ->
+                if (error == null && auxiliary.stats().nativeReleaseConfirmed) auxiliaryRelease.complete(Unit)
+                else auxiliaryRelease.completeExceptionally(error ?: IllegalStateException("Auxiliary native release unconfirmed"))
+            }
+        }
+        synchronized(jointChoiceLock) { jointChoice = null }
         val closingEpoch = generation
         val closeQueuedNs = System.nanoTime()
-        worker.execute {
+        val primaryRelease = CompletableFuture<Unit>()
+        try { worker.execute {
             logCameraQueue("detector_close_queue", closingEpoch, closeQueuedNs)
             val model = detector
-            try { model?.close(); detector = null }
+            try { closePrimaryNative(model); detector = null; primaryRelease.complete(Unit) }
+            catch (error: Throwable) { primaryRelease.completeExceptionally(error) }
             finally { logDetectorTiming("detector_close", model?.lifecycleTiming()) }
-        }
+        } } catch (error: RuntimeException) { primaryRelease.completeExceptionally(error) }
+        runtimeHandoff?.completeAfter(cameraNativeReleases.values.toList() + retiredPrimaryReleases.toList() +
+            listOf(primaryRelease, auxiliaryRelease))
         worker.shutdown()
         if (!startingCamera && (!closingCamera || cameraRelease.failure != null)) cameraWorker.shutdown()
         super.onDestroy()
+    }
+
+    private fun closePrimaryNative(model: TfliteAndroidFrameDetector?) {
+        try { model?.close() }
+        catch (error: Throwable) {
+            failedPrimaryRelease = model
+            runtimeHandoff?.fail(error)
+            throw error
+        }
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -664,8 +830,13 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
             background.draw(frame, texture)
             if (frame.timestamp <= lastFrame) return
             lastFrame = frame.timestamp
-            val model = detector?.takeIf { preparedScope == cameraScope }
+            val model = detector?.takeIf { preparedScope == cameraScope && preparedCameraGeneration == epoch }
                 ?: run { recordCameraLoad(frame.timestamp); return }
+            val choice = jointChoice ?: return
+            if (choice.cameraMode != actualCameraMode(camera) || preparedMode != cameraMode) {
+                invalidateJointRuntime(choice, "camera_mode_mismatch")
+                return
+            }
             if (!busy.compareAndSet(false, true)) { recordCameraLoad(frame.timestamp); return }
             val capturedMs = SystemClock.elapsedRealtime()
             val pacingTicket = primaryInferencePacing.tryStart(capturedMs) ?: run {
@@ -709,7 +880,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                     var detectorInvoked = false
                     var inferenceDurationMs: Long? = null
                     try {
-                        if (!foreground || epoch != generation || model !== detector) return@execute
+                        if (!foreground || epoch != generation || model !== detector || jointChoice !== choice) return@execute
                         // Match the calibrated workload: primary first, then independently paced FastSAM.
                         val meanLuma = meanLuma(ownedImage)
                         val result = try {
@@ -722,8 +893,17 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                             }
                         }
                         inferenceDurationMs = result.timing.modelInferenceMs
+                        if (jointChoice !== choice || detector !== model) return@execute
+                        val runtime = result.timing.modelRuntime
+                        if (runtime == null || runtime.fallbackUsed ||
+                            runtime.activeDelegate != choice.candidate.primary.backend.delegate ||
+                            runtime.numThreads != choice.candidate.primary.numThreads) {
+                            invalidateJointRuntime(choice, "primary_runtime_mismatch")
+                            return@execute
+                        }
                         val qualifiedUnknownFrame = unknownMaterialPoints.qualifyFrame(capturedSnapshot.cameraImageTimestampNs) {
-                            foreground && epoch == generation && trackingGeometryGeneration == unknownGeometryGeneration.get()
+                            foreground && epoch == generation && trackingGeometryGeneration == unknownGeometryGeneration.get() &&
+                                jointChoice === choice && detector === model
                         }
                         // RGB-only captures must not read an unqualified clock for FastSAM tokens.
                         if (qualifiedUnknownFrame && auxiliary != null && foreground && epoch == generation &&
@@ -734,7 +914,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                             val trackingScope = unknownMaterialPoints.acquireScope(epoch, auxiliary.sessionEpoch,
                                 trackingGeometryGeneration, pipeline, geometryId) {
                                 foreground && epoch == generation && trackingGeometryGeneration == unknownGeometryGeneration.get() &&
-                                    unknownRuntime.accepts(auxiliary.sessionEpoch)
+                                    unknownRuntime.accepts(auxiliary.sessionEpoch) && jointChoice === choice && detector === model
                             }
                             if (trackingScope != null) runCatching {
                                 unknownMaterialPoints.offerImage(trackingScope, token, turns, ownedImage,
@@ -752,11 +932,12 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                                         SystemClock.elapsedRealtime()) { unknownTrackingLive(trackingScope) }
                                     if (flight != null) runCatching {
                                         if (!unknownTrackingLive(trackingScope) || !flight.accepts ||
+                                            jointChoice !== choice || detector !== model ||
                                             !auxiliaryPacing.tryStart(auxiliary.sessionEpoch, frameId, capturedMs)) {
                                             unknownMaterialPoints.cancelFlight(trackingScope, flight) { unknownTrackingLive(trackingScope) }
                                         } else {
                                             val admission = auxiliary.submit(ownedImage, token, UnknownCapture(epoch, view, capture,
-                                                trackingScope, turns, flight, auxiliaryFeedbackPolicy))
+                                                trackingScope, turns, flight, auxiliaryFeedbackPolicy, choice, model))
                                             if (admission != FastSamRuntimeService.Admission.ACCEPTED &&
                                                 admission != FastSamRuntimeService.Admission.REPLACED_PENDING) {
                                                 auxiliaryPacing.cancel(auxiliary.sessionEpoch, frameId)
@@ -827,12 +1008,14 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                                 (capture.fullDepthTiming?.let { cameraFullDepthTimingDiagnostic(it) } ?: "Full 요청 없음"))
                         }
                         runOnUiThread {
-                            if (foreground && epoch == generation && trackingGeometryGeneration == unknownGeometryGeneration.get()) {
+                            if (foreground && epoch == generation && trackingGeometryGeneration == unknownGeometryGeneration.get() &&
+                                jointChoice === choice && detector === model) {
                                 if (!objectPresentation.recordPrimary(presentationCapture, presentationRegions)) return@runOnUiThread
                                 if (!primaryUiPresentation.begin(presentationCapture)) return@runOnUiThread
                                 primaryOverlayCapture = presentationCapture
                                 fun renderPrimaryDepth() {
                                     if (!foreground || epoch != generation || trackingGeometryGeneration != unknownGeometryGeneration.get() ||
+                                        jointChoice !== choice || detector !== model ||
                                         primaryOverlayCapture != presentationCapture) return
                                     val displayNow = SystemClock.elapsedRealtime()
                                     val expiredIndices = predictionDeadlines.indices.filter { index ->
@@ -848,6 +1031,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                                     }
                                     primaryUiPresentation.scheduleExpiry(presentationCapture, predictionDeadlines, displayNow,
                                         { foreground && epoch == generation && trackingGeometryGeneration == unknownGeometryGeneration.get() &&
+                                            jointChoice === choice && detector === model &&
                                             primaryOverlayCapture == presentationCapture },
                                         ::renderPrimaryDepth)
                                 }
@@ -862,14 +1046,15 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                         }
                     } catch (error: Exception) {
                         Log.e("WalkSafeCameraTest", "Object inference failed", error)
-                        showError(epoch, "객체 인식 실패: ${error.javaClass.simpleName}")
+                        if (jointChoice === choice && detector === model)
+                            showError(epoch, "객체 인식 실패: ${error.javaClass.simpleName}")
                     } finally {
                         try {
                             ownedImage.close()
                         } finally {
                             try {
                                 // Include capture, queueing, preprocessing and publication, not just native inference.
-                                if (detectorInvoked && foreground && epoch == generation && model === detector) {
+                                if (detectorInvoked && foreground && epoch == generation && model === detector && jointChoice === choice) {
                                     val completedAtMs = SystemClock.elapsedRealtime()
                                     primaryInferencePacing.complete(pacingTicket, completedAtMs, inferenceDurationMs,
                                         thermalThrottled(), loadObservations.latestObservation(completedAtMs))
@@ -877,7 +1062,8 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                             } finally {
                                 busy.set(false)
                                 if (foreground && epoch == generation) runOnUiThread {
-                                    if (foreground && epoch == generation && !isDestroyed && !isFinishing) {
+                                    if (foreground && epoch == generation && !isDestroyed && !isFinishing &&
+                                        jointChoice === choice && detector === model) {
                                         if (detectorInvoked) auxiliaryStartup.complete(epoch)
                                         // A newer primary flight may have started before this UI callback.
                                         // Its completion gets another chance to start the auxiliary model.
@@ -910,7 +1096,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun showError(epoch: Int, message: String) = runOnUiThread {
-        if (foreground && epoch == generation) {
+        if (foreground && epoch == generation && jointChoice != null && detector != null) {
             status.text = message
             objectPresentation.clear()
             primaryUiPresentation.clear()
@@ -1091,19 +1277,23 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun unknownTrackingLive(scope: CameraUnknownMaterialPointScope): Boolean =
         scope.accepts && foreground && scope.cameraEpoch == generation &&
-            scope.geometryGeneration == unknownGeometryGeneration.get() && unknownRuntime.accepts(scope.serviceEpoch)
+            scope.geometryGeneration == unknownGeometryGeneration.get() && unknownRuntime.accepts(scope.serviceEpoch) &&
+            jointChoice != null && detector != null
+
+    private fun unknownCaptureLive(capture: UnknownCapture): Boolean =
+        unknownTrackingLive(capture.trackingScope) && jointChoice === capture.runtimeChoice && detector === capture.primaryModel
 
     private fun showUnknownResult(result: FastSamResult<UnknownCapture>) {
         val callbackStartedNs = System.nanoTime()
         val capture = result.attachment
-        if (!unknownTrackingLive(capture.trackingScope) || !capture.trackingFlight.accepts) {
+        if (!unknownCaptureLive(capture) || !capture.trackingFlight.accepts) {
             unknownMaterialPoints.cancelFlight(capture.trackingScope, capture.trackingFlight) { unknownTrackingLive(capture.trackingScope) }
             return
         }
         val consumed = unknownMaterialPoints.process(capture.trackingScope, capture.depth, result.token,
             capture.imageQuarterTurns, result.masks, SystemClock.elapsedRealtime(), callbackStartedNs,
             capture.trackingFlight) {
-            unknownTrackingLive(capture.trackingScope)
+            unknownCaptureLive(capture)
         } ?: return
         val processed = consumed.depth.forDisplayAt(SystemClock.elapsedRealtime())
         val completedMs = SystemClock.elapsedRealtime()
@@ -1116,68 +1306,24 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
             sourceCapturedAtElapsedRealtimeNs = result.token.capturedElapsedNs,
             completedAtElapsedRealtimeMs = completedMs,
             sourceEpoch = cameraEpoch,
-            currentEpoch = cameraEpoch.takeIf { unknownTrackingLive(capture.trackingScope) && capture.trackingFlight.accepts },
+            currentEpoch = cameraEpoch.takeIf { unknownCaptureLive(capture) && capture.trackingFlight.accepts },
             nowElapsedRealtimeMs = completedMs,
         )
         val candidates = processed.observations.filter { it.walkingSelection?.show == true }
         // Rank display patches and separate measured warnings together, then apply the display cap.
-        val selected = CameraUnknownObservation.selectForDisplay(candidates, allOutputs,
-            admitted?.outputs ?: emptyList(), limit = Int.MAX_VALUE)
-        val mapped = selected.map { candidate ->
-            val rect = candidate.bboxNorm
-            val corners = listOf(point(capture.view, rect.x, rect.y),
-                point(capture.view, rect.x + rect.width, rect.y),
-                point(capture.view, rect.x, rect.y + rect.height),
-                point(capture.view, rect.x + rect.width, rect.y + rect.height))
-            val observation = candidate.observation
-            val output = candidate.output
-            val label = if (observation == null) {
-                // A separate warning retains its own measured distance and bounds.
-                val warning = requireNotNull(output)
-                val kind = if (warning.source == kr.co.hanium.dreamup.walksafe.depth.DepthSource.ARCORE_FULL_DEPTH)
-                    "Full 추정" else "Raw 측정"
-                val alert = if (warning.userFacing.messageLevel == MessageLevel.STOP) "정지 경고 후보" else "주의 경고 후보"
-                String.format(Locale.US, "근접 경고 영역 · %s %.2fm · %s", kind, candidate.distanceM, alert)
-            } else {
-                val distance = output?.rayDistanceM?.toDouble() ?: candidate.distanceM
-                val kind = if (output?.prediction != null) "단기 예측" else if (observation.depth.source == "ARCORE_FULL_DEPTH") "Full 추정" else "Raw 측정"
-                val alert = when (output?.userFacing?.messageLevel) {
-                    MessageLevel.STOP -> " · 정지 경고 후보"
-                    MessageLevel.WARNING -> " · 주의 경고 후보"
-                    else -> ""
-                }
-                (if (observation.proximityDistanceM != null) "근접 표면 · " else "전방 영역 · ") + (distance?.let {
-                    String.format(Locale.US, "%s %.2fm", kind, it)
-                } ?: "거리 미확인") + (observation.metricExtent?.takeIf {
-                    observation.proximityDistanceM == null && distance != null
-                }?.let {
-                    String.format(Locale.US, " · 관측 폭 %.2fm/높이 %.2fm", it.widthM, it.heightM)
-                } ?: "") + (output?.prediction?.let {
-                    String.format(Locale.US, " ±%.2fm · 공백 %dms", it.errorBoundM, it.predictionAgeMs)
-                } ?: "") + alert
-            }
-            DebugBboxOverlayView.DebugOverlayBox(RectF(corners.minOf { it.first }, corners.minOf { it.second },
-                corners.maxOf { it.first }, corners.maxOf { it.second }), label, true, "unnamed-obstacle")
-        }
+        val presentationCapture = CameraObjectPresentation.Capture(capture.epoch, result.token.frameId,
+            result.token.capturedElapsedNs / 1_000_000L, result.token.geometryId)
+        val scene = CameraScenePresentation.prepareUnknown(presentationCapture, candidates, allOutputs,
+            admitted?.outputs ?: emptyList(), capture.view)
         runOnUiThread {
-            if (unknownTrackingLive(capture.trackingScope) && capture.trackingFlight.accepts) {
-                val presentationCapture = CameraObjectPresentation.Capture(capture.epoch, result.token.frameId,
-                    result.token.capturedElapsedNs / 1_000_000L, result.token.geometryId)
+            if (unknownCaptureLive(capture) && capture.trackingFlight.accepts) {
                 if (primaryOverlayCapture?.let {
                         it.geometryId != presentationCapture.geometryId && it.frameId >= presentationCapture.frameId
                     } == true || unknownOverlay?.capture?.frameId?.let { it >= result.token.frameId } == true
                 ) return@runOnUiThread
                 val measured = processed.observations.count { CameraUnknownObservation.distanceM(it) != null }
                 val waiting = processed.observations.firstOrNull { CameraUnknownObservation.distanceM(it) == null }?.depth?.reason
-                val publishedOverlay = UnknownOverlay(presentationCapture, capture.trackingScope, selected.map { candidate ->
-                    CameraObjectPresentation.Region(candidate.bboxNorm, candidate.feedbackId,
-                        candidate.output.trustedPresentationDistanceM()?.takeIf { distance ->
-                            candidate.distanceM?.let { kotlin.math.abs(it - distance) <= 0.30 } == true
-                        }, candidate.output?.detectionConfidence ?: 0f)
-                }, mapped, selected.map { candidate -> candidate.output?.prediction?.let {
-                    DepthPredictionPresentation.validUntilMs(it, presentationCapture.capturedAtMs)
-                        ?: presentationCapture.capturedAtMs - 1L
-                } }, result.masks.size, candidates.size,
+                val publishedOverlay = UnknownOverlay(scene, capture.trackingScope, result.masks.size, candidates.size,
                     "거리 확인 ${measured}개 · 추론 ${result.inferenceMs.toLong()}ms\n" +
                     "3m 이내 보행 위험 조건 충족 시 음성·진동\n" +
                     (processed.rejectionReason?.let { "깊이 대기: $it" }
@@ -1187,7 +1333,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                 val displayNow = SystemClock.elapsedRealtime()
                 renderUnknownObjects(displayNow)
                 if (!offerCameraUnknownFeedbackAfterRender(capture.trackingScope, capture.trackingFlight,
-                        { unknownOverlay === publishedOverlay }, ::unknownTrackingLive) {
+                        { unknownOverlay === publishedOverlay }, { unknownCaptureLive(capture) }) {
                     feedback.offer(CameraTestFeedbackCoordinator.Sample(
                         CameraTestFeedbackCoordinator.Source.UNKNOWN, capture.epoch, result.token.frameId,
                         result.token.capturedElapsedNs / 1_000_000L, completedMs, result.token.geometryId,
@@ -1213,14 +1359,12 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
             unknownBoxes.clear()
             return
         }
-        val merged = objectPresentation.mergedUnknownIndices(observation.capture, observation.regions, nowMs)
-        val visibleIndices = observation.boxes.indices.filter { index -> index !in merged &&
-            observation.predictionDeadlinesMs[index]?.let { nowMs <= it } != false }.take(6)
-        if (unknownUiPresentation.shouldRender(observation.capture, merged to visibleIndices)) {
-            unknownBoxes.updateMapped(visibleIndices.map { observation.boxes[it] }, observation.capture.frameId,
-                observation.capture.capturedAtMs, sourceComplete = true, animate = false)
+        val rendered = CameraScenePresentation.renderUnknown(objectPresentation, observation.scene, nowMs, unknownBoxes) {
+                merged, visible -> unknownUiPresentation.shouldRender(observation.capture, merged to visible)
+        }
+        if (rendered.updated) {
             unknownStatus.setTextIfChanged("FastSAM ${observation.rawCount}개 → 3m 내 후보 ${observation.candidateCount}개 · " +
-                "학습 객체와 통합 ${merged.size}개 · 추가 표시 ${visibleIndices.size}개\n" + observation.detail)
+                "학습 객체와 통합 ${rendered.merged.size}개 · 추가 표시 ${rendered.visibleIndices.size}개\n" + observation.detail)
         }
         unknownUiPresentation.scheduleExpiry(observation.capture,
             observation.predictionDeadlinesMs + (observation.capture.capturedAtMs + UnknownObjectFeedbackPolicy.MAX_SOURCE_AGE_MS),

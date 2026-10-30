@@ -9,6 +9,7 @@ import kotlin.concurrent.thread
 import kr.co.hanium.dreamup.walksafe.device.DeviceTuningRecheckReason
 import kr.co.hanium.dreamup.walksafe.device.RuntimeCalibrationResult
 import kr.co.hanium.dreamup.walksafe.inference.*
+import kr.co.hanium.dreamup.walksafe.inference.composite.*
 import kr.co.hanium.dreamup.walksafe.inference.unknown.*
 import kr.co.hanium.dreamup.walksafe.inference.unknown.tuning.*
 import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
@@ -17,6 +18,128 @@ import org.junit.Test
 
 /** Real FastSam model/post owners; release futures are driven by a controlled test engine. */
 class UnknownRuntimeServiceOwnerTest {
+    @Test fun walkingRestoresBothTheJointAuxiliaryAndItsCadenceWithoutLegacyProfileMixing() {
+        val f = Fixture()
+        f.requiresJoint = true
+        val candidate = JointRuntimeCandidate(RuntimeCandidate(RuntimeBackend.CPU, 1),
+            RuntimeCandidate(RuntimeBackend.CPU, 1), primaryIntervalMs = 300L, auxiliaryIntervalMs = 500L)
+        f.joint = jointChoice(candidate)
+
+        val service = f.startAndAdopt()
+        val options = f.createdOptions.single()
+        assertEquals(FastSamRuntimeOptions.Backend.CPU, options.requestedBackend)
+        assertEquals(1, options.numThreads)
+        assertFalse(options.allowCpuFallback)
+        assertEquals(800L, options.maximumResultAgeMs)
+        assertEquals(500L, f.owner.minimumAuxiliaryIntervalMs(service))
+        assertEquals(0, f.legacyLoads)
+        f.close(service)
+    }
+
+    @Test fun missingJointChoiceBlocksProductionWalkingInsteadOfStartingAnUnmeasuredDefault() {
+        val f = Fixture()
+        f.requiresJoint = true
+        f.start()
+        assertNull(f.owner.currentService)
+        assertNull(f.owner.loadingService)
+        assertEquals(0, f.native.creations.get())
+        assertEquals(0, f.legacyLoads)
+        assertTrue(f.owner.status.contains("기기 점검 필요"))
+    }
+
+    @Test fun aJointChoiceForAnotherPrimaryCannotConfigureWalkingAuxiliary() {
+        val f = Fixture()
+        f.requiresJoint = true
+        f.joint = jointChoice(JointRuntimeCandidate(RuntimeCandidate(RuntimeBackend.GPU, 1),
+            RuntimeCandidate(RuntimeBackend.CPU, 1)))
+        f.start()
+        assertEquals(0, f.native.creations.get())
+        assertNull(f.owner.currentService)
+        assertEquals(0, f.legacyLoads)
+        assertTrue(f.owner.status.contains("기기 점검 필요"))
+    }
+
+    @Test fun missingOrDifferentActualCameraModeCannotStartJointWalkingService() {
+        listOf(null, JointRuntimeTestFixtures.mode.copy(fps = 60),
+            JointRuntimeTestFixtures.mode.copy(displayRefreshHz = 120.0)).forEach { mode ->
+            val f = Fixture()
+            f.requiresJoint = true
+            f.joint = jointChoice(JointRuntimeCandidate(RuntimeCandidate(RuntimeBackend.CPU, 1),
+                RuntimeCandidate(RuntimeBackend.CPU, 1)))
+            f.mode = mode
+            f.start()
+            assertEquals(0, f.native.creations.get())
+            assertNull(f.owner.currentService)
+            assertEquals(0, f.legacyLoads)
+            assertTrue(f.owner.status.contains("기기 점검 필요"))
+        }
+    }
+
+    @Test fun cameraModeChangedDuringNativePreparationRetiresTheReadyServiceWithoutInvalidatingGoodChoice() {
+        val f = Fixture()
+        f.requiresJoint = true
+        f.joint = jointChoice(JointRuntimeCandidate(RuntimeCandidate(RuntimeBackend.CPU, 1),
+            RuntimeCandidate(RuntimeBackend.CPU, 1)))
+        f.native.loadEntered = CountDownLatch(1)
+        f.native.releaseLoad = CountDownLatch(1)
+        f.start()
+        val service = requireNotNull(f.owner.loadingService)
+        assertTrue(f.native.loadEntered.await(3, TimeUnit.SECONDS))
+        f.mode = JointRuntimeTestFixtures.mode.copy(fps = 60)
+        f.native.releaseLoad.countDown()
+        service.start().get(3, TimeUnit.SECONDS)
+        f.awaitQueue(1); f.drain()
+        service.releasedFuture().get(3, TimeUnit.SECONDS)
+        if (f.owner.closing) { f.awaitQueue(1); f.drain() }
+        assertNull(f.owner.currentService)
+        assertEquals(0, f.jointInvalidations)
+        assertTrue(f.owner.status.contains("기기 점검 필요"))
+        assertTrue(service.stats().nativeReleaseConfirmed)
+    }
+
+    @Test fun mismatchingActualAuxiliaryInvalidatesJointChoiceAndReleasesWithoutAdopting() {
+        val f = Fixture()
+        f.requiresJoint = true
+        // The controlled native engine reports CPU even though this measured choice requests GPU.
+        f.joint = jointChoice(JointRuntimeCandidate(RuntimeCandidate(RuntimeBackend.CPU, 1),
+            RuntimeCandidate(RuntimeBackend.GPU, 1)))
+        f.start()
+        val service = requireNotNull(f.owner.loadingService)
+        service.start().get(3, TimeUnit.SECONDS)
+        f.awaitQueue(1); f.drain()
+        service.releasedFuture().get(3, TimeUnit.SECONDS)
+        if (f.owner.closing) { f.awaitQueue(1); f.drain() }
+        assertNull(f.owner.currentService)
+        assertEquals(1, f.jointInvalidations)
+        assertEquals(0, f.pendingMarks)
+        assertTrue(f.owner.status.contains("기기 점검 필요"))
+        assertTrue(service.stats().nativeReleaseConfirmed)
+    }
+
+    @Test fun oldMismatchingServiceCannotInvalidateANewerMeasuredChoice() {
+        val f = Fixture()
+        f.requiresJoint = true
+        f.joint = jointChoice(JointRuntimeCandidate(RuntimeCandidate(RuntimeBackend.CPU, 1),
+            RuntimeCandidate(RuntimeBackend.GPU, 1)))
+        f.start()
+        val service = requireNotNull(f.owner.loadingService)
+        service.start().get(3, TimeUnit.SECONDS)
+        val newer = jointChoice(JointRuntimeCandidate(RuntimeCandidate(RuntimeBackend.CPU, 1),
+            RuntimeCandidate(RuntimeBackend.CPU, 1), auxiliaryIntervalMs = 500L))
+        f.joint = newer
+        f.awaitQueue(1); f.drain()
+        service.releasedFuture().get(3, TimeUnit.SECONDS)
+        if (f.owner.closing) { f.awaitQueue(1); f.drain() }
+        assertSame(newer, f.joint)
+        assertEquals(0, f.jointInvalidations)
+        assertNull(f.owner.currentService)
+        assertTrue(service.stats().nativeReleaseConfirmed)
+    }
+
+    private fun jointChoice(candidate: JointRuntimeCandidate): ValidatedJointRuntimeChoice =
+        requireNotNull(JointRuntimeChoicePolicy.evaluate(JointRuntimeTestFixtures.binding, candidate,
+            RuntimeFeatureScope.CAMERA_TRACKING, JointRuntimeTestFixtures.evidence(candidate), 8))
+
     @Test fun explicitCheckReturnsItsWarmedModelBeforePublishingCompletion() {
         val f = Fixture()
         f.needsRecheck = true
@@ -227,6 +350,52 @@ class UnknownRuntimeServiceOwnerTest {
         assertTrue(service.stats().nativeReleaseConfirmed)
         assertEquals(1, f.native.nativeCloses.get())
         assertEquals(1, f.invalidations)
+    }
+
+    @Test fun primaryCalibrationJoinsAnAlreadyRequestedLoadingReleaseAndWaitsForItsNativeAck() {
+        val f = Fixture()
+        f.start()
+        val service = requireNotNull(f.owner.loadingService)
+        service.start().get(3, TimeUnit.SECONDS)
+        f.awaitQueue(1)
+        f.native.closeEntered = CountDownLatch(1)
+        f.native.releaseClose = CountDownLatch(1)
+        f.owner.releaseLoadingIfPresent()
+        assertTrue(f.native.closeEntered.await(3, TimeUnit.SECONDS))
+        val started = CountDownLatch(1)
+        val finished = CountDownLatch(1)
+        val result = AtomicReference<Boolean?>()
+        val release = thread {
+            started.countDown()
+            try { result.set(f.owner.releaseBeforePrimaryCalibration()) }
+            finally { finished.countDown() }
+        }
+        try {
+            assertTrue(started.await(3, TimeUnit.SECONDS))
+            assertFalse("A normal close already in progress is not an immediate failure", finished.await(100, TimeUnit.MILLISECONDS))
+            assertTrue(f.owner.closing)
+        } finally { f.native.releaseClose.countDown() }
+        release.join(3_000L)
+        assertFalse(release.isAlive)
+        assertEquals(true, result.get())
+        assertTrue(service.stats().nativeReleaseConfirmed)
+        assertFalse(f.owner.closing)
+        assertNull(f.owner.loadingService)
+        assertEquals(1, f.native.nativeCloses.get())
+    }
+
+    @Test fun primaryCalibrationRetiresAQueuedEmptyPreparationWithoutWaitingOnItsOwnTuningLane() {
+        val f = Fixture()
+        f.queueTuning = true
+        f.start()
+        assertEquals(1, f.tuningTasks.size)
+        assertNull(f.owner.loadingService)
+        assertTrue(f.owner.releaseBeforePrimaryCalibration())
+        requireNotNull(f.tuningTasks.pollFirst()).run()
+        assertEquals(0, f.native.creations.get())
+        assertNull(f.owner.currentService)
+        assertNull(f.owner.loadingService)
+        assertFalse(f.owner.closing)
     }
 
     @Test fun failedActualReleaseKeepsPrimaryCalibrationBlocked() {
@@ -459,9 +628,17 @@ class UnknownRuntimeServiceOwnerTest {
         var mayStart = true
         var pendingMarks = 0
         var needsRecheck = false
+        var requiresJoint = false
+        var mode: JointCameraMode? = JointRuntimeTestFixtures.mode
+        var joint: ValidatedJointRuntimeChoice? = null
+        var jointInvalidations = 0
+        var legacyLoads = 0
+        val createdOptions = mutableListOf<FastSamRuntimeOptions>()
         var calibrationFactory: ((UnknownCalibrationRequest) -> UnknownCalibrationSession)? = null
         val events = mutableListOf<UnknownRuntimeServiceEvent>()
         var dispatchOnOtherThreadAndWait = false
+        var queueTuning = false
+        val tuningTasks = ConcurrentLinkedDeque<Runnable>()
         private val config = TwoModelRuntimeConfig("test", null, TwoModelRuntimeConfig.UNIFIED_MODEL_KEY,
             null, null, null, null)
         private val candidate = RuntimeCandidate(RuntimeBackend.CPU, 1)
@@ -472,9 +649,18 @@ class UnknownRuntimeServiceOwnerTest {
         override fun elapsedRealtimeNanos() = 100_000_000_000L
         override fun cpuNanos() = 0L
         val owner = UnknownRuntimeServiceOwner(object : UnknownRuntimeProfileRepository {
+            override val requiresJointChoice get() = requiresJoint
+            override fun loadJoint(config: TwoModelRuntimeConfig, primary: RuntimeCandidate,
+                scope: RuntimeFeatureScope, mode: JointCameraMode?) = joint
+            override fun invalidateJointChoice(choice: ValidatedJointRuntimeChoice): Boolean {
+                if (joint != choice) return false
+                jointInvalidations++
+                joint = null
+                return true
+            }
             override fun createBinding(config: TwoModelRuntimeConfig, primary: RuntimeCandidate,
                 scope: RuntimeFeatureScope): UnknownRuntimeBinding = profileBinding.also { onBinding() }
-            override fun load(binding: UnknownRuntimeBinding): UnknownRuntimeProfile? = null
+            override fun load(binding: UnknownRuntimeBinding): UnknownRuntimeProfile? { legacyLoads++; return null }
             override fun needsRecheck(binding: UnknownRuntimeBinding, manual: Boolean) = this@Fixture.needsRecheck
             override fun markPending(binding: UnknownRuntimeBinding, reason: DeviceTuningRecheckReason): Boolean {
                 pendingMarks++; return true
@@ -482,7 +668,7 @@ class UnknownRuntimeServiceOwnerTest {
         }, object : UnknownRuntimeFactory {
             override fun createService(epoch: Long, options: FastSamRuntimeOptions,
                 listener: FastSamRuntimeService.Listener<UnknownRuntimeAttachment>): FastSamRuntimeService<UnknownRuntimeAttachment> =
-                native.create(epoch, options, listener, this@Fixture::elapsedRealtimeNanos)
+                native.create(epoch, options.also(createdOptions::add), listener, this@Fixture::elapsedRealtimeNanos)
             override fun createCalibration(request: UnknownCalibrationRequest): UnknownCalibrationSession =
                 calibrationFactory?.invoke(request) ?: error("No calibration factory call is expected")
         }, object : UnknownRuntimeServiceAuthority {
@@ -490,7 +676,7 @@ class UnknownRuntimeServiceOwnerTest {
             override fun mayStartWalkingService(): Boolean { authorityReads++; return mayStart }
             override fun calibrationCameraAvailable(): Boolean { authorityReads++; return true }
             override fun speechActive(): Boolean { authorityReads++; return false }
-        }, this, Executor { it.run() }, { action ->
+        }, this, Executor { if (queueTuning) tuningTasks.addLast(it) else it.run() }, { action ->
             if (dispatchOnOtherThreadAndWait) {
                 val failure = AtomicReference<Throwable?>()
                 val callback = thread(name = "unknown-test-release-dispatch") {
@@ -509,7 +695,8 @@ class UnknownRuntimeServiceOwnerTest {
             owner.prepareComposition(config, primary, candidate, RuntimeFeatureScope.CAMERA_TRACKING,
                 false, 160_000L, current)
         }
-        fun start(source: UnknownWalkingSource? = source()) = owner.startForWalk(source, { configReads++; config }, { candidate }) { RuntimeFeatureScope.CAMERA_TRACKING }
+        fun start(source: UnknownWalkingSource? = source()) = owner.startForWalk(source,
+            { configReads++; config }, { candidate }, currentMode = { mode }) { RuntimeFeatureScope.CAMERA_TRACKING }
         fun close(service: FastSamRuntimeService<UnknownRuntimeAttachment>) {
             owner.closeActiveForDetector()
             service.releasedFuture().get(3, TimeUnit.SECONDS)
