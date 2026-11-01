@@ -59,23 +59,7 @@ class UnknownRuntimeServiceOwnerTest {
         assertTrue(f.owner.status.contains("기기 점검 필요"))
     }
 
-    @Test fun missingOrDifferentActualCameraModeCannotStartJointWalkingService() {
-        listOf(null, JointRuntimeTestFixtures.mode.copy(fps = 60),
-            JointRuntimeTestFixtures.mode.copy(displayRefreshHz = 120.0)).forEach { mode ->
-            val f = Fixture()
-            f.requiresJoint = true
-            f.joint = jointChoice(JointRuntimeCandidate(RuntimeCandidate(RuntimeBackend.CPU, 1),
-                RuntimeCandidate(RuntimeBackend.CPU, 1)))
-            f.mode = mode
-            f.start()
-            assertEquals(0, f.native.creations.get())
-            assertNull(f.owner.currentService)
-            assertEquals(0, f.legacyLoads)
-            assertTrue(f.owner.status.contains("기기 점검 필요"))
-        }
-    }
-
-    @Test fun cameraModeChangedDuringNativePreparationRetiresTheReadyServiceWithoutInvalidatingGoodChoice() {
+    @Test fun aRetiredLiveSourceCannotAdoptFixturePreparedAuxiliaryOrInvalidateItsMeasuredChoice() {
         val f = Fixture()
         f.requiresJoint = true
         f.joint = jointChoice(JointRuntimeCandidate(RuntimeCandidate(RuntimeBackend.CPU, 1),
@@ -85,7 +69,7 @@ class UnknownRuntimeServiceOwnerTest {
         f.start()
         val service = requireNotNull(f.owner.loadingService)
         assertTrue(f.native.loadEntered.await(3, TimeUnit.SECONDS))
-        f.mode = JointRuntimeTestFixtures.mode.copy(fps = 60)
+        f.sourceCurrent = false
         f.native.releaseLoad.countDown()
         service.start().get(3, TimeUnit.SECONDS)
         f.awaitQueue(1); f.drain()
@@ -93,7 +77,7 @@ class UnknownRuntimeServiceOwnerTest {
         if (f.owner.closing) { f.awaitQueue(1); f.drain() }
         assertNull(f.owner.currentService)
         assertEquals(0, f.jointInvalidations)
-        assertTrue(f.owner.status.contains("기기 점검 필요"))
+        assertNotNull(f.joint)
         assertTrue(service.stats().nativeReleaseConfirmed)
     }
 
@@ -137,8 +121,7 @@ class UnknownRuntimeServiceOwnerTest {
     }
 
     private fun jointChoice(candidate: JointRuntimeCandidate): ValidatedJointRuntimeChoice =
-        requireNotNull(JointRuntimeChoicePolicy.evaluate(JointRuntimeTestFixtures.binding, candidate,
-            RuntimeFeatureScope.CAMERA_TRACKING, JointRuntimeTestFixtures.evidence(candidate), 8))
+        JointRuntimeTestFixtures.choice(candidate)
 
     @Test fun explicitCheckReturnsItsWarmedModelBeforePublishingCompletion() {
         val f = Fixture()
@@ -335,7 +318,7 @@ class UnknownRuntimeServiceOwnerTest {
         assertEquals(0, f.native.creations.get())
         f.mayStart = false
         f.owner.startForWalk(f.source(), { fail("Blocked source must not read configuration"); null },
-            { fail("Blocked source must not read candidate"); null }) { error("Blocked scope") }
+            { fail("Blocked source must not read candidate"); null })
         assertNull(f.owner.currentService)
         assertEquals(0, f.native.creations.get())
     }
@@ -629,7 +612,6 @@ class UnknownRuntimeServiceOwnerTest {
         var pendingMarks = 0
         var needsRecheck = false
         var requiresJoint = false
-        var mode: JointCameraMode? = JointRuntimeTestFixtures.mode
         var joint: ValidatedJointRuntimeChoice? = null
         var jointInvalidations = 0
         var legacyLoads = 0
@@ -650,8 +632,7 @@ class UnknownRuntimeServiceOwnerTest {
         override fun cpuNanos() = 0L
         val owner = UnknownRuntimeServiceOwner(object : UnknownRuntimeProfileRepository {
             override val requiresJointChoice get() = requiresJoint
-            override fun loadJoint(config: TwoModelRuntimeConfig, primary: RuntimeCandidate,
-                scope: RuntimeFeatureScope, mode: JointCameraMode?) = joint
+            override fun loadJoint(config: TwoModelRuntimeConfig, primary: RuntimeCandidate) = joint
             override fun invalidateJointChoice(choice: ValidatedJointRuntimeChoice): Boolean {
                 if (joint != choice) return false
                 jointInvalidations++
@@ -696,7 +677,7 @@ class UnknownRuntimeServiceOwnerTest {
                 false, 160_000L, current)
         }
         fun start(source: UnknownWalkingSource? = source()) = owner.startForWalk(source,
-            { configReads++; config }, { candidate }, currentMode = { mode }) { RuntimeFeatureScope.CAMERA_TRACKING }
+            { configReads++; config }, { candidate })
         fun close(service: FastSamRuntimeService<UnknownRuntimeAttachment>) {
             owner.closeActiveForDetector()
             service.releasedFuture().get(3, TimeUnit.SECONDS)

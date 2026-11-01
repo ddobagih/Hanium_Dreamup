@@ -88,6 +88,34 @@ class PostLoginDeviceCheckControllerTest {
         assertFalse(f.controller.passesFeatureGate())
     }
 
+    @Test fun fixtureFailureAfterPrimaryRetirementCannotDowngradeIntoAPassedLimitedResult() {
+        val f = Fixture().running()
+        f.ready()
+        f.reader.hardware = f.reader.hardware.copy(detector = PostLoginDeviceCheckDetectorFacts(
+            true, false, false, false, PostLoginDeviceCheckSignal.UNAVAILABLE))
+        f.probes.value = f.probes.value.copy(cameraPipeline = PostLoginDeviceCheckSignal.UNAVAILABLE,
+            compositeRuntimeFailed = true)
+        f.controller.maybeContinue(f.controller.snapshot.bindingOrNull!!)
+        assertEquals(PostLoginDeviceCheckState.FAIL, f.controller.snapshot.state)
+        assertEquals(PostLoginDeviceCheckFailure.CAMERA_PIPELINE_UNAVAILABLE, f.controller.snapshot.failure)
+        assertEquals(0, f.store.saves)
+        assertEquals(0, f.effects.passes)
+    }
+
+    @Test fun fixtureReadyStillRequiresTheSeparateDepthSupportProbeBeforePassing() {
+        val f = Fixture().running()
+        f.ready()
+        f.probes.value = f.probes.value.copy(metricDepth = PostLoginMetricDepthState.PENDING)
+        f.controller.maybeContinue(f.controller.snapshot.bindingOrNull!!)
+        assertEquals(PostLoginDeviceCheckState.RUNNING, f.controller.snapshot.state)
+        assertEquals(1, f.calls.count { it == "metricStart" })
+        assertEquals(0, f.store.saves)
+        f.probes.value = f.probes.value.copy(metricDepth = PostLoginMetricDepthState.SUPPORTED)
+        f.controller.maybeContinue(f.controller.snapshot.bindingOrNull!!)
+        assertEquals(PostLoginDeviceCheckState.FULL, f.controller.snapshot.state)
+        assertEquals(1, f.store.saves)
+    }
+
     @Test fun aLateResultFromThePreviousActorCannotPassOrSave() {
         val f = Fixture().running()
         val binding = f.controller.snapshot.bindingOrNull!!

@@ -14,7 +14,6 @@ import kr.co.hanium.dreamup.walksafe.inference.RuntimeLoadCompletion
 import kr.co.hanium.dreamup.walksafe.inference.TfliteAndroidFrameDetector
 import kr.co.hanium.dreamup.walksafe.inference.TwoModelRuntimeConfig
 import kr.co.hanium.dreamup.walksafe.inference.composite.ValidatedJointRuntimeChoice
-import kr.co.hanium.dreamup.walksafe.inference.composite.JointCameraMode
 import kr.co.hanium.dreamup.walksafe.inference.unknown.tuning.UnknownRuntimeLoadControl
 import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamFrameToken
 import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamResult
@@ -38,8 +37,7 @@ internal class UnknownRuntimeServiceOwner(
 ) {
     private val ownerLock = Any()
     private class WalkingRequest(val source: UnknownWalkingSource,
-        val config: () -> TwoModelRuntimeConfig?, val candidate: () -> RuntimeCandidate?,
-        val mode: () -> JointCameraMode?, val scope: () -> RuntimeFeatureScope)
+        val config: () -> TwoModelRuntimeConfig?, val candidate: () -> RuntimeCandidate?)
     @Volatile private var walkingRequest: WalkingRequest? = null
     private class WalkingService(val service: FastSamRuntimeService<UnknownRuntimeAttachment>, val request: WalkingRequest)
     private var activeWalkingService: WalkingService? = null
@@ -181,13 +179,11 @@ internal class UnknownRuntimeServiceOwner(
 
     /** A null source retires only automatic preparation; explicit calibration keeps its own authority. */
     fun startForWalk(source: UnknownWalkingSource?, currentConfig: () -> TwoModelRuntimeConfig?,
-        currentCandidate: () -> RuntimeCandidate?, currentMode: () -> JointCameraMode? = { null },
-        currentScope: () -> RuntimeFeatureScope) {
+        currentCandidate: () -> RuntimeCandidate?) {
         val requested = if (source != null && source.isCurrent() && authority.mayStartWalkingService())
-            WalkingRequest(source, currentConfig, currentCandidate, currentMode, currentScope) else null
+            WalkingRequest(source, currentConfig, currentCandidate) else null
         val jointMatches = unknownJointChoice?.let {
-            requested != null && requested.candidate() == it.candidate.primary && requested.scope() == it.scope &&
-                requested.mode() == it.cameraMode
+            requested != null && requested.candidate() == it.candidate.primary
         } ?: !profiles.requiresJointChoice
         var invalidate = false
         val closing = synchronized(ownerLock) {
@@ -255,17 +251,14 @@ internal class UnknownRuntimeServiceOwner(
             if (!ownsPreparation(attempt) || !walkingCurrent(request)) { abandonEmpty(); return@execute }
             val config = request.config() ?: run { abandonEmpty(); return@execute }
             val candidate = request.candidate() ?: run { abandonEmpty(); return@execute }
-            val scope = request.scope()
-            val mode = request.mode()
-            val joint = profiles.loadJoint(config, candidate, scope, mode)?.takeIf {
-                it.candidate.primary == candidate && it.scope == scope && it.cameraMode == mode
-            }
+            val joint = profiles.loadJoint(config, candidate)?.takeIf { it.candidate.primary == candidate }
             if (profiles.requiresJointChoice && joint == null) {
                 unknownRuntimeStatus = "기기 점검 필요 · 저장된 인식 조합을 확인하지 못했습니다."
                 abandonEmpty()
                 return@execute
             }
-            val binding = profiles.createBinding(config, candidate, scope)
+            // Legacy comparison records remain separate; a fixture choice never claims live scope.
+            val binding = if (joint == null) profiles.createBinding(config, candidate, RuntimeFeatureScope.CAMERA_TRACKING) else null
             val selected = joint?.candidate?.auxiliary ?: binding?.let { profiles.load(it) }?.candidate
             if (!ownsPreparation(attempt) || !walkingCurrent(request)) { abandonEmpty(); return@execute }
             attempt.binding = binding
@@ -285,8 +278,7 @@ internal class UnknownRuntimeServiceOwner(
                 val matches = joint == null || info != null && !info.fallbackUsed &&
                     info.actualBackend.name == joint.candidate.auxiliary.backend.name &&
                     info.numThreads == joint.candidate.auxiliary.numThreads
-                val workloadMatches = joint == null || request.candidate() == joint.candidate.primary &&
-                    request.scope() == joint.scope && request.mode() == joint.cameraMode
+                val workloadMatches = joint == null || request.candidate() == joint.candidate.primary
                 val current = error == null && info != null && matches && walkingCurrent(request) && workloadMatches
                 val adopted = synchronized(ownerLock) {
                     if (current && preparation === attempt && !attempt.terminal.get() && walkingRequest === request) {

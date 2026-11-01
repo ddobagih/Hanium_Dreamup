@@ -84,6 +84,7 @@ internal data class PostLoginDeviceCheckProbeSignals(
     val locationFix: PostLoginDeviceCheckSignal,
     val wakePhrase: PostLoginDeviceCheckSignal,
     val metricDepth: PostLoginMetricDepthState,
+    val compositeRuntimeFailed: Boolean = false,
 )
 
 internal interface PostLoginDeviceCheckProbeSuite {

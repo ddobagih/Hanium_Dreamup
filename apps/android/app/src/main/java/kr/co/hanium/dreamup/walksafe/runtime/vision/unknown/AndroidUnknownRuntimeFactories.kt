@@ -9,7 +9,6 @@ import kr.co.hanium.dreamup.walksafe.inference.RuntimeFeatureScope
 import kr.co.hanium.dreamup.walksafe.inference.TwoModelRuntimeConfig
 import kr.co.hanium.dreamup.walksafe.inference.composite.AndroidJointRuntimeChoiceStore
 import kr.co.hanium.dreamup.walksafe.inference.composite.ValidatedJointRuntimeChoice
-import kr.co.hanium.dreamup.walksafe.inference.composite.JointCameraMode
 import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamRuntimeOptions
 import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamRuntimeService
 import kr.co.hanium.dreamup.walksafe.inference.unknown.tuning.AndroidUnknownRuntimeProfileStore
@@ -49,9 +48,8 @@ internal class AndroidUnknownRuntimeProfileRepository(private val context: () ->
     private val store by lazy { AndroidUnknownRuntimeProfileStore(context()) }
     private val jointStore by lazy { AndroidJointRuntimeChoiceStore(context()) }
     override val requiresJointChoice = true
-    override fun loadJoint(config: TwoModelRuntimeConfig, primary: RuntimeCandidate,
-        scope: RuntimeFeatureScope, mode: JointCameraMode?): ValidatedJointRuntimeChoice? =
-        mode?.let { jointStore.load(config, scope, it) }?.takeIf { it.candidate.primary == primary }
+    override fun loadJoint(config: TwoModelRuntimeConfig, primary: RuntimeCandidate): ValidatedJointRuntimeChoice? =
+        jointStore.load(config)?.takeIf { it.candidate.primary == primary }
     override fun invalidateJointChoice(choice: ValidatedJointRuntimeChoice) = jointStore.invalidateIfMatches(choice)
     override fun createBinding(config: TwoModelRuntimeConfig, primary: RuntimeCandidate,
         scope: RuntimeFeatureScope): UnknownRuntimeBinding? = AndroidUnknownRuntimeProfileStore.createBinding(context(), config, primary, scope)

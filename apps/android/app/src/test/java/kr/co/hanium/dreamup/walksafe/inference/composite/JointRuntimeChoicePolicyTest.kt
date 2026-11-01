@@ -10,93 +10,116 @@ class JointRuntimeChoicePolicyTest {
 
     @Test fun failedCpuCandidateDoesNotBlockAnIndependentlyUsableGpuCandidate() {
         val cpu = f.candidate.copy(primary = RuntimeCandidate(RuntimeBackend.CPU, 4))
-        val slowCpu = f.evidence(cpu).copy(primaryAgesMs = List(50) { 950.0 })
-        assertNull(JointRuntimeChoicePolicy.evaluate(f.binding, cpu, f.scope, slowCpu, 8))
+        val slowCpu = f.evidence(cpu).copy(primaryTurnaroundMs = List(50) { 950.0 })
+        assertNull(JointRuntimeChoicePolicy.evaluate(f.binding, cpu, slowCpu, 8))
         val gpu = f.choice()
-        // Even an invalid candidate supplied by a corrupt/old caller cannot stop selection.
         val invalidCpu = gpu.copy(candidate = cpu, evidence = slowCpu)
         assertEquals(gpu, JointRuntimeChoicePolicy.select(listOf(invalidCpu, gpu), 8))
         assertEquals(gpu, JointRuntimeChoicePolicy.select(listOf(gpu, invalidCpu), 8))
+        assertEquals(JointRuntimeMeasurementKind.SAMPLE_IMAGES_TWO_MODEL, gpu.measurementKind)
     }
 
-    @Test fun actualBackendAndThreadIdentityCannotBeClaimedByTheRequestedCandidate() {
+    @Test fun requestedSettingsCannotStandInForObservedBackendThreadOrFallbackEvidence() {
         val e = f.evidence()
         listOf(
             e.copy(actualPrimary = RuntimeCandidate(RuntimeBackend.CPU, 2)),
             e.copy(actualPrimary = e.actualPrimary.copy(numThreads = 1)),
             e.copy(actualAuxiliary = RuntimeCandidate(RuntimeBackend.GPU, 2)),
-            e.copy(actualAuxiliary = e.actualAuxiliary.copy(numThreads = 1)),
-            e.copy(fallbackUsed = true), e.copy(fixtureEquivalent = false), e.copy(sourceQualified = false),
-        ).forEach { assertFalse(JointRuntimeChoicePolicy.validateCandidate(f.candidate, f.scope, it, 8)) }
+            e.copy(actualAuxiliary = e.actualAuxiliary.copy(numThreads = 1)), e.copy(fallbackUsed = true),
+        ).forEach { assertFalse(JointRuntimeChoicePolicy.validateCandidate(f.candidate, it, 8)) }
     }
 
-    @Test fun bothModelsNeedCompletionsAndTenSecondsOfFullLoadEvidence() {
+    @Test fun allFourPinnedFixturesNeedCompleteRawShapesAndBothStrictOutputGates() {
         val e = f.evidence()
-        listOf(
-            e.copy(durationMs = 9_999), e.copy(primaryAgesMs = List(9) { 110.0 }),
-            e.copy(auxiliaryAgesMs = List(9) { 350.0 }, freshAuxiliaryFrames = 9),
-            e.copy(primarySubmittedFrames = 49), e.copy(submittedFrames = 24),
-            e.copy(uiDelayMs = emptyList()), e.copy(cameraIntervalMs = List(9) { 34.0 }),
-            e.copy(primaryAgesMs = List(50) { Double.NaN }),
-            e.copy(auxiliaryAgesMs = List(25) { Double.POSITIVE_INFINITY }),
-        ).forEach { assertNull(JointRuntimeChoicePolicy.evaluate(f.binding, f.candidate, f.scope, it, 8)) }
+        val first = e.fixtureQuality.first()
+        val invalid = listOf(
+            e.fixtureQuality.dropLast(1), List(4) { first },
+            e.fixtureQuality.drop(1) + first.copy(fixtureId = "unknown"),
+            e.fixtureQuality.drop(1) + first.copy(primaryRawValueCount = 1),
+            e.fixtureQuality.drop(1) + first.copy(auxiliaryDetectionValueCount = 1),
+            e.fixtureQuality.drop(1) + first.copy(auxiliaryPrototypeValueCount = 1),
+            e.fixtureQuality.drop(1) + first.copy(primaryOutputEquivalent = false),
+            e.fixtureQuality.drop(1) + first.copy(primaryFixtureRolesMatched = false),
+            e.fixtureQuality.drop(1) + first.copy(auxiliaryRawEquivalent = false),
+            e.fixtureQuality.drop(1) + first.copy(auxiliaryMasksEquivalent = false),
+        )
+        invalid.forEach { assertFalse(JointRuntimeChoicePolicy.validateCandidate(f.candidate, e.copy(fixtureQuality = it), 8)) }
     }
 
-    @Test fun captureAgeFreshnessAndCompletionGapsAreEnforcedSeparately() {
+    @Test fun bothModelsNeedTenSecondsAndTenActualCompletionsFromTheJointWindow() {
         val e = f.evidence()
         listOf(
-            e.copy(primaryAgesMs = e.primaryAgesMs + 800.01, primarySubmittedFrames = 51),
-            e.copy(freshAuxiliaryFrames = 24, staleAuxiliaryFrames = 1),
-            e.copy(submittedFrames = 32), // 25 fresh completions / 32 submissions is below 80%.
-            e.copy(auxiliaryAgesMs = List(19) { 350.0 } + List(6) { 801.0 },
-                freshAuxiliaryFrames = 19, staleAuxiliaryFrames = 6),
+            e.copy(durationMs = 9_999), e.copy(primaryTurnaroundMs = List(9) { 110.0 }),
+            e.copy(auxiliaryTurnaroundMs = List(9) { 350.0 }),
+            e.copy(primarySubmittedFrames = 49), e.copy(auxiliarySubmittedFrames = 24),
+            e.copy(primaryTurnaroundMs = emptyList()), e.copy(auxiliaryTurnaroundMs = List(25) { Double.NaN }),
+            e.copy(primaryTurnaroundMs = List(50) { Double.POSITIVE_INFINITY }),
+            e.copy(auxiliaryTurnaroundMs = List(25) { 10_001.0 }),
+        ).forEach { assertNull(JointRuntimeChoicePolicy.evaluate(f.binding, f.candidate, it, 8)) }
+    }
+
+    @Test fun submissionToCompletionBudgetDerivesTimelyFractionFromAcceptedWork() {
+        val e = f.evidence()
+        listOf(
+            e.copy(primaryTurnaroundMs = e.primaryTurnaroundMs + 800.01, primarySubmittedFrames = 51),
+            e.copy(primarySubmittedFrames = 63), // 50/63 is below 80%.
+            e.copy(auxiliarySubmittedFrames = 32), // 25/32 is below 80%.
+            e.copy(auxiliaryTurnaroundMs = List(19) { 350.0 } + List(6) { 801.0 }),
             e.copy(primaryLongestGapMs = 1_001.0), e.copy(auxiliaryLongestGapMs = 1_201.0),
-        ).forEach { assertFalse(JointRuntimeChoicePolicy.validateCandidate(f.candidate, f.scope, it, 8)) }
-        val boundary = e.copy(auxiliaryAgesMs = List(20) { 800.0 } + List(5) { 801.0 },
-            freshAuxiliaryFrames = 20, staleAuxiliaryFrames = 5)
-        assertTrue(JointRuntimeChoicePolicy.validateCandidate(f.candidate, f.scope, boundary, 8))
+        ).forEach { assertFalse(JointRuntimeChoicePolicy.validateCandidate(f.candidate, it, 8)) }
+        val boundary = e.copy(auxiliaryTurnaroundMs = List(20) { 800.0 } + List(5) { 801.0 })
+        assertTrue(JointRuntimeChoicePolicy.validateCandidate(f.candidate, boundary, 8))
+        // Callers cannot submit a separate fabricated "fresh count": the policy derives it.
+        assertEquals(20, boundary.auxiliaryTurnaroundMs.count { it <= 800.0 })
     }
 
-    @Test fun uiAndCameraPressureThermalAndFabricatedBudgetsRejectTheCombination() {
+    @Test fun observedThermalPressureRejectsButUnavailableObservationStaysExplicitlyUnknown() {
         val e = f.evidence()
-        listOf(
-            e.copy(uiDelayMs = List(60) { 35.0 }), e.copy(uiDelayMs = List(59) { 2.0 } + 251.0),
-            e.copy(cameraIntervalMs = List(60) { 68.0 }),
-            e.copy(cameraIntervalMs = List(59) { 34.0 } + 251.0),
-            e.copy(uiBudgetMs = 1000.0), e.copy(cameraBudgetMs = 1000.0),
-            e.copy(displayRefreshHz = Double.NaN), e.copy(cameraFps = 0),
-            e.copy(thermalStatus = 2), e.copy(thermalStatus = -1),
-        ).forEach { assertFalse(JointRuntimeChoicePolicy.validateCandidate(f.candidate, f.scope, it, 8)) }
+        assertTrue(JointRuntimeChoicePolicy.validateCandidate(f.candidate, e.copy(thermalStatus = -1), 8))
+        assertEquals(-1, f.choice(evidence = e.copy(thermalStatus = -1)).evidence.thermalStatus)
+        for (status in listOf(-2, 2, 3, 4)) {
+            assertFalse(JointRuntimeChoicePolicy.validateCandidate(f.candidate, e.copy(thermalStatus = status), 8))
+        }
     }
 
-    @Test fun threadCountsCannotExceedFourOrTheCurrentProcessorCount() {
+    @Test fun threadCountsAndCadencesRemainWithinMeasuredPolicyLimits() {
         for (threads in listOf(5, 9)) {
             val candidate = f.candidate.copy(primary = f.candidate.primary.copy(numThreads = threads))
-            assertNull(JointRuntimeChoicePolicy.evaluate(f.binding, candidate, f.scope, f.evidence(candidate), 8))
+            assertNull(JointRuntimeChoicePolicy.evaluate(f.binding, candidate, f.evidence(candidate), 8))
         }
-        assertNull(JointRuntimeChoicePolicy.evaluate(f.binding, f.candidate, f.scope, f.evidence(), 1))
-        assertNotNull(JointRuntimeChoicePolicy.evaluate(f.binding, f.candidate, f.scope, f.evidence(), 2))
+        for (cadence in listOf(99L, 601L)) {
+            assertNull(JointRuntimeChoicePolicy.evaluate(f.binding, f.candidate.copy(primaryIntervalMs = cadence), f.evidence(), 8))
+        }
+        assertNull(JointRuntimeChoicePolicy.evaluate(f.binding, f.candidate, f.evidence(), 1))
+        assertNotNull(JointRuntimeChoicePolicy.evaluate(f.binding, f.candidate, f.evidence(), 2))
     }
 
-    @Test fun selectionPrioritizesUiHeadroomBeforePrimaryLatencyAndAuxiliaryThroughput() {
-        val uiResponsive = f.choice(evidence = f.evidence().copy(uiDelayMs = List(60) { 1.0 },
-            primaryAgesMs = List(50) { 300.0 }))
-        val fasterModel = f.choice(evidence = f.evidence().copy(uiDelayMs = List(60) { 4.0 },
-            primaryAgesMs = List(50) { 80.0 }))
-        assertEquals(uiResponsive, JointRuntimeChoicePolicy.select(listOf(fasterModel, uiResponsive), 8))
-        val freshThroughput = f.choice(evidence = f.evidence().copy(submittedFrames = 30,
-            auxiliaryAgesMs = List(30) { 350.0 }, freshAuxiliaryFrames = 30))
-        assertEquals(freshThroughput, JointRuntimeChoicePolicy.select(listOf(f.choice(), freshThroughput), 8))
+    @Test fun selectionUsesPrimaryTurnaroundThenTimelyAuxiliaryThroughputWithinAdmittedCandidates() {
+        val fastPrimary = f.choice(evidence = f.evidence().copy(primaryTurnaroundMs = List(50) { 80.0 }))
+        val fastAuxiliary = f.choice(evidence = f.evidence().copy(auxiliarySubmittedFrames = 30,
+            auxiliaryTurnaroundMs = List(30) { 200.0 }))
+        assertEquals(fastPrimary, JointRuntimeChoicePolicy.select(listOf(fastAuxiliary, fastPrimary), 8))
+        assertEquals(fastAuxiliary, JointRuntimeChoicePolicy.select(listOf(f.choice(), fastAuxiliary), 8))
     }
 
-    @Test fun evaluationSnapshotsMeasurementsAndRejectsBadBindingAndOldPolicy() {
-        val ages = MutableList(50) { 110.0 }
-        val choice = f.choice(evidence = f.evidence().copy(primaryAgesMs = ages))
-        ages[0] = 900.0
-        assertEquals(110.0, choice.evidence.primaryAgesMs.first(), 0.0)
-        assertTrue(choice.isValid(f.binding, 8))
-        assertFalse(choice.isValid("b".repeat(64), 8))
-        assertFalse(choice.copy(policyVersion = "previous").isValid(f.binding, 8))
-        assertNull(JointRuntimeChoicePolicy.evaluate("invalid", f.candidate, f.scope, f.evidence(), 8))
+    @Test fun evaluationSnapshotsSampleMeasurementsAndRejectsBadBindingOrOldPolicy() {
+        val timings = MutableList(50) { 110.0 }; val quality = f.quality().toMutableList()
+        val choice = f.choice(evidence = f.evidence().copy(primaryTurnaroundMs = timings, fixtureQuality = quality))
+        timings[0] = 900.0; quality.clear()
+        assertEquals(110.0, choice.evidence.primaryTurnaroundMs.first(), 0.0)
+        assertEquals(4, choice.evidence.fixtureQuality.size)
+        assertTrue(choice.isValid(f.binding, 8)); assertFalse(choice.isValid("b".repeat(64), 8))
+        assertFalse(choice.copy(policyVersion = "joint-camera-runtime-768-v1").isValid(f.binding, 8))
+        assertNull(JointRuntimeChoicePolicy.evaluate("invalid", f.candidate, f.evidence(), 8))
+    }
+
+    @Test fun eachLogicalMeasurementGetsAUniqueValidatedIdEvenWithIdenticalMetrics() {
+        val first = f.choice(); val second = f.choice()
+        assertEquals(first.candidate, second.candidate)
+        assertEquals(first.evidence, second.evidence)
+        assertNotEquals(first.measurementId, second.measurementId)
+        assertTrue(JointRuntimeChoicePolicy.validMeasurementId(first.measurementId))
+        assertFalse(first.copy(measurementId = "invalid").isValid(f.binding, 8))
+        assertFalse(first.copy(measurementId = "00000000-0000-0000-0000-000000000000").isValid(f.binding, 8))
     }
 }

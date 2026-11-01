@@ -112,6 +112,67 @@ class AndroidPostLoginDeviceProbesTest {
         assertEquals(listOf(f.binding), f.continued)
     }
 
+    @Test fun fixtureSuccessDoesNotOpenLegacyCameraOrClaimMetricDepthSupport() {
+        val f = Fixture()
+        f.support.compositeHandled = true
+        f.probes.startCamera(f.binding)
+        f.support.compositeRequests.single().finished(PostLoginCompositeCameraCheckResult(true))
+        f.ui.drain()
+        assertTrue(f.camera.requests.isEmpty())
+        assertEquals(PostLoginDeviceCheckSignal.READY, f.probes.signals.cameraPipeline)
+        assertEquals(PostLoginMetricDepthState.PENDING, f.probes.signals.metricDepth)
+        assertFalse(f.probes.signals.compositeRuntimeFailed)
+    }
+
+    @Test fun unconfirmedFixtureWorkerExitPublishesFailureOnceAndRetainsAllocationFence() {
+        val f = Fixture()
+        f.support.compositeHandled = true
+        f.probes.startCamera(f.binding)
+        val run = f.support.compositeRequests.single()
+        // Even an inconsistent producer cannot publish READY without release proof.
+        run.finished(PostLoginCompositeCameraCheckResult(true, releaseConfirmed = false))
+        run.finished(PostLoginCompositeCameraCheckResult(true))
+        f.ui.drain()
+        assertEquals(PostLoginDeviceCheckSignal.UNAVAILABLE, f.probes.signals.cameraPipeline)
+        assertTrue(f.probes.signals.compositeRuntimeFailed)
+        assertEquals(PostLoginMetricDepthState.PENDING, f.probes.signals.metricDepth)
+        assertFalse(f.probes.cameraActive)
+        assertTrue(f.probes.cameraCleanupPending)
+        assertFalse(f.probes.hasCamera) // Native allocation remains fenced without any camera opened.
+        assertEquals(listOf(f.binding), f.continued)
+        f.probes.startCamera(f.binding)
+        assertEquals(1, f.support.compositeRequests.size)
+        assertTrue(f.camera.requests.isEmpty())
+    }
+
+    @Test fun actualLateWorkerDeathReleasesOnlyItsOwnFailedAttemptFence() {
+        val f = Fixture()
+        f.support.compositeHandled = true
+        f.probes.startCamera(f.binding)
+        f.support.compositeRequests.single().finished(PostLoginCompositeCameraCheckResult(false, releaseConfirmed = false))
+        f.ui.drain()
+        assertTrue(f.probes.cameraCleanupPending)
+        f.probes.confirmCompositeRuntimeRelease(f.binding.copy(attemptGeneration = 99L))
+        assertTrue(f.probes.cameraCleanupPending)
+        f.probes.confirmCompositeRuntimeRelease(f.binding)
+        assertFalse(f.probes.cameraCleanupPending)
+        assertEquals(PostLoginDeviceCheckSignal.UNAVAILABLE, f.probes.signals.cameraPipeline)
+        assertTrue(f.probes.signals.compositeRuntimeFailed)
+        assertEquals(PostLoginMetricDepthState.PENDING, f.probes.signals.metricDepth)
+    }
+
+    @Test fun lateWorkerDeathBeforeQueuedFailurePublicationCannotLoseTheReleaseAckOrReviveSuccess() {
+        val f = Fixture()
+        f.support.compositeHandled = true
+        f.probes.startCamera(f.binding)
+        f.support.compositeRequests.single().finished(PostLoginCompositeCameraCheckResult(true, releaseConfirmed = false))
+        f.probes.confirmCompositeRuntimeRelease(f.binding)
+        f.ui.drain()
+        assertFalse(f.probes.cameraCleanupPending)
+        assertEquals(PostLoginDeviceCheckSignal.UNAVAILABLE, f.probes.signals.cameraPipeline)
+        assertTrue(f.probes.signals.compositeRuntimeFailed)
+    }
+
     @Test fun cancelledCompositeRunWaitsForReleaseAndCannotPublishOldEvidenceOrReleaseANewerRun() {
         val f = Fixture()
         f.support.compositeHandled = true

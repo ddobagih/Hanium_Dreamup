@@ -376,7 +376,8 @@ internal class PostLoginDeviceCheckController(
                 hardware.resourceReadiness == WalkSessionReadinessStatus.UNAVAILABLE -> PostLoginDeviceCheckFailure.DEVICE_RESOURCE
                 koreanTextToSpeechAvailable == false -> PostLoginDeviceCheckFailure.KOREAN_TTS_UNAVAILABLE
                 cameraPipeline == PostLoginDeviceCheckSignal.UNAVAILABLE && startup.cameraAvailable != false &&
-                    hardware.cameraPermission && !detectorUnavailable -> PostLoginDeviceCheckFailure.CAMERA_PIPELINE_UNAVAILABLE
+                    hardware.cameraPermission && (!detectorUnavailable || probeSignals.compositeRuntimeFailed) ->
+                    PostLoginDeviceCheckFailure.CAMERA_PIPELINE_UNAVAILABLE
                 else -> null
             },
         )

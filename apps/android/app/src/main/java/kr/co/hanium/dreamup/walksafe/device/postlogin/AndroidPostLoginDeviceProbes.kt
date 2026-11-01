@@ -36,11 +36,12 @@ internal enum class PostLoginCameraPipelineFailure {
     NO_VALID_FRAME, DETECTOR_FAILED, COMPOSITE_RUNTIME_UNAVAILABLE, RELEASE_TIMED_OUT, TIMED_OUT,
 }
 
-/** Completion is delivered only after the joint choice is saved/applied and native camera work drained. */
+/** Successful completion requires a saved/applied fixture choice and confirmed worker release. */
 internal data class PostLoginCompositeCameraCheckResult(
     val success: Boolean,
     val metricDepth: PostLoginMetricDepthState? = null,
     val reason: String = "",
+    val releaseConfirmed: Boolean = true,
 )
 
 internal enum class PostLoginLocationFixTerminalFailure { REQUEST_FAILED, TIMED_OUT }
@@ -181,7 +182,8 @@ internal class AndroidPostLoginDeviceProbes(
     private var locationSignal = PostLoginDeviceCheckSignal.PENDING
     private var wakeSignal = PostLoginDeviceCheckSignal.PENDING
     private var metricDepth = PostLoginMetricDepthState.PENDING
-    override val signals get() = PostLoginDeviceCheckProbeSignals(cameraSignal, locationSignal, wakeSignal, metricDepth)
+    override val signals get() = PostLoginDeviceCheckProbeSignals(cameraSignal, locationSignal, wakeSignal, metricDepth,
+        compositeRuntimeFailed = cameraFailure == PostLoginCameraPipelineFailure.COMPOSITE_RUNTIME_UNAVAILABLE)
     override var metricPreflightStarted = false
         private set
     override val capabilityProbeStarted get() = support.capabilityProbeStarted
@@ -213,11 +215,13 @@ internal class AndroidPostLoginDeviceProbes(
     private var cameraTerminalClaim: AtomicBoolean? = null
     private var cameraReleaseGeneration = 0L
     private var compositeCameraRun: CompositeCameraRun? = null
+    private var unconfirmedCompositeReleaseBinding: PostLoginDeviceCheckBinding? = null
     private class CompositeCameraRun(val binding: PostLoginDeviceCheckBinding, val generation: Long) {
         var handled: Boolean? = null
         var completion: PostLoginCompositeCameraCheckResult? = null
         var completionDispatched = false
         var retired = false
+        var releaseAcknowledged = false
     }
 
     private var wakeProbe: PostLoginWakeProbe? = null
@@ -576,22 +580,39 @@ internal class AndroidPostLoginDeviceProbes(
         dispatcher.post(Runnable {
             if (compositeCameraRun !== run) return@Runnable
             compositeCameraRun = null
-            cameraCleanupPending = false
+            val released = result.releaseConfirmed || synchronized(run) { run.releaseAcknowledged }
+            cameraCleanupPending = !released
+            unconfirmedCompositeReleaseBinding = if (released) null else run.binding
             val current = !run.retired && cameraCurrent(run.binding, run.generation)
             cameraActive = false
             cameraTerminalClaim?.set(true)
             cameraTerminalClaim = null
             if (current) {
-                cameraFailure = if (result.success) null else PostLoginCameraPipelineFailure.COMPOSITE_RUNTIME_UNAVAILABLE
-                cameraSignal = if (result.success) PostLoginDeviceCheckSignal.READY else PostLoginDeviceCheckSignal.UNAVAILABLE
-                if (result.success) result.metricDepth?.let { metricDepth = it }
-                observer.navigationDiagnostic("postLoginDeviceCheck=composite_camera_${if (result.success) "ready" else "unavailable"} reason=${result.reason}")
+                val success = result.success && result.releaseConfirmed
+                cameraFailure = if (success) null else PostLoginCameraPipelineFailure.COMPOSITE_RUNTIME_UNAVAILABLE
+                cameraSignal = if (success) PostLoginDeviceCheckSignal.READY else PostLoginDeviceCheckSignal.UNAVAILABLE
+                if (success) result.metricDepth?.let { metricDepth = it }
+                observer.navigationDiagnostic("postLoginDeviceCheck=composite_camera_${if (success) "ready" else "unavailable"} reason=${result.reason}")
             }
             // A retired completion proves release only. It may let a newer current attempt start,
             // but can never publish READY or metric evidence from the old attempt.
             currentBinding()?.let { binding -> if (isCurrent(binding)) observer.continueCheck(binding) }
             if (uiAlive()) observer.changed()
         })
+    }
+
+    /** Late death ACK releases only its original worker fence, never its failed result. */
+    fun confirmCompositeRuntimeRelease(binding: PostLoginDeviceCheckBinding) {
+        val run = compositeCameraRun
+        if (run?.binding == binding) {
+            synchronized(run) { run.releaseAcknowledged = true }
+            return
+        }
+        if (unconfirmedCompositeReleaseBinding != binding) return
+        unconfirmedCompositeReleaseBinding = null
+        cameraCleanupPending = false
+        currentBinding()?.let { current -> if (isCurrent(current)) observer.continueCheck(current) }
+        if (uiAlive()) observer.changed()
     }
 
     private fun retireCompositeCamera(reason: String): Boolean {

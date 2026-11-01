@@ -1,7 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.inference.composite
 
 import android.content.SharedPreferences
-import kr.co.hanium.dreamup.walksafe.inference.RuntimeFeatureScope
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
@@ -11,23 +10,19 @@ class AndroidJointRuntimeChoiceStoreTest {
     private val f = JointRuntimeTestFixtures
     private var processors = 8
     private var mainThread = false
+    private var thermalSupported = false
 
-    @Test fun atomicRecordRoundTripRequiresExactModelScopeCameraAndProcessorIdentity() {
+    @Test fun atomicRecordRoundTripRequiresExactModelAndProcessorIdentity() {
         val prefs = Prefs()
         val store = store(prefs)
         val choice = f.choice()
         assertTrue(store.save(f.config, choice))
-        assertEquals(choice, store(prefs).load(f.config, f.scope, f.mode))
-        assertEquals(choice, store(prefs).load(f.config)) // Initial model preparation only.
-        assertNull(store.load(f.config.copy(primaryModelKey = "another-model"), f.scope, f.mode))
-        assertNull(store.load(f.config, RuntimeFeatureScope.CAMERA_TRACKING, f.mode))
-        assertNull(store.load(f.config, f.scope, f.mode.copy(width = 1280)))
-        assertNull(store.load(f.config, f.scope, f.mode.copy(fps = 60)))
-        assertNull(store.load(f.config, f.scope, f.mode.copy(displayRefreshHz = 59.94)))
+        assertEquals(choice, store(prefs).load(f.config))
+        assertNull(store.load(f.config.copy(primaryModelKey = "another-model")))
         processors = 1
-        assertNull(store.load(f.config, f.scope, f.mode))
+        assertNull(store.load(f.config))
         processors = 8
-        assertEquals(choice, store.load(f.config, f.scope, f.mode))
+        assertEquals(choice, store.load(f.config))
         assertEquals(setOf("choice"), prefs.values.keys)
         assertEquals(1, prefs.commits)
         assertEquals(0, prefs.applies)
@@ -38,14 +33,14 @@ class AndroidJointRuntimeChoiceStoreTest {
         val text = requireNotNull(JointRuntimeChoiceCodec.encode(choice))
         assertEquals(choice, JointRuntimeChoiceCodec.decode(text))
         listOf(text.dropLast(1), text + "junk", "[]", "{\"schema\":1}",
-            text.replaceFirst("\"schema\":1", "\"schema\":2"),
-            text.replaceFirst("\"schema\":1", "\"schema\":1,\"schema\":1"),
+            text.replaceFirst("\"schema\":2", "\"schema\":1"),
+            text.replaceFirst("\"schema\":2", "\"schema\":2,\"schema\":2"),
             text.replaceFirst("{", "{\"unknown\":true,"),
             text.replaceFirst("\"threads\":2", "\"threads\":\"2\""),
             text.replaceFirst("\"threads\":2", "\"threads\":2.1"),
             text.replaceFirst("\"threads\":2", "\"threads\":0"),
             text.replaceFirst("\"durationMs\":10000", "\"durationMs\":9223372036854775808"),
-            text.replaceFirst("\"sourceQualified\":true", "\"sourceQualified\":\"true\""),
+            text.replaceFirst("\"fallbackUsed\":false", "\"fallbackUsed\":\"false\""),
             text.replaceFirst("{", "{/*comment*/"),
             text.replaceFirst("\"schema\"", "'schema'"),
         ).forEach { assertNull(it.take(60), JointRuntimeChoiceCodec.decode(it)) }
@@ -56,26 +51,72 @@ class AndroidJointRuntimeChoiceStoreTest {
         val invalid = listOf(
             original.copy(policyVersion = "old-policy"), original.copy(bindingHash = "b".repeat(64)),
             original.copy(candidate = original.candidate.copy(primary = original.candidate.primary.copy(numThreads = 1))),
-            original.copy(evidence = original.evidence.copy(fixtureEquivalent = false)),
-            original.copy(evidence = original.evidence.copy(sourceQualified = false)),
-            original.copy(evidence = original.evidence.copy(freshAuxiliaryFrames = 24)),
+            original.copy(evidence = original.evidence.copy(fallbackUsed = true)),
+            original.copy(evidence = original.evidence.copy(fixtureQuality = original.evidence.fixtureQuality.dropLast(1))),
+            original.copy(evidence = original.evidence.copy(auxiliarySubmittedFrames = 32)),
         )
         for (choice in invalid) {
             val prefs = Prefs()
             val store = store(prefs)
             assertTrue(store.save(f.config, original))
             assertFalse(store.save(f.config, choice))
-            assertEquals(original, store.load(f.config, f.scope, f.mode))
+            assertEquals(original, store.load(f.config))
             assertEquals(1, prefs.commits)
             val corruptPrefs = Prefs()
             corruptPrefs.values["choice"] = JointRuntimeChoiceCodec.encode(choice)
-            assertNull(store(corruptPrefs).load(f.config, f.scope, f.mode))
+            assertNull(store(corruptPrefs).load(f.config))
         }
         val missingEvidence = JSONObject(requireNotNull(JointRuntimeChoiceCodec.encode(original)))
         missingEvidence.getJSONObject("evidence").remove("actualAuxiliary")
         val prefs = Prefs()
         prefs.values["choice"] = missingEvidence.toString()
-        assertNull(store(prefs).load(f.config, f.scope, f.mode))
+        assertNull(store(prefs).load(f.config))
+    }
+
+    @Test fun oldLiveRecordOrMissingMeasurementKindCannotBeReclassifiedAsSampleEvidence() {
+        val valid = requireNotNull(JointRuntimeChoiceCodec.encode(f.choice()))
+        val oldLive = JSONObject(valid).put("schema", 1).put("policy", "joint-camera-runtime-768-v1")
+            .put("scope", "CAMERA_TRACKING_METRIC_DEPTH")
+        oldLive.remove("measurementKind")
+        val missingKind = JSONObject(valid).also { it.remove("measurementKind") }
+        val inventedKind = JSONObject(valid).put("measurementKind", "LIVE_CAMERA")
+        for (record in listOf(oldLive, missingKind, inventedKind)) {
+            val prefs = Prefs()
+            prefs.values["choice"] = record.toString(); prefs.values["unrelated"] = "preserve"
+            assertNull(store(prefs).load(f.config))
+            assertEquals(0, prefs.commits)
+            assertEquals("preserve", prefs.values["unrelated"])
+            assertNotNull(prefs.values["choice"]) // Fail closed, without an implicit destructive migration.
+        }
+    }
+
+    @Test fun workerEvidenceCodecIsBoundedAndContainsOnlySampleModelMeasurements() {
+        val measured = f.evidence()
+        val text = requireNotNull(JointRuntimeChoiceCodec.encodeEvidence(measured))
+        assertEquals(measured, JointRuntimeChoiceCodec.decodeEvidence(text))
+        assertTrue(text.toByteArray(Charsets.UTF_8).size <= JointRuntimeChoiceCodec.MAX_EVIDENCE_JSON_BYTES)
+        val json = JSONObject(text)
+        for (unsupported in listOf("scope", "cameraWidth", "cameraFps", "displayRefreshHz", "sourceQualified",
+            "uiDelayMs", "cameraIntervalMs", "primaryAgesMs", "freshAuxiliaryFrames")) {
+            assertFalse(json.has(unsupported))
+        }
+        assertNull(JointRuntimeChoiceCodec.decodeEvidence(text + "junk"))
+        assertNull(JointRuntimeChoiceCodec.decodeEvidence(" ".repeat(JointRuntimeChoiceCodec.MAX_EVIDENCE_JSON_BYTES + 1)))
+        assertNull(JointRuntimeChoiceCodec.decodeEvidence(JSONObject(text).put("sourceQualified", true).toString()))
+    }
+
+    @Test fun unavailableThermalReadingIsPreservedOnlyOnAPlatformWithoutTheApi() {
+        val prefs = Prefs()
+        val store = store(prefs)
+        val unknown = f.choice(evidence = f.evidence().copy(thermalStatus = -1))
+        assertTrue(store.save(f.config, unknown))
+        assertEquals(-1, store.load(f.config)!!.evidence.thermalStatus)
+        thermalSupported = true
+        assertNull(store.load(f.config))
+        assertFalse(store.save(f.config, unknown))
+        assertEquals(1, prefs.commits)
+        assertTrue(store.save(f.config, f.choice()))
+        assertEquals(0, store.load(f.config)!!.evidence.thermalStatus)
     }
 
     @Test fun failedCommitKeepsThePreviousPersistedChoiceEvenAfterStoreRecreation() {
@@ -87,11 +128,11 @@ class AndroidJointRuntimeChoiceStoreTest {
         prefs.commitResult = false
         assertFalse(store.save(f.config, replacement))
         assertNotEquals(JointRuntimeChoiceCodec.encode(original), prefs.values["choice"])
-        assertEquals(original, store.load(f.config, f.scope, f.mode))
-        assertEquals(original, store(prefs).load(f.config, f.scope, f.mode))
+        assertEquals(original, store.load(f.config))
+        assertEquals(original, store(prefs).load(f.config))
         prefs.commitResult = true
         assertTrue(store.save(f.config, replacement))
-        assertEquals(replacement, store(prefs).load(f.config, f.scope, f.mode))
+        assertEquals(replacement, store(prefs).load(f.config))
     }
 
     @Test fun noPriorRecordCannotBecomeAcceptedFromAFailedCommit() {
@@ -99,7 +140,7 @@ class AndroidJointRuntimeChoiceStoreTest {
         prefs.commitResult = false
         assertFalse(store(prefs).save(f.config, f.choice()))
         assertNotNull(prefs.values["choice"])
-        assertNull(store(prefs).load(f.config, f.scope, f.mode))
+        assertNull(store(prefs).load(f.config))
     }
 
     @Test fun invalidationRetiresOnlyThisRecordAndFailedRemovalStaysUnusableInTheProcess() {
@@ -109,14 +150,14 @@ class AndroidJointRuntimeChoiceStoreTest {
         assertTrue(store.save(f.config, f.choice()))
         prefs.commitResult = false
         assertFalse(store.invalidate())
-        assertNull(store(prefs).load(f.config, f.scope, f.mode))
+        assertNull(store(prefs).load(f.config))
         assertEquals("preserve", prefs.values["unrelated"])
         // An explicit new successful, fully validated measurement can replace the retired record.
         prefs.commitResult = true
         assertTrue(store.save(f.config, f.choice()))
-        assertNotNull(store(prefs).load(f.config, f.scope, f.mode))
+        assertNotNull(store(prefs).load(f.config))
         assertTrue(store.invalidate())
-        assertNull(store(prefs).load(f.config, f.scope, f.mode))
+        assertNull(store(prefs).load(f.config))
         assertEquals(mapOf("unrelated" to "preserve"), prefs.values)
     }
 
@@ -125,7 +166,7 @@ class AndroidJointRuntimeChoiceStoreTest {
         val oldOwner = store(prefs)
         val original = f.choice()
         assertTrue(oldOwner.save(f.config, original))
-        val captured = requireNotNull(oldOwner.load(f.config, f.scope, f.mode))
+        val captured = requireNotNull(oldOwner.load(f.config))
         // Binding and requested runtime can stay identical after a new, independently measured run.
         val newer = f.choice(evidence = f.evidence().copy(durationMs = 12_000))
         assertEquals(captured.bindingHash, newer.bindingHash)
@@ -133,8 +174,8 @@ class AndroidJointRuntimeChoiceStoreTest {
         assertTrue(store(prefs).save(f.config, newer))
 
         assertFalse(oldOwner.invalidateIfMatches(captured))
-        assertEquals(newer, oldOwner.load(f.config, f.scope, f.mode))
-        assertEquals(newer, store(prefs).load(f.config, f.scope, f.mode))
+        assertEquals(newer, oldOwner.load(f.config))
+        assertEquals(newer, store(prefs).load(f.config))
         assertEquals(2, prefs.commits)
     }
 
@@ -146,26 +187,58 @@ class AndroidJointRuntimeChoiceStoreTest {
         assertTrue(store.save(f.config, original))
         val differentEvidence = f.choice(evidence = f.evidence().copy(durationMs = 12_000))
         assertFalse(store.invalidateIfMatches(differentEvidence))
-        assertEquals(original, store.load(f.config, f.scope, f.mode))
+        assertEquals(original, store.load(f.config))
         assertEquals(1, prefs.commits)
         val reconstructed = requireNotNull(JointRuntimeChoiceCodec.decode(JointRuntimeChoiceCodec.encode(original)))
         assertNotSame(original, reconstructed)
         assertTrue(store(prefs).invalidateIfMatches(reconstructed))
-        assertNull(store.load(f.config, f.scope, f.mode))
+        assertNull(store.load(f.config))
         assertEquals(mapOf("unrelated" to "preserve"), prefs.values)
         assertFalse(store.invalidateIfMatches(original))
         assertEquals(2, prefs.commits)
     }
 
+    @Test fun identicalPayloadFromANewMeasurementCannotBeInvalidatedByThePreviousOwner() {
+        val prefs = Prefs(); val oldOwner = store(prefs)
+        val old = f.choice(); val newer = f.choice()
+        assertEquals(old.evidence, newer.evidence); assertEquals(old.candidate, newer.candidate)
+        assertNotEquals(old.measurementId, newer.measurementId)
+        assertTrue(oldOwner.save(f.config, old))
+        assertTrue(store(prefs).save(f.config, newer))
+        assertFalse(oldOwner.invalidateIfMatches(old))
+        assertEquals(newer, store(prefs).load(f.config))
+        assertEquals(2, prefs.commits)
+        assertTrue(store(prefs).invalidateIfMatches(newer))
+        assertNull(oldOwner.load(f.config))
+    }
+
+    @Test fun retryOfSameMeasurementIsIdempotentButCannotChangeItsEvidence() {
+        val prefs = Prefs(); val store = store(prefs); val original = f.choice()
+        assertTrue(store.save(f.config, original))
+        val reconstructed = requireNotNull(JointRuntimeChoiceCodec.decode(JointRuntimeChoiceCodec.encode(original)))
+        assertEquals(original.measurementId, reconstructed.measurementId)
+        assertTrue(store(prefs).save(f.config, reconstructed))
+        assertEquals(1, prefs.commits)
+        val changedEvidence = original.copy(evidence = original.evidence.copy(durationMs = 12_000))
+        assertTrue(changedEvidence.isValid(f.binding, 8))
+        assertFalse(store.save(f.config, changedEvidence))
+        assertEquals(original, store.load(f.config)); assertEquals(1, prefs.commits)
+        val missingId = JSONObject(requireNotNull(JointRuntimeChoiceCodec.encode(original))).also { it.remove("measurementId") }
+        assertNull(JointRuntimeChoiceCodec.decode(missingId.toString()))
+        val invalidId = JSONObject(requireNotNull(JointRuntimeChoiceCodec.encode(original))).put("measurementId", "invalid")
+        assertNull(JointRuntimeChoiceCodec.decode(invalidId.toString()))
+    }
+
     @Test fun mainThreadCannotCommitSaveOrInvalidation() {
         val prefs = Prefs()
         val store = store(prefs)
-        assertTrue(store.save(f.config, f.choice()))
+        val original = f.choice()
+        assertTrue(store.save(f.config, original))
         mainThread = true
-        assertFalse(store.save(f.config, f.choice()))
+        assertFalse(store.save(f.config, original))
         assertFalse(store.invalidate())
-        assertFalse(store.invalidateIfMatches(f.choice()))
-        assertNotNull(store.load(f.config, f.scope, f.mode))
+        assertFalse(store.invalidateIfMatches(original))
+        assertNotNull(store.load(f.config))
         assertEquals(1, prefs.commits)
     }
 
@@ -174,14 +247,12 @@ class AndroidJointRuntimeChoiceStoreTest {
         val store = store(prefs)
         val original = f.choice()
         assertTrue(store.save(f.config, original))
-        prefs.duringCommit = { assertEquals(original, store(prefs).load(f.config, f.scope, f.mode)) }
+        prefs.duringCommit = { assertEquals(original, store(prefs).load(f.config)) }
         assertTrue(store.save(f.config, f.choice(evidence = f.evidence().copy(durationMs = 12_000))))
     }
 
     private fun store(prefs: Prefs) = AndroidJointRuntimeChoiceStore(prefs.shared,
-        { config, scope, mode ->
-            f.binding.takeIf { config == f.config && scope == f.scope && mode == f.mode }
-        }, { processors }, { mainThread })
+        { config -> f.binding.takeIf { config == f.config } }, { processors }, { mainThread }, { thermalSupported })
 
     /** commit(false) still changes process memory, matching SharedPreferences' difficult case. */
     private class Prefs {

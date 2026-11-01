@@ -13857,17 +13857,7 @@ generation != cameraFallbackGeneration
         val source = captureAutomaticUnknownWalkingSource()
         if (source == null && !unknownServiceOwnerLazy.isInitialized()) return
         unknownServiceOwner.startForWalk(source, { reportRuntimeConfig },
-            { primaryRuntimeCalibrationOwner.projection().activeCandidate }, currentMode = {
-                val ar = arSessionOwner.observe()
-                if (ar.purpose != ArSessionPurpose.RUNTIME) null else ar.session?.cameraConfig?.let { camera ->
-                    window.decorView.display?.refreshRate?.toDouble()?.let { refresh ->
-                        JointCameraMode(camera.imageSize.width, camera.imageSize.height, camera.fpsRange.lower, refresh)
-                    }
-                }
-            }) {
-            if (postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE))
-                RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH else RuntimeFeatureScope.ARCORE_CAMERA_TRACKING
-        }
+            { primaryRuntimeCalibrationOwner.projection().activeCandidate })
     }
 
     /** Resource eligibility does not assert fresh metric/tracking evidence for unknown results. */
@@ -13889,13 +13879,13 @@ generation != cameraFallbackGeneration
     }
 
     private fun loadDetectorForPostLoginDeviceCheck() {
-        if (postLoginDeviceCheckSnapshot.state != PostLoginDeviceCheckState.RUNNING) return
+        if (postLoginDeviceCheckSnapshot.state != PostLoginDeviceCheckState.RUNNING || deviceCompositeAttempt != null) return
         if (deferPrimaryForCameraRelease(allowComparison = true)) return
         primaryDetectorLifecycleController.loadForCurrentProcess(allowComparison = true)
     }
 
     private fun loadDetectorForCurrentProcess() {
-        if (cameraEntryReleasePending || deferPrimaryForCameraRelease()) return
+        if (cameraEntryReleasePending || deviceCompositeAttempt != null || deferPrimaryForCameraRelease()) return
         primaryDetectorLifecycleController.loadForCurrentProcess()
     }
 
@@ -14159,6 +14149,8 @@ generation != cameraFallbackGeneration
         var choice: ValidatedJointRuntimeChoice? = null
         var applying = false
         var saving = false
+        var completionPublished = false
+        var lateReleaseConfirmed = false
     }
     @Volatile private var deviceCompositeAttempt: DeviceCompositeAttempt? = null
 
@@ -14196,7 +14188,7 @@ generation != cameraFallbackGeneration
         val attempt = DeviceCompositeAttempt(binding, config, deadline, finished)
         deviceCompositeAttempt = attempt
         stopHandsFreeVoiceService()
-        updateStatus("카메라와 객체 인식 성능 점검", "밝은 곳의 물체를 비춰 주세요. 기본 인식·추가 인식·거리 계산을 함께 확인합니다.")
+        updateStatus("내장 이미지로 인식 성능 점검", "앱에 포함된 테스트 이미지로 기본 인식과 추가 인식을 함께 확인합니다. 카메라를 비출 필요가 없습니다.")
         primaryDetectorLifecycleController.releaseForCompositeCheck({ compositeAttemptCurrent(attempt) }) { released ->
             if (!released) {
                 if (!primaryDetectorOwner.projection().closing)
@@ -14216,10 +14208,14 @@ generation != cameraFallbackGeneration
                         completeDeviceCompositeAttempt(attempt, false, "joint_runtime_retired")
                         return@runOnUiThread
                     }
-                    val runner = AndroidJointRuntimeCheck(this, config, candidate, deadline,
-                        isCurrent = { compositeAttemptCurrent(attempt) }, speechActive = ::isHandsFreeVoiceOutputActive) { result ->
+                    val runner = AndroidJointRuntimeCheck(applicationContext, config, candidate, deadline,
+                        isCurrent = { compositeAttemptCurrent(attempt) }, speechActive = ::isHandsFreeVoiceOutputActive,
+                        onReleaseConfirmed = { acknowledgeDeviceCompositeLateRelease(attempt) },
+                        onProgress = { message ->
+                            if (compositeAttemptCurrent(attempt)) updateStatus("내장 이미지로 인식 성능 점검", message)
+                        }, onFinished = { result ->
                         if (!result.releaseConfirmed) {
-                            updateNavigationStatus("deviceComposite=release_unconfirmed reason=${result.reason}")
+                            publishDeviceCompositeReleaseFailure(attempt, result.reason)
                         } else if (!compositeAttemptCurrent(attempt) || result.choice == null) {
                             completeDeviceCompositeAttempt(attempt, false, result.reason)
                         } else {
@@ -14242,7 +14238,7 @@ generation != cameraFallbackGeneration
                                 }
                             }
                         }
-                    }
+                    })
                     attempt.runner = runner
                     if (!runner.start()) completeDeviceCompositeAttempt(attempt, false, "joint_runtime_start_failed")
                 }
@@ -14282,11 +14278,41 @@ generation != cameraFallbackGeneration
         val accepted = success && compositeAttemptCurrent(attempt)
         deviceCompositeAttempt = null
         if (!attempt.applying) primaryDetectorLifecycleController.finishCompositeCheck(reload = false)
-        val metric = if (accepted) {
-            if (attempt.choice?.scope == RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH) PostLoginMetricDepthState.SUPPORTED
-            else PostLoginMetricDepthState.EXPLICITLY_UNSUPPORTED
-        } else null
-        attempt.finished(PostLoginCompositeCameraCheckResult(accepted, metric, reason))
+        // Image fixtures do not prove Depth support or fresh camera data. The existing
+        // support-only Depth API probe continues after this performance result.
+        if (!attempt.completionPublished) {
+            attempt.completionPublished = true
+            attempt.finished(PostLoginCompositeCameraCheckResult(accepted, metricDepth = null, reason = reason))
+        }
+        if (postLoginDeviceCheckSnapshot.state == PostLoginDeviceCheckState.RUNNING &&
+            postLoginDeviceCheckSnapshot.bindingOrNull != attempt.binding) loadDetectorForPostLoginDeviceCheck()
+    }
+
+    private fun publishDeviceCompositeReleaseFailure(attempt: DeviceCompositeAttempt, reason: String) {
+        if (deviceCompositeAttempt !== attempt || attempt.completionPublished) return
+        val currentBinding = postLoginDeviceCheckController.isRunningBindingCurrent(attempt.binding)
+        attempt.completionPublished = true
+        attempt.cancelled = true
+        // Finish the failure presentation, while retaining this owner as a native-allocation fence.
+        // The worker was never a camera owner; an unconfirmed process death is not a cleanup ACK.
+        primaryDetectorLifecycleController.finishCompositeCheck(reload = false)
+        attempt.finished(PostLoginCompositeCameraCheckResult(false, reason = reason, releaseConfirmed = false))
+        if (currentBinding && isActivityForeground && !isDestroyed && !isFinishing) {
+            updateStatus("성능 점검 종료 확인 필요",
+                "시험 작업의 종료를 확인하지 못했습니다. 종료 확인 전에는 다른 인식 작업을 시작하지 않습니다.")
+        }
+        if (attempt.lateReleaseConfirmed) acknowledgeDeviceCompositeLateRelease(attempt)
+    }
+
+    private fun acknowledgeDeviceCompositeLateRelease(attempt: DeviceCompositeAttempt) {
+        if (deviceCompositeAttempt !== attempt) return
+        attempt.lateReleaseConfirmed = true
+        if (!attempt.completionPublished) return
+        deviceCompositeAttempt = null
+        postLoginDeviceProbes.confirmCompositeRuntimeRelease(attempt.binding)
+        // Release only the old allocation fence. A timed-out result can never become READY.
+        if (postLoginDeviceCheckSnapshot.state == PostLoginDeviceCheckState.RUNNING)
+            loadDetectorForPostLoginDeviceCheck()
     }
 
     private fun cancelDeviceCompositeCameraCheck(reason: String) {

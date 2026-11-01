@@ -291,7 +291,7 @@ class UnknownCaptureCoordinatorTest {
             }, services) { false }
         fun startService(): FastSamRuntimeService<UnknownRuntimeAttachment> {
             services.startForWalk(UnknownWalkingSource(Any(), Any(), "runtime", 1L, WalkRuntimeEpoch("walk", 1L)) { true }, { TwoModelRuntimeConfig("test", null, TwoModelRuntimeConfig.UNIFIED_MODEL_KEY,
-                null, null, null, null) }, { RuntimeCandidate(RuntimeBackend.CPU, 1) }) { RuntimeFeatureScope.CAMERA_TRACKING }
+                null, null, null, null) }, { RuntimeCandidate(RuntimeBackend.CPU, 1) })
             val service = requireNotNull(services.loadingService)
             service.start().get(3, TimeUnit.SECONDS)
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3)

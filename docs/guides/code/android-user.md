@@ -37,6 +37,15 @@ adb install -r apps/android/app/build/outputs/apk/debug/app-debug.apk
 
 통합 동의의 저장된 확인서 복원은 [`IntegratedConsentPolicy.kt`](../../../apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentPolicy.kt)의 현재 Backend 권한 확인과 분리되며, 서버 재확인 전에는 전송을 허용하지 않습니다. CAS 충돌의 거부 선택 보존과 production V2 압축 journal은 [`RejectedConsentCasJournalCodec.kt`](../../../apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/RejectedConsentCasJournalCodec.kt), 실제 prefs 저장·HTTP 연결은 `MainActivity`에서 확인합니다. 현재 연동 근거는 JVM 클라이언트→Gateway→Backend이며 실제 Activity·encrypted prefs 프로세스 재시작·최신 APK 설치는 미검증입니다.
 
+## 샘플 이미지 성능 점검 연결 (2026-11-01)
+
+- 진입은 `MainActivity.startDeviceCompositeCameraCheck` → `inference/composite/AndroidJointRuntimeCheck`입니다. 기존 기기점검의 probe/controller가 진행과 최종 상태를 소유합니다. 점검에는 카메라·ARCore preview 또는 사용자 물체 촬영 단계가 없습니다.
+- `FixtureRuntimeService`는 비공개 `:fixture_runtime` 프로세스의 수명을 소유하고, `RemoteFixtureRuntime`/`FixtureRuntimeProtocol`은 시도·nonce에 결속한 IPC와 실제 process death 확인을 담당합니다. `FixtureRuntimeWorker`는 내장4장 검증과 두 모델의 공동 샘플 측정만 수행합니다. 큰 영상/tensor는 자식 내부에서 처리하며 결과는 제한된 수치 데이터입니다.
+- `JointRuntimeChoice`의 샘플 전용 evidence와 `AndroidJointRuntimeChoiceStore`의 schema2/모델·fixture·기기 binding이 선택 기록을 검증합니다. 카메라 mode·ARCore scope·live source age를 샘플 측정값으로 위조하지 않습니다.
+- 기본 모델은 `AndroidPrimaryLifecyclePlatform`/`AndroidJointRuntimeLoader`, 추가 모델은 `UnknownRuntimeServiceOwner`의 기존 소유자에 복원됩니다. CameraTest와 실제 보행의 원본 frame·geometry·세션·거리 freshness 검사는 이 저장 기록과 별개입니다. 기존 화면 간 `CameraRuntimeHandoff`도 유지합니다.
+- 샘플 검사 실패는 실행 실패로 유지하며 기본 모델을 잠시 해제했다는 이유로 성공한 제한 결과로 낮추지 않습니다. 실제 worker 해제가 미확인되면 실패 안내와 재할당 차단을 함께 유지합니다. 거리 지원은 기존 `runtime/metric/AndroidRuntimeMetricPreflight`의 API support-only 검사에 맡깁니다.
+- 관련 자동 회귀는 `inference/composite`의 policy/store/IPC·감독 시험, `AndroidPrimaryInitialPreparationTest`, `AndroidPostLoginDeviceProbesTest`, `PostLoginDeviceCheckControllerTest`, `CameraRuntimePreparationContractTest`입니다. 실제 기기 시험과 구분합니다.
+
 ## 변경 시 확인
 
 - `network`, `report`, `navigation` 변경은 Gateway route·OpenAPI와 Backend consumer까지 확인합니다.

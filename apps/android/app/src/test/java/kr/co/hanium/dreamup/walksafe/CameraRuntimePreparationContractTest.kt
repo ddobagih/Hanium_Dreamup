@@ -42,7 +42,7 @@ class CameraRuntimePreparationContractTest {
     }
 
     @Test fun cameraIsCacheOnlyAndStartsAuxiliaryAfterPrimaryWarmup() {
-        val prepare = body(camera, "private fun prepareCameraDetector(scope: RuntimeFeatureScope, mode: JointCameraMode)")
+        val prepare = body(camera, "private fun prepareCameraDetector()")
         assertTrue(prepare.contains("AndroidJointRuntimeLoader.restore("))
         assertTrue(prepare.contains("resumeUnknownAfterPrimaryLiveAttempt()"))
         assertTrue(prepare.contains("if (detector == null)"))
@@ -83,13 +83,14 @@ class CameraRuntimePreparationContractTest {
         assertFalse(open.contains("detectorLoadInFlight"))
         assertFalse(main.contains("cameraTestLaunchPending"))
         val create = body(camera, "override fun onCreate(")
-        assertFalse("The real depth scope must be known before choosing a live profile",
+        assertFalse("Opening a camera must not run a new performance benchmark",
             create.contains("AndroidFixedFixtureRuntimeSelector.load("))
-        val prepare = body(camera, "private fun prepareCameraDetector(scope: RuntimeFeatureScope, mode: JointCameraMode)")
+        val prepare = body(camera, "private fun prepareCameraDetector()")
         assertTrue(prepare.indexOf("worker.execute") < prepare.indexOf("AndroidJointRuntimeLoader.restore("))
         assertTrue(prepare.contains("AndroidJointRuntimeLoader.restore("))
-        assertTrue(prepare.contains("config, scope, mode"))
-        assertTrue(body(camera, "private fun startCamera()").contains("prepareCameraDetector(scope, mode)"))
+        assertFalse(prepare.contains("choice.scope"))
+        assertFalse(prepare.contains("choice.cameraMode"))
+        assertTrue(body(camera, "private fun startCamera()").contains("prepareCameraDetector()"))
     }
 
     @Test fun recheckDuringLoadingCannotResetAttemptAndLeaveSuccessPending() {
@@ -110,6 +111,38 @@ class CameraRuntimePreparationContractTest {
         val apply = body(main, "private fun finishDeviceCompositeApplicationIfReady()")
         assertTrue(apply.contains("RunningDetectorVerificationState.VERIFIED"))
         assertTrue(apply.contains("DeviceCheckJointRuntimeChoice"))
+    }
+
+    @Test fun samplePerformanceCheckerAndWorkerHaveNoCameraOrArCoreDependency() {
+        val directory = File("src/main/java/kr/co/hanium/dreamup/walksafe/inference/composite")
+        val source = listOf("AndroidJointRuntimeCheck.kt", "FixtureRuntimeWorker.kt", "FixtureRuntimeService.kt",
+            "FixtureRuntimeProtocol.kt", "RemoteFixtureRuntime.kt").joinToString("\n") { File(directory, it).readText() }
+        listOf("AndroidRuntimeCalibrationSession", "com.google.ar.core", "android.media.Image",
+            "android.hardware.camera2", "androidx.camera", "ACTION_IMAGE_CAPTURE").forEach { forbidden ->
+            assertFalse("Sample-image performance check must not use $forbidden", source.contains(forbidden))
+        }
+        assertTrue(source.contains("RuntimeCalibrationFixtures"))
+        assertFalse(body(main, "private fun startDeviceCompositeCameraCheck(").contains("비춰"))
+        val complete = body(main, "private fun completeDeviceCompositeAttempt(")
+        assertTrue(complete.contains("metricDepth = null"))
+        assertFalse(complete.contains("PostLoginMetricDepthState.SUPPORTED"))
+    }
+
+    @Test fun unconfirmedWorkerDeathFinishesFailurePresentationWhileRetainingItsAllocationFence() {
+        val failure = body(main, "private fun publishDeviceCompositeReleaseFailure(")
+        assertTrue(failure.contains("attempt.completionPublished = true"))
+        assertTrue(failure.contains("attempt.finished(PostLoginCompositeCameraCheckResult(false"))
+        assertTrue(failure.contains("releaseConfirmed = false"))
+        assertFalse(failure.contains("deviceCompositeAttempt = null"))
+    }
+
+    @Test fun samplePerformanceWorkerIsPrivateAndSeparateFromMainAndVoice() {
+        val manifest = File("src/main/AndroidManifest.xml").readText()
+        val service = Regex("<service[^>]*FixtureRuntimeService[\\s\\S]*?/>").find(manifest)?.value
+        assertNotNull("Dedicated fixture Service must be declared", service)
+        assertTrue(service!!.contains("android:exported=\"false\""))
+        assertTrue(service.contains("android:process=\":fixture_runtime\""))
+        assertFalse(service.contains(":vosk_decoder"))
     }
 
 }

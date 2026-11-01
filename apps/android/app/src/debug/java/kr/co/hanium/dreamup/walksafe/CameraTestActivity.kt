@@ -41,10 +41,8 @@ import kr.co.hanium.dreamup.walksafe.depth.Point2
 import kr.co.hanium.dreamup.walksafe.inference.AdaptiveInferencePacingPolicy
 import kr.co.hanium.dreamup.walksafe.inference.AndroidRuntimeLoadObservationSource
 import kr.co.hanium.dreamup.walksafe.inference.RuntimeCandidate
-import kr.co.hanium.dreamup.walksafe.inference.RuntimeFeatureScope
 import kr.co.hanium.dreamup.walksafe.inference.composite.AndroidJointRuntimeChoiceStore
 import kr.co.hanium.dreamup.walksafe.inference.composite.AndroidJointRuntimeLoader
-import kr.co.hanium.dreamup.walksafe.inference.composite.JointCameraMode
 import kr.co.hanium.dreamup.walksafe.inference.composite.ValidatedJointRuntimeChoice
 import kr.co.hanium.dreamup.walksafe.depth.TrackedObjectDepth
 import kr.co.hanium.dreamup.walksafe.inference.AndroidDetectorLoadTiming
@@ -180,11 +178,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                 ?.let { kotlin.math.ceil(1000.0 / it).toLong() }
         })
     }
-    @Volatile private var preparedScope: RuntimeFeatureScope? = null
-    @Volatile private var cameraScope: RuntimeFeatureScope? = null
-    @Volatile private var preparedMode: JointCameraMode? = null
     @Volatile private var preparedCameraGeneration = -1
-    @Volatile private var cameraMode: JointCameraMode? = null
     private val jointChoiceLock = Any()
     @Volatile private var jointChoice: ValidatedJointRuntimeChoice? = null
     @Volatile private var primaryCandidate: RuntimeCandidate? = null
@@ -285,16 +279,14 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         })
     }
 
-    /** Admit only the complete choice measured with this actual AR camera/display mode. */
-    private fun prepareCameraDetector(scope: RuntimeFeatureScope, mode: JointCameraMode) {
-        if (detector != null && preparedCameraGeneration == generation && preparedScope == scope &&
-            preparedMode == mode && jointChoice != null) return
+    /** Restore sample-measured execution settings; live geometry/depth keep their own source gates. */
+    private fun prepareCameraDetector() {
+        if (detector != null && preparedCameraGeneration == generation && jointChoice != null) return
         val epoch = generation
         if (deferCameraRuntimeUntilAuxiliaryReleased(unknownRuntime.service,
                 dispatch = { action -> feedbackHandler.post { action() } },
-                isCurrent = { foreground && !isDestroyed && !isFinishing && generation == epoch &&
-                    cameraScope == scope && cameraMode == mode },
-                onReleased = { prepareCameraDetector(scope, mode) },
+                isCurrent = { foreground && !isDestroyed && !isFinishing && generation == epoch },
+                onReleased = { prepareCameraDetector() },
                 onReleaseFailure = {
                     status.text = "이전 추가 인식 모델의 해제가 확인되지 않아 시작할 수 없습니다. 화면을 닫아 주세요."
                 })) {
@@ -304,10 +296,9 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         val modelQueuedNs = System.nanoTime()
         worker.execute {
             fun current() = foreground && !isDestroyed && !isFinishing && epoch == generation &&
-                cameraScope == scope && cameraMode == mode && runtimeHandoff?.released?.isCompletedExceptionally != true
+                runtimeHandoff?.released?.isCompletedExceptionally != true
             if (!current()) return@execute
-            if (detector != null && preparedCameraGeneration == epoch && preparedScope == scope &&
-                preparedMode == mode && jointChoice != null) return@execute
+            if (detector != null && preparedCameraGeneration == epoch && jointChoice != null) return@execute
             logCameraQueue("model_load_queue", generation, modelQueuedNs)
             val previous = detector
             detector = null
@@ -316,17 +307,15 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                 closePrimaryNative(previous)
                 val config = TwoModelRuntimeConfig.load(applicationContext)
                 val prepared = requireNotNull(AndroidJointRuntimeLoader.restore(applicationContext,
-                    config, scope, mode, ::current)) { "Device check joint runtime required" }
+                    config, ::current)) { "Device check joint runtime required" }
                 owned = prepared.load.detector
                 check(current())
                 synchronized(jointChoiceLock) { jointChoice = prepared.choice }
                 primaryCandidate = prepared.choice.candidate.primary
                 auxiliaryCandidate = prepared.choice.candidate.auxiliary
-                primarySetting = "기기 점검 설정 · ${prepared.choice.candidate.primaryIntervalMs}ms 간격"
-                auxiliarySetting = "기기 점검 설정 · ${prepared.choice.candidate.auxiliaryIntervalMs}ms 간격"
+                primarySetting = "샘플 이미지 성능 점검 설정 · ${prepared.choice.candidate.primaryIntervalMs}ms 간격"
+                auxiliarySetting = "샘플 이미지 성능 점검 설정 · ${prepared.choice.candidate.auxiliaryIntervalMs}ms 간격"
                 primaryInferencePacing.configureMinimumInterval(prepared.choice.candidate.primaryIntervalMs)
-                preparedScope = scope
-                preparedMode = mode
                 preparedCameraGeneration = epoch
                 prepared.load
             }.onFailure {
@@ -336,8 +325,6 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                 owned = null
                 primaryCandidate = null
                 auxiliaryCandidate = null
-                preparedScope = null
-                preparedMode = null
                 preparedCameraGeneration = -1
                 synchronized(jointChoiceLock) { jointChoice = null }
                 Log.e("WalkSafeCameraTest", "Model initialization failed", it)
@@ -345,7 +332,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
             primaryInferencePacing.reset()
             detector = loaded?.detector
             Log.i("WalkSafeCameraTest", "Model initialization: ${loaded?.reason ?: "exception"} " +
-                "scope=$scope primary=$primaryCandidate primarySetting=$primarySetting auxiliary=$auxiliaryCandidate")
+                "measurement=sample_images primary=$primaryCandidate primarySetting=$primarySetting auxiliary=$auxiliaryCandidate")
             logDetectorTiming("model_load", loaded?.loadTiming)
             runOnUiThread {
                 if (isDestroyed || isFinishing) return@runOnUiThread
@@ -363,7 +350,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun createUnknownService(epoch: Long): FastSamRuntimeService<UnknownCapture> {
         val choice = requireNotNull(jointChoice) { "Device check joint runtime required" }
-        check(choice.scope == cameraScope && choice.cameraMode == cameraMode)
+        check(preparedCameraGeneration == generation && detector != null)
         // Publish fresh tracker/policy state before the new service becomes visible to the GL worker.
         unknownMaterialPoints.invalidate()
         unknownPipeline = UnknownObjectDepthPipeline(SystemClock::elapsedRealtime)
@@ -420,7 +407,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
             unknownGeometryGeneration.incrementAndGet()
             jointChoice = null
             detector.also {
-                detector = null; preparedScope = null; preparedMode = null; preparedCameraGeneration = -1
+                detector = null; preparedCameraGeneration = -1
             } to receipt
         }
         try { worker.execute {
@@ -455,11 +442,6 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         }
         Log.w("WalkSafeCameraTest", "Joint runtime retired: $reason")
     }
-
-    @Suppress("DEPRECATION")
-    private fun actualCameraMode(camera: Session): JointCameraMode = JointCameraMode(
-        camera.cameraConfig.imageSize.width, camera.cameraConfig.imageSize.height,
-        camera.cameraConfig.fpsRange.lower, windowManager.defaultDisplay.refreshRate.toDouble())
 
     private fun showUnknownRuntimeStatus() {
         if (!foreground || isDestroyed || isFinishing) return
@@ -497,9 +479,8 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun resumeUnknownAfterPrimaryLiveAttempt() {
-        val choice = jointChoice ?: return
+        if (jointChoice == null) return
         if (!foreground || isDestroyed || isFinishing || session == null || detector == null ||
-            choice.scope != cameraScope || choice.cameraMode != cameraMode || preparedMode != cameraMode ||
             preparedCameraGeneration != generation ||
             !auxiliaryStartup.mayStart(generation, busy.get())
         ) return
@@ -585,12 +566,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                         cameraFrameBudgetMs = value.first.cameraConfig.fpsRange.lower.takeIf { it > 0 }
                             ?.let { kotlin.math.ceil(1000.0 / it).toLong() }
                         loadObservations.start()
-                        val scope = if (value.third) RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH
-                            else RuntimeFeatureScope.ARCORE_CAMERA_TRACKING
-                        cameraScope = scope
-                        val mode = actualCameraMode(value.first)
-                        cameraMode = mode
-                        prepareCameraDetector(scope, mode)
+                        prepareCameraDetector()
                         surface.onResume()
                         status.text = if (value.third) "Depth 지원 · 실제 프레임을 기다리는 중"
                             else "Depth 미지원 · 카메라와 객체 인식만 표시합니다."
@@ -711,7 +687,6 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         val closingSessionEpoch = cameraSessionEpoch
         session = null
         provider = null
-        cameraScope = null
         cameraSessionEpoch = null
         objectPresentation.clear()
         primaryUiPresentation.clear()
@@ -804,7 +779,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun recordCameraLoad(timestampNs: Long, depthMs: Long? = null) {
         loadObservations.recordFrame(timestampNs, SystemClock.elapsedRealtime(), depthMs, null, null,
-            "$generation:${unknownGeometryGeneration.get()}:$preparedScope:$primaryCandidate")
+            "$generation:${unknownGeometryGeneration.get()}:$primaryCandidate")
     }
 
     override fun onDrawFrame(gl: GL10?) {
@@ -830,13 +805,9 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
             background.draw(frame, texture)
             if (frame.timestamp <= lastFrame) return
             lastFrame = frame.timestamp
-            val model = detector?.takeIf { preparedScope == cameraScope && preparedCameraGeneration == epoch }
+            val model = detector?.takeIf { preparedCameraGeneration == epoch }
                 ?: run { recordCameraLoad(frame.timestamp); return }
             val choice = jointChoice ?: return
-            if (choice.cameraMode != actualCameraMode(camera) || preparedMode != cameraMode) {
-                invalidateJointRuntime(choice, "camera_mode_mismatch")
-                return
-            }
             if (!busy.compareAndSet(false, true)) { recordCameraLoad(frame.timestamp); return }
             val capturedMs = SystemClock.elapsedRealtime()
             val pacingTicket = primaryInferencePacing.tryStart(capturedMs) ?: run {
