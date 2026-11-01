@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Comparator;
 import java.util.List;
+import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamModelContract;
 
 /** Fixed FastSAM-s 768 FP32 decoder. Stateless, thread-safe and free of Android dependencies. */
 public final class FastSamDecoder {
@@ -26,17 +27,12 @@ public final class FastSamDecoder {
      */
     public DecodeResult decode(float[] detections, float[] prototypes, int originalWidth, int originalHeight) {
         long begin = System.nanoTime();
-        if (detections == null || detections.length != CHANNELS * ANCHORS)
-            throw new IllegalArgumentException("Expected 37*12096 detection floats");
-        if (prototypes == null || prototypes.length != PROTO_SIZE * PROTO_SIZE * MASK_CHANNELS)
-            throw new IllegalArgumentException("Expected 192*192*32 NHWC prototype floats");
+        FastSamModelContract.validateRawOutputShape(detections,prototypes);
         if (originalWidth <= 0 || originalHeight <= 0)
             throw new IllegalArgumentException("Original dimensions must be positive");
         Math.multiplyExact(originalWidth, originalHeight);
-        for (float value : detections) if (!(value <= Float.MAX_VALUE && value >= -Float.MAX_VALUE))
-            throw new IllegalArgumentException("Non-finite detection output");
-        for (float value : prototypes) if (!(value <= Float.MAX_VALUE && value >= -Float.MAX_VALUE))
-            throw new IllegalArgumentException("Non-finite prototype output");
+        FastSamModelContract.validateFinite(detections);
+        FastSamModelContract.validateFinite(prototypes);
         List<Candidate> candidates = new ArrayList<>();
         for (int anchor = 0; anchor < ANCHORS; anchor++) {
             float score = detections[4 * ANCHORS + anchor];
@@ -97,6 +93,9 @@ public final class FastSamDecoder {
                     float value = 0f;
                     // Deliberately ordered IEEE float32 accumulation, no FMA or parallel reduction.
                     for (int ch = 0; ch < MASK_CHANNELS; ch++) value += coefficients[ch] * prototypes[base + ch];
+                    if (!(value <= Float.MAX_VALUE && value >= -Float.MAX_VALUE))
+                        throw new FastSamModelContract.NativeOutputException(
+                            FastSamModelContract.NativeOutputFailureReason.INVALID_NATIVE_OUTPUT,"Non-finite native mask projection");
                     logits[pixel] = value;
                 }
             }

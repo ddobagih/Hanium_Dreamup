@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application android:networkSecurityConfig="@xml/debug_network_security_config">
+        <!-- Retained only for explicit legacy fault diagnostics; device check uses :vision_runtime. -->
+        <service
+            android:name=".inference.composite.FixtureRuntimeService"
+            android:exported="false"
+            android:process=":fixture_runtime" />
         <activity android:name=".CameraTestActivity" android:exported="false"
             android:label="카메라 테스트" />
         <activity

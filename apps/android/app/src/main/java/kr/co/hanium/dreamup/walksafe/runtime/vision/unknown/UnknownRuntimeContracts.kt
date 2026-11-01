@@ -77,6 +77,7 @@ internal interface UnknownRuntimeServiceAuthority {
 }
 
 internal sealed interface UnknownRuntimeServiceEvent {
+    data class PairPreparationRequired(val reason: String) : UnknownRuntimeServiceEvent
     data object PreparationFinished : UnknownRuntimeServiceEvent
     data object CalibrationWillStart : UnknownRuntimeServiceEvent
     data class CalibrationClosed(val result: RuntimeCalibrationResult?) : UnknownRuntimeServiceEvent

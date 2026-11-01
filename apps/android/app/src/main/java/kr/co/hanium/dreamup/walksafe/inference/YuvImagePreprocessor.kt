@@ -210,11 +210,11 @@ data class LetterboxTransform(
  * The returned tensor is borrowed until the next call with the same instance and model size,
  * including calls that select a different strategy. No source image or plane is retained.
  */
-class YuvImagePreprocessor {
+class YuvImagePreprocessor(private val bufferProvider: ((Int) -> ByteBuffer)? = null) {
     private val bilinearScratch = mutableMapOf<Int, FloatArray>()
 
     /** Same uint8 bilinear resize and integer letterbox padding as the reference model. */
-    fun preprocessBilinear(image: ArgbImage, modelSize: Int): PreprocessedImage {
+    @Synchronized fun preprocessBilinear(image: ArgbImage, modelSize: Int): PreprocessedImage {
         val buffer = reusableBuffer(modelSize)
         val scratch = bilinearScratch.getOrPut(modelSize) { FloatArray(modelSize * modelSize * 3) }
         RgbLetterboxPreprocessor.write(image.pixels, image.width, image.height, modelSize, buffer, scratch)
@@ -228,7 +228,13 @@ class YuvImagePreprocessor {
     private val reusableInputBuffers = mutableMapOf<Int, ByteBuffer>()
     private val reusableRgbRows = mutableMapOf<Int, FloatArray>()
 
-    fun preprocess(
+    /** Called only after the serial caller has drained every borrowed tensor consumer.
+     * Drops host cache ownership; it does not free arena backing, force GC or prove native release. */
+    @Synchronized internal fun clearAfterDrain() {
+        bilinearScratch.clear(); reusableInputBuffers.clear(); reusableRgbRows.clear()
+    }
+
+    @Synchronized fun preprocess(
         image: Image,
         modelSize: Int,
         strategy: YuvPreprocessingStrategy = YuvPreprocessingStrategy.LEGACY_TWO_PASS,
@@ -288,7 +294,7 @@ class YuvImagePreprocessor {
         )
     }
 
-    fun preprocess(image: ArgbImage, modelSize: Int): PreprocessedImage {
+    @Synchronized fun preprocess(image: ArgbImage, modelSize: Int): PreprocessedImage {
         require(modelSize > 0) { "modelSize must be positive" }
         val scale = min(modelSize / image.width.toFloat(), modelSize / image.height.toFloat())
         val resizedWidth = max(1, (image.width * scale).roundToInt())
@@ -334,7 +340,7 @@ class YuvImagePreprocessor {
      * Samples before converting, retaining the legacy nearest-neighbor and RGB arithmetic exactly.
      * Plane indices remain absolute, including when a source buffer has a nonzero position.
      */
-    internal fun preprocessYuv420(
+    @Synchronized internal fun preprocessYuv420(
         width: Int,
         height: Int,
         yBuffer: ByteBuffer,
@@ -350,7 +356,7 @@ class YuvImagePreprocessor {
         yRowStride, yPixelStride, uvRowStride, uvPixelStride, modelSize, cropRect,
         YuvColorConversion.BT601_FULL)
 
-    internal fun preprocessYuv420(
+    @Synchronized internal fun preprocessYuv420(
         width: Int,
         height: Int,
         yBuffer: ByteBuffer,
@@ -450,8 +456,10 @@ class YuvImagePreprocessor {
             current.clear()
             return current
         }
-        return ByteBuffer.allocateDirect(requiredBytes)
-            .order(ByteOrder.nativeOrder())
+        return (bufferProvider?.invoke(modelSize) ?: ByteBuffer.allocateDirect(requiredBytes).order(ByteOrder.nativeOrder()))
+            .also { require(it.isDirect && !it.isReadOnly && it.capacity() == requiredBytes && it.order() == ByteOrder.nativeOrder()) {
+                "Preprocessor input backing must match the complete native-order tensor"
+            }; it.clear() }
             .also { reusableInputBuffers[modelSize] = it }
     }
 

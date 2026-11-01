@@ -6,8 +6,275 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.CompletableFuture
 
 class PostLoginDeviceCheckControllerTest {
+    @Test fun nativeRetirementMustBeConfirmedBeforeRuntimeProbesOrReadyAcceptance() {
+        val f = Fixture()
+        var released: ((Boolean) -> Unit)? = null
+        f.probes.lease = { _, callback -> released = callback }
+        f.running(); f.ready(); f.controller.evaluate()
+        assertEquals(0, f.calls.count { it == "prepareModels" })
+        assertEquals(0, f.calls.count { it == "startAutomatic" })
+        assertEquals(0, f.store.saves)
+        released!!.invoke(true)
+        assertEquals(1, f.calls.count { it == "prepareModels" })
+        released!!.invoke(false)
+        assertEquals(1, f.calls.count { it == "prepareModels" })
+    }
+
+    @Test fun overdueRetirementAckCannotRestartTheTimedOutAttempt() {
+        val f = Fixture()
+        var released: ((Boolean) -> Unit)? = null
+        f.probes.lease = { _, callback -> released = callback }
+        f.running(); f.nowMs = f.controller.runtimeDeadlineMs!!
+        released!!.invoke(true)
+        assertEquals(PostLoginDeviceCheckFailure.CHECK_TIMEOUT, f.controller.snapshot.failure)
+        assertEquals(0, f.calls.count { it == "prepareModels" })
+        assertEquals(0, f.store.saves)
+    }
+
+    @Test fun strictImageCheckQueriesSupportFirstAndDoesNotRequireACpuBootstrap() {
+        val f = Fixture()
+        f.probes.joint = true
+        f.reader.hardware = f.reader.hardware.copy(detector = PostLoginDeviceCheckDetectorFacts(
+            true, false, false, false, PostLoginDeviceCheckSignal.UNAVAILABLE))
+        f.running()
+        f.probes.value = f.probes.value.copy(wakePhrase = PostLoginDeviceCheckSignal.READY)
+        f.controller.maybeContinue()
+        assertTrue(f.calls.contains("metricStart"))
+        assertFalse(f.calls.contains("cameraStart"))
+        f.probes.value = f.probes.value.copy(metricDepth = PostLoginMetricDepthState.SUPPORTED)
+        f.controller.maybeContinue()
+        assertTrue(f.calls.contains("cameraStart"))
+        assertEquals(PostLoginDeviceCheckState.RUNNING, f.controller.snapshot.state)
+        assertEquals(0, f.store.saves)
+    }
+
+    @Test fun compositeFailureEndsLogicallyWhileItsPhysicalCleanupIsStillPending() {
+        val f = Fixture().running()
+        f.ready()
+        f.probes.value = f.probes.value.copy(cameraPipeline = PostLoginDeviceCheckSignal.PENDING,
+            compositeRuntimeActive = true, compositeRuntimeFailed = true)
+        f.controller.evaluate()
+        assertEquals(PostLoginDeviceCheckFailure.CAMERA_PIPELINE_UNAVAILABLE, f.controller.snapshot.failure)
+        assertEquals(0, f.store.saves)
+        assertFalse(f.controller.passesFeatureGate())
+    }
+    @Test fun timerCancellationCannotMixANewerActorsSignalsIntoTheDecidedWrite() {
+        val f = Fixture().running()
+        f.ready()
+        f.store.pendingSave = CompletableFuture()
+        f.store.onSave = { assertEquals("actor", f.reader.actor.actorId) }
+        f.scheduler.tasks.first().onCancel = {
+            f.scheduler.tasks.first().onCancel = {}
+            f.reader.actor = f.reader.actor.copy(actorId = "other", verifiedActorId = "other", sessionGeneration = 2L)
+            f.controller.bindSession("other", 2L)
+            f.controller.beginFromPrimaryAction()
+        }
+        f.controller.evaluate()
+        assertEquals(1, f.store.saves)
+        assertEquals(listOf(PostLoginMetricDepthState.SUPPORTED), f.store.savedDepths)
+        assertEquals("other", f.controller.snapshot.actorId)
+        assertTrue(f.controller.runtimeDeadlineMs != null)
+        assertFalse(f.scheduler.tasks.last().cancelled)
+    }
+
+    @Test fun successfulOldProbeTeardownCannotStopANewActorsCameraOrAdvanceOnboarding() {
+        val f = Fixture().running()
+        f.store.pendingSave = CompletableFuture()
+        f.ready(); f.controller.evaluate()
+        var stopsAfterNewAttempt = -1
+        f.probes.onFunctionalCancel = {
+            f.probes.onFunctionalCancel = {}
+            f.reader.actor = f.reader.actor.copy(actorId = "other", verifiedActorId = "other", sessionGeneration = 2L)
+            f.controller.bindSession("other", 2L)
+            f.controller.beginFromPrimaryAction()
+            stopsAfterNewAttempt = f.calls.count { it == "cameraStop" }
+        }
+        f.store.pendingSave!!.complete(DeviceCheckAuthorityOutcome.Committed(Unit, 1, "write"))
+        assertEquals("other", f.controller.snapshot.actorId)
+        assertEquals(stopsAfterNewAttempt, f.calls.count { it == "cameraStop" })
+        assertEquals(0, f.effects.passes)
+        assertTrue(f.controller.runtimeDeadlineMs != null)
+    }
+    @Test fun aBackgroundedCapabilityAckCannotBeMisreportedAsAnUnknownWrite() {
+        val f = Fixture()
+        f.store.restored = PersistedPostLoginDeviceCheckResult(PostLoginDeviceCheckState.LIMITED,
+            setOf(PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE), false, false, PostLoginMetricDepthState.PENDING)
+        f.controller.bindSession("actor", 1L)
+        f.store.pendingSave = CompletableFuture()
+        f.controller.completeStoredMetricRefresh(true, f.controller.snapshot.bindingOrNull!!)
+        val timer = f.scheduler.tasks.lastOrNull()
+        f.reader.actor = f.reader.actor.copy(foreground = false)
+        f.controller.enteredBackground()
+        f.store.pendingSave!!.complete(DeviceCheckAuthorityOutcome.Committed(Unit, 2, "update"))
+        f.reader.actor = f.reader.actor.copy(foreground = true)
+        timer?.action?.invoke()
+        assertEquals(0, f.store.unconfirmed)
+        assertEquals(PostLoginDeviceCheckState.LIMITED, f.controller.snapshot.state)
+        assertFalse(f.calls.contains("metricChanged:true"))
+    }
+    @Test fun capabilityRefreshDoesNotApplyBeforeItsDurableAck() {
+        for (speech in listOf(false, true)) {
+            val f = Fixture()
+            val disabled = if (speech) PostLoginDeviceCheckFeature.VOICE_GUIDANCE
+                else PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE
+            f.store.restored = PersistedPostLoginDeviceCheckResult(PostLoginDeviceCheckState.LIMITED,
+                setOf(disabled), false, false, PostLoginMetricDepthState.PENDING)
+            f.controller.bindSession("actor", 1L)
+            f.store.pendingSave = CompletableFuture()
+            if (speech) f.controller.recoverKoreanSpeechPassedGate()
+            else f.controller.completeStoredMetricRefresh(true, f.controller.snapshot.bindingOrNull!!)
+            assertTrue(disabled in f.controller.snapshot.disabledFeatures)
+            f.store.pendingSave!!.complete(DeviceCheckAuthorityOutcome.Committed(Unit, 2, "update"))
+            assertFalse(disabled in f.controller.snapshot.disabledFeatures)
+        }
+    }
+
+    @Test fun lateCapabilityRefreshCannotPublishIntoAnotherActor() {
+        val f = Fixture()
+        f.store.expectedBinding = f.reader.resultBinding("actor")
+        f.store.restored = PersistedPostLoginDeviceCheckResult(PostLoginDeviceCheckState.LIMITED,
+            setOf(PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE), false, false, PostLoginMetricDepthState.PENDING)
+        f.controller.bindSession("actor", 1L)
+        f.store.pendingSave = CompletableFuture()
+        f.controller.completeStoredMetricRefresh(true, f.controller.snapshot.bindingOrNull!!)
+        f.reader.actor = f.reader.actor.copy(actorId = "other", verifiedActorId = "other", sessionGeneration = 2L)
+        f.controller.bindSession("other", 2L)
+        f.store.pendingSave!!.complete(DeviceCheckAuthorityOutcome.Committed(Unit, 2, "update"))
+        assertEquals("other", f.controller.snapshot.actorId)
+        assertEquals(PostLoginDeviceCheckState.NOT_RUN, f.controller.snapshot.state)
+        assertFalse(f.calls.contains("metricChanged:true"))
+    }
+    @Test fun theCommitRequestIsFrozenWhileTheActorAndPairAreStillCurrent() {
+        val f = Fixture().running()
+        f.store.pendingSave = CompletableFuture()
+        f.store.onSave = { assertTrue(f.reader.actor.foreground) }
+        f.effects.onRefresh = {
+            if (f.controller.snapshot.state == PostLoginDeviceCheckState.SAVING) {
+                f.reader.actor = f.reader.actor.copy(foreground = false)
+                f.controller.enteredBackground()
+            }
+        }
+        f.ready(); f.controller.evaluate()
+        assertEquals(1, f.store.saves)
+        assertEquals(0, f.effects.passes)
+    }
+
+    @Test fun pairRevocationDuringAckPublicationLeavesAnExplicitRetryableFailure() {
+        val f = Fixture().running()
+        f.store.pendingSave = CompletableFuture()
+        f.ready(); f.controller.evaluate()
+        f.effects.onInvalidation = { f.store.pairReady = false }
+        f.store.pendingSave!!.complete(DeviceCheckAuthorityOutcome.Committed(Unit, 1, "write"))
+        assertFalse(f.controller.snapshot.passesFeatureGate)
+        assertEquals(PostLoginDeviceCheckState.FAIL, f.controller.snapshot.state)
+        assertEquals(0, f.effects.passes)
+    }
+
+    @Test fun rejectedOldFailurePublicationCannotCancelANewActorsRuntime() {
+        for (pairFailure in listOf(false, true)) {
+            val f = Fixture().running()
+            f.store.pendingSave = CompletableFuture()
+            f.ready(); f.controller.evaluate()
+            f.effects.onInvalidation = {
+                f.effects.onInvalidation = {}
+                f.reader.actor = f.reader.actor.copy(actorId = "other", verifiedActorId = "other", sessionGeneration = 2L)
+                f.controller.bindSession("other", 2L)
+                f.controller.beginFromPrimaryAction()
+            }
+            if (pairFailure) f.store.pairReady = false
+            f.store.pendingSave!!.complete(if (pairFailure) DeviceCheckAuthorityOutcome.Committed(Unit, 1, "write")
+                else DeviceCheckAuthorityOutcome.NotPublished("disk"))
+            assertEquals("other", f.controller.snapshot.actorId)
+            assertEquals(PostLoginDeviceCheckState.RUNNING, f.controller.snapshot.state)
+            assertTrue(f.controller.runtimeDeadlineMs != null)
+            assertFalse(f.scheduler.tasks.last().cancelled)
+        }
+    }
+    @Test fun noRuntimeWorkOrReadyAcceptanceBeforeAttemptJournalAck() {
+        val f = Fixture()
+        f.store.pendingBegin = CompletableFuture()
+        f.running(); f.ready(); f.controller.evaluate()
+        assertEquals(0, f.calls.count { it == "prepareModels" })
+        assertEquals(0, f.calls.count { it == "startAutomatic" })
+        assertEquals(0, f.store.saves)
+        assertFalse(f.controller.passesFeatureGate())
+        f.store.pendingBegin!!.complete(DeviceCheckAuthorityOutcome.Committed(Unit, 1, "begin"))
+        assertEquals(1, f.calls.count { it == "prepareModels" })
+    }
+
+    @Test fun overdueOrCancelledAttemptAckCannotStartRuntimeWork() {
+        for (cancel in listOf(false, true)) {
+            val f = Fixture()
+            f.store.pendingBegin = CompletableFuture()
+            f.running()
+            if (cancel) f.controller.enteredBackground() else {
+                f.nowMs = f.controller.runtimeDeadlineMs!!
+                f.scheduler.tasks.first().action()
+            }
+            f.store.pendingBegin!!.complete(DeviceCheckAuthorityOutcome.Committed(Unit, 1, "begin"))
+            assertEquals(0, f.calls.count { it == "prepareModels" })
+            assertEquals(0, f.calls.count { it == "startAutomatic" })
+            assertFalse(f.controller.passesFeatureGate())
+        }
+    }
+
+    @Test fun durablePublicationMustFinishBeforeTheFeatureGateOpens() {
+        val f = Fixture().running()
+        f.store.pendingSave = CompletableFuture()
+        f.ready()
+        f.controller.evaluate()
+        assertFalse(f.controller.passesFeatureGate())
+        assertFalse(f.controller.snapshot.passesFeatureGate)
+        assertEquals(0, f.effects.passes)
+        f.store.pendingSave!!.complete(DeviceCheckAuthorityOutcome.Committed(Unit, 1, "write"))
+        assertTrue(f.controller.passesFeatureGate())
+        assertEquals(1, f.effects.passes)
+    }
+
+    @Test fun lateDurableAckCannotPassAfterBackgroundOrSessionChange() {
+        for (sessionChange in listOf(false, true)) {
+            val f = Fixture().running()
+            f.store.pendingSave = CompletableFuture()
+            f.ready(); f.controller.evaluate()
+            if (sessionChange) {
+                f.reader.actor = f.reader.actor.copy(actorId = "other", verifiedActorId = "other", sessionGeneration = 2L)
+                f.controller.bindSession("other", 2L)
+            } else {
+                f.reader.actor = f.reader.actor.copy(foreground = false)
+                f.controller.enteredBackground()
+            }
+            f.store.pendingSave!!.complete(DeviceCheckAuthorityOutcome.Committed(Unit, 1, "write"))
+            assertFalse(f.controller.passesFeatureGate())
+            assertEquals(0, f.effects.passes)
+        }
+    }
+
+    @Test fun currentPairRevocationBeforeDurableAckCannotBecomePassed() {
+        val f = Fixture().running()
+        f.store.pendingSave = CompletableFuture()
+        f.ready(); f.controller.evaluate()
+        f.store.pairReady = false
+        f.store.pendingSave!!.complete(DeviceCheckAuthorityOutcome.Committed(Unit, 1, "write"))
+        assertFalse(f.controller.passesFeatureGate())
+        assertEquals(0, f.effects.passes)
+    }
+
+    @Test fun savingTimeoutIsIndeterminateAndLateAckDoesNotOpenGate() {
+        val f = Fixture().running()
+        f.store.pendingSave = CompletableFuture()
+        f.ready(); f.controller.evaluate()
+        assertFalse(f.controller.passesFeatureGate())
+        f.nowMs += 30_000L
+        f.scheduler.tasks.last().action()
+        assertEquals(1, f.store.unconfirmed)
+        assertFalse(f.controller.passesFeatureGate())
+        f.store.pendingSave!!.complete(DeviceCheckAuthorityOutcome.Committed(Unit, 1, "write"))
+        assertEquals(0, f.effects.passes)
+        assertFalse(f.controller.passesFeatureGate())
+    }
     @Test fun constructionDoesNotReadFactsStartProbesOrApplyEffects() {
         val f = Fixture()
         assertEquals(0, f.reader.reads)
@@ -660,6 +927,29 @@ class PostLoginDeviceCheckControllerTest {
         assertFalse(f.controller.passesFeatureGate())
     }
 
+    @Test fun temporaryConsumerHandoffRetainsHistoricalResultButCannotOpenTheFeatureGate() {
+        val f = Fixture()
+        f.store.gateRestoreOnPair = true
+        f.store.restored = PersistedPostLoginDeviceCheckResult(PostLoginDeviceCheckState.FULL,
+            emptySet(), false, true, PostLoginMetricDepthState.SUPPORTED)
+        f.controller.bindSession("actor", 1L)
+        assertTrue(f.controller.passesFeatureGate())
+        f.store.pairReady = false
+        assertFalse(f.controller.revalidateCompletedPrerequisites())
+        f.controller.bindSession("actor", 1L)
+        assertEquals(PostLoginDeviceCheckState.FULL, f.controller.snapshot.state)
+        assertFalse(f.controller.passesFeatureGate())
+        f.store.pairReady = true
+        assertTrue(f.controller.passesFeatureGate())
+        f.controller.reportRuntimeLost(PostLoginDeviceCheckBinding("previous", 0, 1))
+        assertEquals(PostLoginDeviceCheckState.FULL, f.controller.snapshot.state)
+        f.store.pairReady = false
+        f.controller.reportRuntimeLost(requireNotNull(f.controller.snapshot.bindingOrNull))
+        assertEquals(PostLoginDeviceCheckState.FAIL, f.controller.snapshot.state)
+        assertEquals(PostLoginDeviceCheckFailure.DETECTOR_UNAVAILABLE, f.controller.snapshot.failure)
+        assertEquals(0, f.store.saves)
+    }
+
     @Test fun unsupportedMetricDepthRemainsALimitedFeatureRatherThanForgedSupport() {
         val f = Fixture().running()
         f.ready()
@@ -717,14 +1007,32 @@ class PostLoginDeviceCheckControllerTest {
     }
 
     private class Store : PostLoginDeviceCheckSavedResults {
+        var pendingBegin: CompletableFuture<DeviceCheckAuthorityOutcome<Unit>>? = null
+        var pendingSave: CompletableFuture<DeviceCheckAuthorityOutcome<Unit>>? = null
+        var pairReady = true
+        var gateRestoreOnPair = false
+        var unconfirmed = 0
+        var onSave: () -> Unit = {}
+        val savedDepths = mutableListOf<PostLoginMetricDepthState>()
         var restored: PersistedPostLoginDeviceCheckResult? = null
         var expectedBinding: PostLoginDeviceCheckResultBinding? = null
         var saveSucceeds = true
         var saves = 0
+        override fun beginAttemptAsync(binding: PostLoginDeviceCheckBinding,
+            resultBinding: PostLoginDeviceCheckResultBinding, startedAtMs: Long, deadlineMs: Long) =
+            pendingBegin ?: super.beginAttemptAsync(binding, resultBinding, startedAtMs, deadlineMs)
         override fun candidatePresent() = restored != null
         override fun restore(binding: PostLoginDeviceCheckResultBinding) =
+            retainedResult(binding).takeIf { !gateRestoreOnPair || pairReady }
+        override fun retainedResult(binding: PostLoginDeviceCheckResultBinding) =
             restored.takeIf { expectedBinding == null || expectedBinding == binding }
         override fun save(snapshot: PostLoginDeviceCheckSnapshot, binding: PostLoginDeviceCheckResultBinding, cameraDependentChecksDeferred: Boolean, metricDepthState: PostLoginMetricDepthState): Boolean { saves++; return saveSucceeds }
+        override fun saveAsync(snapshot: PostLoginDeviceCheckSnapshot, binding: PostLoginDeviceCheckResultBinding,
+            cameraDependentChecksDeferred: Boolean, metricDepthState: PostLoginMetricDepthState,
+            acceptedAtMs: Long) = pendingSave?.also { onSave(); savedDepths += metricDepthState; saves++ } ?: super.saveAsync(snapshot, binding,
+                cameraDependentChecksDeferred, metricDepthState, acceptedAtMs)
+        override fun runtimeReady(binding: PostLoginDeviceCheckBinding) = pairReady
+        override fun publicationUnconfirmed(binding: PostLoginDeviceCheckBinding) { unconfirmed++ }
     }
 
     private class Permissions : PostLoginDeviceCheckPermissionPort {
@@ -739,32 +1047,39 @@ class PostLoginDeviceCheckControllerTest {
 
     private class Scheduler : PostLoginDeviceCheckScheduler {
         data class Task(val delay: Long, val action: () -> Unit, var cancelled: Boolean = false) : DeviceCheckScheduledTask {
-            override fun cancel() { cancelled = true }
+            var onCancel: () -> Unit = {}
+            override fun cancel() { cancelled = true; onCancel() }
         }
         val tasks = mutableListOf<Task>()
         override fun schedule(delayMs: Long, action: () -> Unit) = Task(delayMs, action).also(tasks::add)
     }
 
     private class Probes(private val calls: MutableList<String>) : PostLoginDeviceCheckProbeSuite {
+        var joint = false
+        override val requiresJointRuntimeCheck get() = joint
+        private var metricStarted = false
+        var lease: (PostLoginDeviceCheckBinding, (Boolean) -> Unit) -> Unit = { _, done -> done(true) }
         var value = pending()
         var changed: (() -> Unit)? = null
         var onRestart: () -> Unit = {}
         var onPrepareModels: () -> Unit = {}
+        var onFunctionalCancel: () -> Unit = {}
         val cameraBindings = mutableListOf<PostLoginDeviceCheckBinding>()
         val metricBindings = mutableListOf<PostLoginDeviceCheckBinding>()
         override val signals get() = value
-        override val metricPreflightStarted = false
+        override val metricPreflightStarted get() = metricStarted
         override val capabilityProbeStarted = false
         override val storedBindingValidationPending = false
-        override fun resetForAttempt(binding: PostLoginDeviceCheckBinding) { value = pending() }
+        override fun resetForAttempt(binding: PostLoginDeviceCheckBinding) { value = pending(); metricStarted = false }
         override fun restartCapabilityAndResources(binding: PostLoginDeviceCheckBinding, onChanged: () -> Unit) { changed = onChanged; onRestart() }
         override fun prepareVoiceModelAndDetector() { calls += "prepareModels"; onPrepareModels() }
+        override fun prepareRuntimeLease(binding: PostLoginDeviceCheckBinding, onReady: (Boolean) -> Unit) = lease(binding, onReady)
         override fun startAutomaticProbes(binding: PostLoginDeviceCheckBinding) { calls += "startAutomatic" }
         override fun startCamera(binding: PostLoginDeviceCheckBinding) { calls += "cameraStart"; cameraBindings += binding }
-        override fun startMetricPreflight(binding: PostLoginDeviceCheckBinding) { calls += "metricStart"; metricBindings += binding }
+        override fun startMetricPreflight(binding: PostLoginDeviceCheckBinding) { metricStarted = true; calls += "metricStart"; metricBindings += binding }
         override fun cancelCalibration(reason: String) { calls += "calibrationCancel:$reason" }
-        override fun cancelFunctionalProbes() { calls += "functionalCancel" }
-        override fun cancelMetricPreflight(reason: String) { calls += "metricCancel:$reason" }
+        override fun cancelFunctionalProbes() { calls += "functionalCancel"; onFunctionalCancel() }
+        override fun cancelMetricPreflight(reason: String) { metricStarted = false; calls += "metricCancel:$reason" }
         override fun closeCapabilityAndResetResources() { calls += "capabilityClose" }
         override fun clearStoredBindingValidation() = Unit
         override fun stopCamera() { calls += "cameraStop" }
@@ -787,6 +1102,7 @@ class PostLoginDeviceCheckControllerTest {
         var permissionObservation: (PostLoginDeviceCheckBinding) -> Boolean = { true }
         var passContinuation: (PostLoginDeviceCheckSnapshot) -> PostLoginDeviceCheckPassContinuation = { PostLoginDeviceCheckPassContinuation.COMPLETED }
         var onInvalidation: () -> Unit = {}
+        var onRefresh: () -> Unit = {}
         override fun invalidateRouteResponseLease() { calls += "route"; statesDuringInvalidation += snapshot().state; onInvalidation() }
         override fun invalidateSpeechStorageLease() { calls += "speech"; statesDuringInvalidation += snapshot().state }
         override fun applyCapabilityOverrides(overrides: PostLoginDeviceCheckCapabilityOverrides) { this.overrides += overrides }
@@ -794,7 +1110,7 @@ class PostLoginDeviceCheckControllerTest {
         override fun showStatus(title: String, detail: String) { calls += "status:$title" }
         override fun announceTerminal(message: String) { terminals++ }
         override fun failureMessage(failure: PostLoginDeviceCheckFailure?) = failure?.name.orEmpty()
-        override fun refreshReadinessPresentation() = Unit
+        override fun refreshReadinessPresentation() = onRefresh()
         override fun noteCancellation(reason: String) { calls += "cancel:$reason" }
         override fun recordPermissionObservation(binding: PostLoginDeviceCheckBinding): Boolean { permissionObservations++; return permissionObservation(binding) }
         override fun afterPermissionObservation(binding: PostLoginDeviceCheckBinding) = Unit

@@ -59,21 +59,25 @@ adb install -r "$VISUAL_TEST_WORKSPACE/apps/android/app/build/outputs/apk/visual
 
 ## 기존 기기점검의 샘플 이미지 성능 확인
 
-- 기존 **기기점검**의 객체 인식 성능 검사는 앱에 포함된 고정 테스트 이미지4장만 사용합니다. 카메라 미리보기·ARCore 추적·실시간 Depth를 켜지 않으며, 물체를 비추거나 휴대폰을 움직이는 절차는 없습니다. 별도의 설정 점검 버튼도 없습니다.
-- CPU1 참조 결과와 각 CPU/GPU 후보의 raw 출력·분할 mask를 같은 이미지로 비교합니다. 기본 인식과 FastSAM을 함께 실행한 샘플 전처리·추론·후처리 시간, 완료 수·완료율·처리 간격을 측정합니다. 카메라 촬영 지연·실제 거리 정확도·화면 렌더링 성능을 측정한 것으로 기록하지 않습니다.
-- 모델 시험은 비공개 `:fixture_runtime` 보조 프로세스가 소유합니다. 후보별 준비·실행·종료 기한을 전체 기기점검 제한 안에 두고, GPU 생성이 반환하지 않으면 해당 보조 프로세스의 종료를 요청합니다. 실제 Binder death를 확인하기 전에는 다음 후보를 시작하지 않습니다. 앱 본체와 음성 디코더 프로세스를 종료하지 않습니다.
-- 샘플 출력 동등성·실제 delegate/스레드·fallback 여부와 공동 성능 기준을 충족한 조합만 한 설정으로 저장합니다. 저장 형식은 `SAMPLE_IMAGES_TWO_MODEL`인 schema2이며 이전 실시간 점검 기록을 재사용하지 않습니다. 온도 관측 API가 없는 경우는 미관측으로 보존하고 정상 온도로 위조하지 않습니다.
-- 시험용 모델과 보조 프로세스의 종료 확인 후 선택 설정으로 기본 모델을 다시 불러와 예제 추론을 검증합니다. 홈 카메라와 보행은 같은 기록의 두 모델 및 간격을 복원하며, 실제 영상의 frame·geometry·fresh depth 검사는 계속 별도로 수행합니다. 점검 전 준비는 CPU의 임시 초기 준비이며, 검증된 최종 조합을 뜻하지 않습니다.
-- 거리 기능 점검은 기존 `DEPTH_API_SUPPORT_ONLY` 경로로 지원 여부만 확인합니다. 샘플 결과로 Depth 지원·미지원이나 실제 거리의 유효성을 판정하지 않습니다. 실제 사용 시 fresh depth gate는 유지합니다.
-- `CameraCompositionCalibrationDeviceTest`의 명시적 입력은 `allowFixtureCompositionCalibration=true`입니다. 내장 이미지 측정·worker 종료·실제 유효 기록 저장을 시험하며 HOME·카메라를 열거나 계정·동의·교육을 만들어내지 않습니다. 이번 작업에서는 사용자 지시에 따라 이 실기기 시험을 실행하지 않습니다.
-- `CameraHomeReopenDiagnosticDeviceTest`는 실제 카메라 진입을 따로 확인하는 기존 진단입니다. `restoredHome`과 `directCamera`를 구분하며 샘플 성능 검사의 일부로 자동 실행하지 않습니다.
+- 객체 성능 검사는 내장 이미지4장만 사용합니다. 카메라 미리보기·ARCore 추적·실시간 Depth를 켜거나 사용자에게 물체를 비추도록 요구하지 않습니다. 별도 설정 성능점검 버튼과 CPU bootstrap 성공 조건도 없습니다.
+- GPU/GPU부터 잠정 조합을 측정하고 CPU1 참조를 한 번 생성합니다. 선택 후보의 실제 두 모델로4장 raw/역할/mask를 엄격히 비교한 뒤 같은 인스턴스에서10초 이상 공동 측정해야 최종 증명과 선택이 발급됩니다. 참조·최종·정리 예산을 먼저 예약하며 미측정·성능 실패·정확성 미확인을 구분합니다.
+- 운영 샘플과 실사용은 같은 부모 전처리/IPC/자식 native/출력 전송/후처리 경로를 사용합니다. 후보별 fresh owner와 실제 회수 증거로 다음 trial을 제한합니다. `:fixture_runtime`은 debug의 명시적 레거시 시험에만 남습니다.
+- v3 정책은 두 모델의 샘플 P95≤600ms와 기존800ms 유효시간·완료율·정확성 gate를 모두 요구합니다. 이는 운영 여유 기준이며 실제 카메라·ARCore·화면의 성능 측정값이 아닙니다. 실사용에서는 freshness·cadence floor·부하 backoff·보조 admission 보류·hard fault 퇴역을 별도로 검증합니다.
+- 점검5분과 이후 저장 확인15초를 구분합니다. `SAVING`은 통과가 아니며, 단일 authority의 저장 ACK와 현재 actor/pair가 맞아야 결과를 적용합니다. restart의 과거 기록만으로 현재 모델 준비를 대신하지 않습니다. 저장 각 단계의 미확정 결과는 재정산 전 복원을 차단합니다.
+- 최종 성공한 두 모델은 유지하고 정상 Main↔Camera 양방향 인계에서 같은 child PID·모델 ID를 사용합니다. Java host 배출과 실제 native 종료를 혼동하지 않으며 source가 target의 모델 수명 종료를 기다리는 순환도 허용하지 않습니다.
+- Depth는 support-only 조회이며 TTS는 합성 증거입니다. 실제 거리·음성 청취·진동 체감·현재 GPS 품질을 샘플 성공으로 표시하지 않습니다.
 
-## 모델 프로세스 격리 회귀
+## 모델·저장 경계 회귀
 
-- `VisionRuntimeFaultAndroidTest`는 `visionRemoteFaultTests=true`로 명시한 debug 시험입니다. 전용 에뮬레이터에서 실제 Service/Binder/SharedMemory를 이용해 정지·늦은 명령·소유권 이전·응답 유실·실제 종료를 확인합니다. native 모델을 흉내 낸 정지 주입이며 GPU 드라이버 복구나 처리 성능을 증명하지 않습니다.
-- `MetricSupportIsolationFaultDeviceTest`의 debug 입력은 `allowMetricSupportIsolationFaults=true`입니다. 생성·지원 조회·close 정지와 취소를 주입하며, 실제 ARCore 지원 성공·거리 측정·카메라 촬영을 시험하지 않습니다.
-- `VisionProductionModelsAndroidTest`는 `visionProductionModelTests=true`로 실제 번들 CPU 모델 두 개를 운영 adapter로 실행합니다. 고유 owner context, 같은 자식 PID, 서로 다른 두 native owner, 두 이미지에서 유지되는 모델 식별자와 raw 반환을 확인합니다. 기기별 GPU 성능·장시간 카메라·보행의 증거와 구분합니다.
-- 위 격리 회귀의 실행 대상은 별도 에뮬레이터 serial을 명시합니다. 앱/AndroidTest APK 빌드와 설치만 성공한 상태를 해당 회귀 실행 성공으로 표시하지 않습니다.
+- 단위 시험은 Controller/authority·store·pair preparation·selection·Host/Reference/Final·policy/ledger·consumer transfer·primary/unknown owner·pacing의 실제 상태 전이를 사용합니다. 소스 문자열 계약 시험과 실제 Android 실행 증거를 구분합니다.
+- `VisionRuntimeFaultAndroidTest` (`visionRemoteFaultTests=true`)는 debug 전용 정지·늦은 명령·잘못된 길이/세대·FD·실제 사망·executor/history 상한을 확인합니다. native를 흉내 낸 fault이며 GPU 드라이버 성능 증거가 아닙니다.
+- `MetricSupportIsolationFaultDeviceTest` (`allowMetricSupportIsolationFaults=true`)는 생성·지원 조회·close 정지와 실제 child 회수를 검사합니다. 실제 ARCore 지원 성공이나 촬영/거리 측정을 시험하지 않습니다.
+- 부모 bind/unbind 정지는 같은 opt-in 시험의 Context wrapper로 주입합니다. 종료 응답과 실제 부모 작업 배출, journal 정산, 다음 조회 허용을 나눠 검사하며 운영체제·GPU 커널 전체 정지 증거로 사용하지 않습니다. `MetricParentExecutionTest`, `MetricReleaseJournalTest`, `VisionParentReleaseTrackerTest`, `DeviceCheckNativeReleaseSettlementTest`는 해당 상태·정산 계약의 단위 회귀입니다.
+- `VisionProductionModelsAndroidTest` (`visionProductionModelTests=true`)는 실제 내장 CPU 두 모델의 같은 child PID·서로 다른 native owner·raw 반환·양방향 동일 인스턴스 인계와 이전 scope 거절을 검사합니다.
+- `JointRuntimeSampleHostAndroidTest` (`allowJointSampleHostTests=true`)는 명시적 진단 realm에서 실제 CPU 모델과 내장4장으로 잠정 측정→참조1회→최종 strict/지속 측정의 운영 adapter를 검사합니다. 실제 출력·역할·mask·600ms gate를 완화하지 않으며 계정·권한·카메라를 만들지 않습니다.
+- `DeviceCheckAuthorityPublicationFaultDeviceTest` (`allowDeviceCheckAuthorityFaults=true`)는 별도 진단 저장소에 fsync/rename/readback 오류를 넣고 확실한 ACK와 미확정 결과를 구분합니다. 운영 저장소·계정 키를 초기화하지 않습니다.
+- 별도 에뮬레이터 serial을 항상 명시합니다. APK 빌드·설치 성공을 위 시험 실행 성공으로 표시하지 않습니다. 이 시험은 실제 휴대폰/GPU 드라이버/장시간 카메라/보행의 성능 또는 안전성 검증을 대신하지 않습니다.
+- `CameraCompositionCalibrationDeviceTest` (`allowFixtureCompositionCalibration=true`)는 별도 진단 realm에서 후보 탐색과 참조 반환만 확인합니다. 반환값은 최종 검증 전 선택이며 운영 PASS/choice를 저장하지 않습니다. `CameraHomeReopenDiagnosticDeviceTest`는 별도의 실제 카메라 진단입니다. 두 시험을 현행 기기점검의 자동 실행 목록에 넣지 않으며, 실제 카메라 진입 시험은 사용자 지시대로 이번 수정 검증에서 실행하지 않습니다.
 
 ## 관리자 앱
 

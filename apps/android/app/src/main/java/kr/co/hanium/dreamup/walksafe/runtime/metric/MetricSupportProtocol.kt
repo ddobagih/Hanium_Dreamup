@@ -7,6 +7,7 @@ internal enum class MetricSupportFailure {
     ASYNC_REQUIRED, WRONG_PARENT_PROCESS, BUSY, BIND_REJECTED, HANDSHAKE_TIMEOUT,
     IDENTITY_MISMATCH, QUERY_TIMEOUT, NATIVE_FAILED, CLOSE_FAILED, CHILD_DIED,
     RELEASE_UNCONFIRMED, CANCELLED, DEADLINE_REACHED, PROTOCOL_ERROR,
+    OWNER_NOT_REGISTERED, JOURNAL_UNCONFIRMED,
 }
 
 internal class MetricSupportProbeException(val reason: MetricSupportFailure, cause: Throwable? = null) :
@@ -14,9 +15,9 @@ internal class MetricSupportProbeException(val reason: MetricSupportFailure, cau
 
 /** Small bounded control messages only. No camera, frames, account data or model tensors cross IPC. */
 internal object MetricSupportProtocol {
-    const val VERSION = 1
-    const val DESCRIPTOR = "walksafe.metric.support.v1"
-    const val CALLBACK_DESCRIPTOR = "walksafe.metric.support.callback.v1"
+    const val VERSION = 2
+    const val DESCRIPTOR = "walksafe.metric.support.v2"
+    const val CALLBACK_DESCRIPTOR = "walksafe.metric.support.callback.v2"
     const val PROCESS_SUFFIX = ":metric_support"
     const val HELLO = 1
     const val QUERY = 2
@@ -64,11 +65,22 @@ internal class MetricSupportAttemptGate {
     }
 }
 
-/** This fence is released by actual endpoint death/unbind or revoked pre-QUERY native authority. */
+/**
+ * The caller must join native proof, successful binding cleanup, every actual parent transport task,
+ * outer orchestration and the captured durable journal cleanup before admitting the next probe.
+ * A revoked pre-QUERY permit alone does not release a blocked parent bind/HELLO/unbind call.
+ */
+internal fun interface MetricSupportPendingRelease { fun recheckRelease() }
+
 internal object MetricSupportSupervisor {
     private var owner: Any? = null
     @Synchronized fun acquire(value: Any): Boolean = if (owner == null) { owner = value; true } else false
     @Synchronized fun owns(value: Any) = owner === value
+    @Synchronized fun pending() = owner != null
     @Synchronized fun release(value: Any, confirmed: Boolean): Boolean =
         if (confirmed && owner === value) { owner = null; true } else false
+    fun recheckRelease() {
+        val pending = synchronized(this) { owner as? MetricSupportPendingRelease }
+        pending?.recheckRelease() // Cleanup-only callbacks never run under the global owner lock.
+    }
 }

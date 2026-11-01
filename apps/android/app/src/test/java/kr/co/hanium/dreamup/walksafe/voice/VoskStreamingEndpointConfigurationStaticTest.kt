@@ -47,7 +47,8 @@ class VoskStreamingEndpointConfigurationStaticTest {
         assertFalse(deviceFactory.contains("timeoutMs ="))
         assertTrue(probe.contains("timeoutMs: Long = DEFAULT_TIMEOUT_MS"))
         assertTrue(probe.contains("const val DEFAULT_TIMEOUT_MS = 20_000L"))
-        assertTrue(probe.contains("val listeningTimeout = if (listenUntilWake) null else try"))
+        assertTrue(probe.contains("if (!listenUntilWake && !armPhaseTimeout(State.LISTENING, runId)) return"))
+        assertTrue(probe.contains("(state == State.STARTING || !listenUntilWake) && nowMs - phaseStartedAtMs >= timeoutMs"))
     }
 
     private companion object {

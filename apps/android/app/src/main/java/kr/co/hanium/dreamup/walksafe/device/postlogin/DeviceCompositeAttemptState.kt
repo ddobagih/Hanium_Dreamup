@@ -19,6 +19,7 @@ internal class DeviceCompositeAttemptState<C>(private val onCompletion: (Complet
     private var savedByAttempt = false
     private var cleanupStarted = false
     private var savedAndAccepted = false
+    private var preparedAndAccepted = false
     private var workerReleaseAcknowledged = false
     private var retireSaved: (() -> Unit)? = null
     val applying get() = phase == Phase.APPLYING && !cancelled
@@ -60,14 +61,17 @@ internal class DeviceCompositeAttemptState<C>(private val onCompletion: (Complet
             cancelled = true
             (!completionPublished).also { completionPublished = true }
         }
-        if (first) onCompletion(Completion(false, false, reason))
-        val actions = synchronized(this) {
-            val native = phase != Phase.RUNNING && phase != Phase.FINISHED && !cleanupClaimed
-            if (native) cleanupClaimed = true
-            native to retireSaved.takeIf { savedByAttempt && !storagePending }
-        }
-        if (actions.first) requestNativeCleanup()
-        actions.second?.invoke()
+        settleEffects(
+            { if (first) onCompletion(Completion(false, false, reason)) },
+            {
+                val actions = synchronized(this) {
+                    val native = phase != Phase.RUNNING && phase != Phase.FINISHED && !cleanupClaimed
+                    if (native) cleanupClaimed = true
+                    native to retireSaved.takeIf { savedByAttempt && !storagePending }
+                }
+                settleEffects({ if (actions.first) requestNativeCleanup() }, { actions.second?.invoke() })
+            },
+        )
         return first
     }
 
@@ -81,11 +85,30 @@ internal class DeviceCompositeAttemptState<C>(private val onCompletion: (Complet
             phase = Phase.FINISHED
             completionPublished.also { completionPublished = true }
         }
-        beforeNotify()
-        if (published) onPreviouslyPublishedRelease()
-        else onCompletion(Completion(success && !cancelled && savedAndAccepted, true, reason))
-        releaseBudget()
+        var preparationNotified = false
+        settleEffects(
+            { beforeNotify(); preparationNotified = true },
+            {
+                if (published) onPreviouslyPublishedRelease()
+                else onCompletion(Completion(success && preparationNotified && !cancelled &&
+                    (preparedAndAccepted || savedAndAccepted), true,
+                    if (preparationNotified) reason else "joint_runtime_completion_callback_failed"))
+            },
+            releaseBudget,
+        )
         return true
+    }
+
+    /** External notification failures cannot skip cleanup or the already-proven budget return. */
+    private fun settleEffects(vararg effects: () -> Unit) {
+        var failure: Throwable? = null
+        effects.forEach { effect ->
+            try { effect() } catch (error: Throwable) {
+                val first = failure
+                if (first == null) failure = error else if (first !== error) first.addSuppressed(error)
+            }
+        }
+        failure?.let { throw it }
     }
 
     /** Only a runner's death ACK belongs here, never a parent-model or metadata cleanup ACK. */
@@ -95,6 +118,16 @@ internal class DeviceCompositeAttemptState<C>(private val onCompletion: (Complet
         return completionPublished
     }
     @Synchronized fun hasWorkerReleaseAcknowledgement() = workerReleaseAcknowledged
+
+    /** Actual pair readiness is not durable success. The Controller alone commits the bundle. */
+    fun acceptPrepared(isCurrent: () -> Boolean): Boolean {
+        synchronized(this) { if (cancelled || phase != Phase.APPLYING) return false }
+        if (!runCatching(isCurrent).getOrDefault(false)) return false
+        return synchronized(this) {
+            if (cancelled || phase != Phase.APPLYING) false
+            else { preparedAndAccepted = true; true }
+        }
+    }
 
     /** The verified in-memory candidate is the only choice that can reach durable storage. */
     fun persistVerified(
@@ -148,5 +181,114 @@ internal class DeviceCompositeAttemptState<C>(private val onCompletion: (Complet
             }
         } catch (_: RuntimeException) { finished(false, "joint_runtime_save_schedule_failed") }
         return true
+    }
+}
+
+/** The same transaction drives Main's real receivers and deterministic queue tests. No SDK types. */
+internal class DevicePreparedPairAdoption<P : Any>(
+    private val current: () -> Boolean,
+    private val adoptPrimary: (P, (Boolean) -> Unit) -> Unit,
+    private val adoptAuxiliary: (P) -> Boolean,
+    private val verification: (P) -> Verification,
+    private val publish: (P) -> Boolean,
+    private val onReady: (P) -> Unit,
+    private val onFailure: (String) -> Unit,
+) {
+    enum class Verification { PENDING, VERIFIED, FAILED }
+    private enum class Phase { CREATING, ADOPTING, VERIFYING, PUBLISHING, READY, RETIRED }
+    private var phase = Phase.CREATING
+    private var pair: P? = null
+    private var primaryAnswered = false
+    private fun live() = runCatching(current).getOrDefault(false)
+
+    fun prepared(value: P) {
+        synchronized(this) {
+            if (phase != Phase.CREATING) return
+            pair = value
+            phase = Phase.ADOPTING
+        }
+        if (!live()) { fail("pair_adoption_retired"); return }
+        try { adoptPrimary(value) { accepted ->
+            synchronized(this) {
+                if (phase != Phase.ADOPTING || primaryAnswered) return@adoptPrimary
+                primaryAnswered = true
+            }
+            if (!accepted || !live()) { fail("pair_primary_adoption_failed"); return@adoptPrimary }
+            val auxiliary = runCatching { adoptAuxiliary(value) }.getOrDefault(false)
+            if (!auxiliary || !live()) { fail("pair_auxiliary_adoption_failed"); return@adoptPrimary }
+            synchronized(this) {
+                if (phase != Phase.ADOPTING) return@adoptPrimary
+                phase = Phase.VERIFYING
+            }
+            poll()
+        } } catch (_: Throwable) { fail("pair_primary_adoption_failed") }
+    }
+
+    fun poll() {
+        val value = synchronized(this) { pair.takeIf { phase == Phase.VERIFYING } } ?: return
+        if (!live()) { fail("pair_verification_retired"); return }
+        val state = runCatching { verification(value) }.getOrDefault(Verification.FAILED)
+        if (!live()) { fail("pair_verification_retired"); return }
+        if (state == Verification.PENDING) return
+        if (state != Verification.VERIFIED) { fail("pair_verification_failed"); return }
+        synchronized(this) {
+            if (phase != Phase.VERIFYING) return
+            phase = Phase.PUBLISHING
+        }
+        val accepted = runCatching { publish(value) }.getOrDefault(false)
+        if (!accepted || !live()) { fail("pair_publication_retired"); return }
+        synchronized(this) {
+            if (phase != Phase.PUBLISHING) return
+            phase = Phase.READY
+        }
+        onReady(value)
+    }
+
+    fun fail(reason: String) {
+        synchronized(this) {
+            if (phase == Phase.RETIRED) return
+            phase = Phase.RETIRED
+        }
+        onFailure(reason)
+    }
+}
+
+/** Query the captured owner only after queued old creation and both host drains have returned. */
+internal object DeviceRuntimeLeaseRetirement {
+    fun <O : Any, R : Any> afterHostDrain(owner: O?, hostDrained: java.util.concurrent.CompletionStage<Unit>,
+        snapshot: (O) -> R?, actualReleased: (R) -> java.util.concurrent.CompletionStage<*>,
+        requestExit: (R) -> Unit, knownRetirement: R? = null): java.util.concurrent.CompletableFuture<Unit> {
+        val finished = java.util.concurrent.CompletableFuture<Unit>()
+        hostDrained.whenComplete { _, hostError ->
+            val captured = try { owner?.let(snapshot) ?: knownRetirement } catch (error: Throwable) {
+                finished.completeExceptionally(error); return@whenComplete
+            }
+            if (captured == null) {
+                if (hostError == null) finished.complete(Unit) else finished.completeExceptionally(hostError)
+            } else {
+                val physical = try { actualReleased(captured) } catch (error: Throwable) {
+                    finished.completeExceptionally(error); return@whenComplete
+                }
+                physical.whenComplete { _, nativeError ->
+                    val error = hostError ?: nativeError
+                    if (error == null) finished.complete(Unit) else finished.completeExceptionally(error)
+                }
+                // A control exception does not prove native death; keep waiting for the actual ACK.
+                runCatching { requestExit(captured) }
+            }
+        }
+        return finished
+    }
+}
+
+/** The delegated attach owns its own create/failure receipt; admission failure owns NO_CREATE. */
+internal class DeviceRuntimeCreationBoundary(private val noCreate: () -> Unit) {
+    private var entered = false
+    private var finished = false
+    fun enteredAttachment() { check(!finished); entered = true }
+    fun finish() {
+        if (finished) return
+        finished = true
+        if (!entered) noCreate()
     }
 }

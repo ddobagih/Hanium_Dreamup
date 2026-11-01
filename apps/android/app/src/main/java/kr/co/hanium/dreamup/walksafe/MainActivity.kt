@@ -9,7 +9,7 @@ import kr.co.hanium.dreamup.walksafe.runtime.metric.RuntimeMetricPreflightRender
 import kr.co.hanium.dreamup.walksafe.runtime.metric.RuntimeMetricPreflightPresentation
 import kr.co.hanium.dreamup.walksafe.runtime.metric.RuntimeMetricLossLifecycle
 import kr.co.hanium.dreamup.walksafe.runtime.metric.RemoteMetricSupportProbe
-import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRuntimeContext
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.*
 import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.RemoteVisionClient
 import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionOwnerRetirement
 import kr.co.hanium.dreamup.walksafe.runtime.metric.AndroidRuntimeMetricFrameEvidence
@@ -269,7 +269,13 @@ import kr.co.hanium.dreamup.walksafe.device.AndroidPostLoginDeviceCheckBindingFa
 import kr.co.hanium.dreamup.walksafe.device.postlogin.*
 import kr.co.hanium.dreamup.walksafe.device.environment.*
 import kr.co.hanium.dreamup.walksafe.device.PostLoginDeviceCheckBindingFacts
-import kr.co.hanium.dreamup.walksafe.device.AndroidPostLoginDeviceCheckSavedResults
+import kr.co.hanium.dreamup.walksafe.device.AuthorityPostLoginDeviceCheckSavedResults
+import kr.co.hanium.dreamup.walksafe.device.AndroidDeviceCheckAuthority
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckAuthorityBinding
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckAuthorityRead
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckOwnerRef
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckReadyRuntime
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckAuthorityValidation
 import kr.co.hanium.dreamup.walksafe.device.PostLoginDeviceCheckPermissionPort
 import kr.co.hanium.dreamup.walksafe.device.PostLoginDeviceCheckEffects
 import kr.co.hanium.dreamup.walksafe.device.PostLoginDeviceCheckCapabilityOverrides
@@ -1673,16 +1679,40 @@ private val framePipelineController: FramePipelineController<ArSessionLease, ArS
 
     private val frozenReportFrameCoordinator get() = riskFeedbackComponents.frozenReportFrameCoordinator
     private val visionRuntimeOwnerId = "main-${java.util.UUID.randomUUID()}"
-    private val visionRuntimeContext by lazy { VisionRuntimeContext(applicationContext, visionRuntimeOwnerId) }
+    private data class MainRuntimeSource(val binding: PostLoginDeviceCheckBinding, val owner: DeviceCheckOwnerRef,
+        val context: VisionRuntimeContext)
+    private class MainPreparedRuntime(val binding: PostLoginDeviceCheckBinding, val source: MainRuntimeSource,
+        val pair: AndroidJointRuntimeLoader.PreparedPair<UnknownRuntimeAttachment>, val consumerLease: VisionConsumerLease,
+        val consumerDrained: CompletableFuture<Unit>,
+        val primarySlot: kr.co.hanium.dreamup.walksafe.runtime.vision.primary.PrimaryPreparedPairSlot,
+        val auxiliarySlot: UnknownRuntimeServiceOwner.PreparedPairSlot)
+    @Volatile private var mainRuntimeSource: MainRuntimeSource? = null
+    @Volatile private var mainPreparedRuntime: MainPreparedRuntime? = null
+    private data class CameraRuntimeJourney(val binding: PostLoginDeviceCheckBinding, val source: MainRuntimeSource,
+        val config: TwoModelRuntimeConfig, val choice: ValidatedJointRuntimeChoice,
+        val ticket: kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionPairConsumerTransferTicket,
+        val sourceHostDrained: CompletableFuture<Unit>)
+    private var cameraRuntimeJourney: CameraRuntimeJourney? = null
+    private var cameraReturnTicketId: String? = null
+    private var cameraReturnPreparing = false
+    private var cameraReturnWaitId: String? = null
+    private var cameraReturnMetadataWaitId: String? = null
+    private var pendingRuntimeRetirement: kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRetirementSnapshot? = null
+    private val cameraPairRequestCode = 49028
+
+    private val visionRuntimeContext: android.content.Context get() = mainRuntimeSource?.context ?: applicationContext
+    private val deviceCheckAuthority by lazy { AndroidDeviceCheckAuthority.forApp(applicationContext) }
+
 
     private fun retireVisionOwner(participant: CameraRuntimeHandoff.Claim,
         primaryDrained: java.util.concurrent.CompletionStage<Unit>,
         auxiliaryAfterDrain: () -> List<java.util.concurrent.CompletionStage<*>>, reason: String) {
-        val ownerId = visionRuntimeOwnerId
+        val owner = mainRuntimeSource?.owner
+        val ownerId = owner?.ownerId ?: visionRuntimeOwnerId
         val client = if (Build.VERSION.SDK_INT >= 31) RemoteVisionClient.forMainProcess(applicationContext) else null
         // These callbacks retain application context and IDs only, never this Activity.
         VisionOwnerRetirement.begin(ownerId, participant, primaryDrained, auxiliaryAfterDrain,
-            { client?.retirementSnapshot(ownerId) },
+            { owner?.let { client?.retirementSnapshot(it) } },
             { lease -> client?.requestExit(lease, reason); Unit },
             { error -> android.util.Log.w("WalkSafeVisionRetirement", reason, error); Unit })
     }
@@ -1691,9 +1721,36 @@ private val framePipelineController: FramePipelineController<ArSessionLease, ArS
         if (visionFinalRetirementStarted) return
         visionFinalRetirementStarted = true
         val participant = CameraRuntimeHandoff.joinRetirement()
+        val journey = cameraRuntimeJourney
+        if (journey != null && mainPreparedRuntime == null && pendingRuntimeRetirement == null &&
+            !cameraReturnPreparing && cameraReturnTicketId == null) {
+            val primaryHost = primaryDetectorOwner.hostDrainedFuture()
+            val auxiliaryHost = if (unknownServiceOwnerLazy.isInitialized()) {
+                unknownServiceOwner.currentService?.closeAsync()?.handle { _, _ -> Unit }
+                    ?: unknownServiceOwner.transferredHostDrain()?.toCompletableFuture()
+            } else null
+            val hosts = CompletableFuture.allOf(*listOfNotNull(primaryHost, auxiliaryHost).toTypedArray())
+            val drained = journey.sourceHostDrained
+            hosts.whenComplete { _, error ->
+                if (error == null) drained.complete(Unit) else drained.completeExceptionally(error)
+            }
+            participant.completeAfter(listOf(hosts))
+            return
+        }
         primaryDetectorOwner.fenceForClose()
         val auxiliaryRef = if (unknownServiceOwnerLazy.isInitialized())
             java.lang.ref.WeakReference(unknownServiceOwner) else null
+        val prepared = mainPreparedRuntime
+        prepared?.pair?.proof?.revoke()
+        prepared?.let { runtime ->
+            val consumerDrained = runtime.consumerDrained
+            val consumers = primaryDetectorOwner.closedFuture().thenCompose {
+                CompletableFuture.allOf(*auxiliaryRef?.get()?.retainedReleaseReceipts().orEmpty().toTypedArray())
+                    .thenApply { Unit }
+            }
+            runtime.consumerLease.retire(consumers)
+            consumers.whenComplete { _, error -> if (error == null) consumerDrained.complete(Unit) }
+        }
         retireVisionOwner(participant, primaryDetectorOwner.closedFuture(),
             { auxiliaryRef?.get()?.retainedReleaseReceipts().orEmpty() }, "main_destroyed")
     }
@@ -3775,8 +3832,8 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
     private val destinationSearchVoiceState get() = destinationSearchController.state.voicePage
     private val destinationSearchPresenter = DestinationSearchPresenter()
     private val routeExecutor = newNavigationRequestExecutor()
-    private var reportRuntimeConfig: TwoModelRuntimeConfig? = null
-    private var reportModelConfigSha256: String? = null
+    @Volatile private var reportRuntimeConfig: TwoModelRuntimeConfig? = null
+    @Volatile private var reportModelConfigSha256: String? = null
     private var reportApkSha256: String? = null
     private var reportAttemptStore = AndroidReportAttemptStore(bootCountProvider = ::reportCooldownBootCount)
     private val legacyPendingReportQueuePurgeController = createPrivacyLegacyPurge()
@@ -3888,7 +3945,8 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                     })
                 }
                 override fun ownsFrame(generation: Int, epoch: WalkRuntimeEpoch) = isCurrentFrameGeneration(generation, epoch)
-                override fun execution() = UnknownCaptureExecutionObservation(latestInferenceThermalThrottled)
+                override fun execution() = UnknownCaptureExecutionObservation(latestInferenceThermalThrottled,
+                    auxiliaryAdmissionAllowed = !primaryDetectorOwner.pacingSnapshot().auxiliaryHoldActive)
                 override fun metricOutputAllowsWork(expectedArGeneration: Long) = currentRuntimeMetricOutputAllowsWork(expectedArGeneration)
                 override fun cameraProfile() = activeCameraFrameQualityProfile
                 override fun powerSaveMode() = getSystemService(android.os.PowerManager::class.java).isPowerSaveMode
@@ -3927,6 +3985,19 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
             override fun mayRefreshReadiness() = isActivityForeground && !isDestroyed && !isFinishing
             override fun refreshReadiness() = refreshStartupCapabilityUi()
             override fun speakPreparationCompleted() { speakStatusExplanation("추가 물체 인식 준비를 마쳤습니다.") }
+            override fun requirePairPreparation(reason: String) {
+                runOnUiThread {
+                    if (isDestroyed || cameraEntryReleasePending ||
+                        primaryRestoreAfterCameraScreen || deviceCompositeAttempt != null) return@runOnUiThread
+                    if (reason == "auxiliary_runtime_failed") retireOperationalRuntime(reason)
+                    if (!isActivityForeground) return@runOnUiThread
+                    if (::walkSessionLifecycle.isInitialized && walkSessionLifecycle.snapshot().state in
+                        setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED))
+                        enterWalkSessionSafetyStopAndCancelOutputs("joint_runtime_pair_missing")
+                    updateStatus("두 인식 모델 준비 필요", "기기 점검에서 확인한 두 모델의 준비 상태를 다시 확인해 주세요.")
+                    refreshStartupCapabilityUi()
+                }
+            }
         },
     )
     private val unknownServiceOwnerLazy: Lazy<UnknownRuntimeServiceOwner> = visionUnknownComposition.services
@@ -4315,6 +4386,189 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
 
     private val postLoginDeviceCheckController by lazy(LazyThreadSafetyMode.NONE) { createPostLoginDeviceCheckController() }
 
+
+    private val authorityDeviceCheckResults by lazy(LazyThreadSafetyMode.NONE) {
+        val activity = java.lang.ref.WeakReference(this)
+        AuthorityPostLoginDeviceCheckSavedResults(deviceCheckAuthority,
+            bindingFor = ::deviceAuthorityBinding,
+            readyRuntime = { mainPreparedRuntime?.takeIf { runtime ->
+                val primary = primaryDetectorOwner.projection()
+                primary.available && !primary.closing && primary.detector === runtime.pair.load.detector &&
+                    primaryDetectorLifecycleController.verifiedForOutput() && runtime.pair.auxiliary.isReady &&
+                    unknownServiceOwner.currentService === runtime.pair.auxiliary
+            }?.let { DeviceCheckReadyRuntime(it.binding, it.pair.choice, it.pair.proof) } },
+            isCurrent = ::deviceAuthorityBindingCurrent,
+            sessionIsCurrent = { actor, generation ->
+                val process = GatewaySessionProcessCoordinator.snapshot()
+                process.generation == generation && process.session?.let {
+                    it.actorId == actor && it.verificationState == GatewaySessionVerificationState.VERIFIED && it.isUsableFor(actor)
+                } == true && !process.storageBlocked && !process.deletionRecoveryOnly
+            },
+            isIssuedProof = JointPairReadyProof::ownsProof, nowMs = SystemClock::elapsedRealtime,
+            onChanged = { activity.get()?.runOnUiThread {
+                activity.get()?.let { current ->
+                    if (!current.isDestroyed && !current.isFinishing) {
+                        current.maybePrepareHistoricalRuntime()
+                        current.postLoginDeviceCheckController.maybeContinue()
+                        current.refreshStartupCapabilityUi()
+                    }
+                }
+            } })
+    }
+    private var authorityRefreshIdentity: Pair<DeviceCheckAuthorityBinding, Long>? = null
+
+    private fun deviceAuthorityBinding(result: PostLoginDeviceCheckResultBinding): DeviceCheckAuthorityBinding? {
+        val config = reportRuntimeConfig ?: return null // Metadata was read on the startup worker.
+        val resultHash = AndroidDeviceCheckResultStore.bindingHash(result) ?: return null
+        val jointHash = AndroidJointRuntimeChoiceStore.createBinding(applicationContext, config) ?: return null
+        return DeviceCheckAuthorityBinding(DeviceCheckAuthorityValidation.digest(
+            "${result.actorId}\u0000${result.installationId}"), resultHash, jointHash, BuildConfig.WALKSAFE_RUNTIME_BUILD_ID)
+    }
+
+    /** Also admits a projected historical binding before Controller restores generation one. */
+    private fun deviceAuthorityBindingCurrent(expected: PostLoginDeviceCheckBinding): Boolean {
+        if (!isActivityForeground || isDestroyed || isFinishing) return false
+        val actual = postLoginDeviceCheckController.currentSessionBinding() ?: return false
+        return expected.actorId == actual.actorId && expected.sessionGeneration == actual.sessionGeneration &&
+            expected.attemptGeneration == actual.attemptGeneration.coerceAtLeast(1L)
+    }
+
+    private fun refreshDeviceAuthorityBinding() {
+        if (!isActivityForeground || isDestroyed || isFinishing || reportRuntimeConfig == null ||
+            !::startupCapabilityProbe.isInitialized || !::gatewaySessionStore.isInitialized) return
+        val current = postLoginDeviceCheckController.currentSessionBinding() ?: return
+        val result = currentPostLoginDeviceCheckResultBinding(current.actorId) ?: return
+        val identity = (deviceAuthorityBinding(result) ?: return) to current.sessionGeneration
+        if (authorityRefreshIdentity == identity) return
+        authorityRefreshIdentity = identity
+        authorityDeviceCheckResults.refresh(result)
+    }
+
+    private class RuntimeLeasePreparation(val source: MainRuntimeSource, val budget: CameraRuntimeHandoff.Claim,
+        val onReady: (Boolean) -> Unit) {
+        val notified = java.util.concurrent.atomic.AtomicBoolean()
+    }
+    private var runtimeLeasePreparation: RuntimeLeasePreparation? = null
+
+    private var runtimeUiCompletionSerial = 0L
+    private var runtimeUiCompletionsClosed = false
+    private val runtimeUiCompletions = mutableMapOf<Long, (Throwable?) -> Unit>()
+
+    /** Physical receipts never retain an Activity or a request containing its callbacks. */
+    private fun observeRuntimeCompletion(stage: java.util.concurrent.CompletionStage<*>,
+        onOwnerGone: (Throwable?) -> Unit = {}, onCompleted: (Throwable?) -> Unit) {
+        if (runtimeUiCompletionsClosed || isDestroyed || isFinishing) {
+            stage.whenComplete { _, error -> onOwnerGone(error) }
+            return
+        }
+        val serial = ++runtimeUiCompletionSerial
+        runtimeUiCompletions[serial] = onCompleted
+        val activity = java.lang.ref.WeakReference(this)
+        stage.whenComplete { _, error ->
+            val owner = activity.get()
+            if (owner == null) onOwnerGone(error)
+            else owner.runOnUiThread {
+                val action = activity.get()?.runtimeUiCompletions?.remove(serial)
+                if (action == null) onOwnerGone(error) else action(error)
+            }
+        }
+    }
+
+    /** Ends the preceding captured owner before metric QUERY or either model can start. */
+    private fun prepareDeviceRuntimeLease(binding: PostLoginDeviceCheckBinding, onReady: (Boolean) -> Unit) {
+        if (!deviceAuthorityBindingCurrent(binding) || runtimeLeasePreparation != null || mainPairPreparation != null) {
+            onReady(false); return
+        }
+        val budget = CameraRuntimeHandoff.begin() ?: run { onReady(false); return }
+        val owner = authorityDeviceCheckResults.registerRuntimeOwner(binding,
+            "$visionRuntimeOwnerId-${java.util.UUID.randomUUID()}")
+        if (owner == null) { budget.complete(); onReady(false); return }
+        val source = MainRuntimeSource(binding, owner, VisionRuntimeContext(applicationContext, owner))
+        val oldSource = mainRuntimeSource
+        val oldRuntime = mainPreparedRuntime
+        val client = if (Build.VERSION.SDK_INT >= 31) RemoteVisionClient.forMainProcess(applicationContext) else null
+        val oldOwner = oldSource?.owner // Capture the capability, not a pre-drain cohort snapshot.
+        val knownRetirement = pendingRuntimeRetirement ?: oldRuntime?.consumerLease?.let {
+            kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRetirementSnapshot(it.runtime.lease,
+                it.nativeReleased, client?.whenAvailable(it.runtime.lease.cohortId) ?: it.nativeReleased)
+        }
+        val preparation = RuntimeLeasePreparation(source, budget, onReady)
+        runtimeLeasePreparation = preparation
+        mainRuntimeSource = source
+        mainPreparedRuntime = null
+        oldRuntime?.pair?.proof?.revoke()
+        oldSource?.owner?.let(deviceCheckAuthority::retireOwner)
+        val hostDrained = CompletableFuture<Unit>()
+        val oldRegistryReleased = oldRuntime?.consumerLease?.consumerReleased
+        oldRuntime?.consumerLease?.retire(hostDrained)
+        fun notify(ready: Boolean) {
+            if (preparation.notified.compareAndSet(false, true)) preparation.onReady(ready)
+        }
+        fun failed(reason: String) {
+            // Keep the global receipt pending. A rejected operation is not host/native release.
+            deviceCheckAuthority.retireOwner(source.owner)
+            oldOwner?.let { old -> client?.retirementSnapshot(old) }?.let {
+                runCatching { client?.requestExit(it.lease, reason) }
+            }
+            notify(false)
+            if (deviceAuthorityBindingCurrent(binding) && mainRuntimeSource === source &&
+                !isDestroyed && !isFinishing && isActivityForeground) updateStatus("이전 인식 작업 종료 확인 필요",
+                "모델과 실행부의 실제 종료를 확인하지 못했습니다. 앱을 완전히 종료한 뒤 다시 실행해 주세요.")
+        }
+        fun finishNative() {
+            hostDrained.complete(Unit)
+            oldRuntime?.consumerDrained?.complete(Unit)
+            val physical = DeviceRuntimeLeaseRetirement.afterHostDrain(oldOwner, hostDrained,
+                snapshot = { old -> client?.retirementSnapshot(old) ?: knownRetirement },
+                actualReleased = { captured -> CompletableFuture.allOf(captured.actualReleased.toCompletableFuture(),
+                    captured.allocationAvailable.toCompletableFuture()) },
+                requestExit = { client?.requestExit(it.lease, "device_check_lease_retired"); Unit },
+                knownRetirement = knownRetirement)
+            val settled = CompletableFuture.allOf(physical,
+                oldRegistryReleased?.toCompletableFuture() ?: CompletableFuture.completedFuture(Unit))
+            observeRuntimeCompletion(settled, onOwnerGone = { error -> if (error == null) budget.complete() }) { error ->
+                if (runtimeLeasePreparation !== preparation) {
+                    if (error == null) budget.complete()
+                    return@observeRuntimeCompletion
+                }
+                if (error != null) { failed("old_cohort_or_consumer_release_unconfirmed"); return@observeRuntimeCompletion }
+                val current = deviceAuthorityBindingCurrent(binding) && mainRuntimeSource === source &&
+                    deviceCheckAuthority.ownerRef(owner.ownerId) === owner
+                if (primaryDetectorOwner.projection().closing && current) {
+                    val resumed = owner.source is kr.co.hanium.dreamup.walksafe.device.DeviceCheckAttemptRef &&
+                        primaryDetectorLifecycleController.resumeQuiescedForRecheck { deviceAuthorityBindingCurrent(binding) }
+                    if (!resumed) { failed("primary_recheck_authorization_unavailable"); return@observeRuntimeCompletion }
+                }
+                primaryDetectorLifecycleController.finishCompositeCheck(reload = false)
+                runtimeLeasePreparation = null
+                if (pendingRuntimeRetirement === knownRetirement) pendingRuntimeRetirement = null
+                if (!current) deviceCheckAuthority.retireOwner(owner)
+                budget.complete()
+                notify(current)
+            }
+        }
+        fun auxiliaryAfterPrimary() {
+            val released = if (unknownServiceOwnerLazy.isInitialized()) unknownServiceOwner.releaseBeforePrimaryCalibrationAsync()
+                else CompletableFuture.completedFuture(true)
+            val settled = released.thenApply { check(it) { "Old auxiliary release unconfirmed" }; Unit }
+            observeRuntimeCompletion(settled) { error ->
+                if (error == null) finishNative() else failed("old_auxiliary_release_unconfirmed")
+            }
+        }
+        if (primaryDetectorOwner.projection().closing) {
+            val quiesced = knownRetirement ?: oldOwner?.let { client?.retirementSnapshot(it) }
+            if (quiesced == null) { failed("old_primary_release_unproven"); return }
+            observeRuntimeCompletion(primaryDetectorLifecycleController.quiesceForRuntimeError(quiesced)) { error ->
+                if (error == null) auxiliaryAfterPrimary() else failed("old_primary_host_unconfirmed")
+            }
+        } else primaryDetectorLifecycleController.cancelPendingLoadAfterDrain { drained ->
+            if (!drained) { failed("old_primary_drain_unconfirmed"); return@cancelPendingLoadAfterDrain }
+            primaryDetectorLifecycleController.releaseForCompositeCheck({ runtimeLeasePreparation === preparation }) { released ->
+                if (released) auxiliaryAfterPrimary() else failed("old_primary_release_unconfirmed")
+            }
+        }
+    }
+
     private val postLoginDeviceCheckBindingFactory by lazy(LazyThreadSafetyMode.NONE) {
         AndroidPostLoginDeviceCheckBindingFactory(applicationContext) {
             if (!::startupCapabilityProbe.isInitialized || !::gatewaySessionStore.isInitialized) null else {
@@ -4373,12 +4627,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
         )
         return PostLoginDeviceCheckController(
             facts = reader,
-            savedResults = AndroidPostLoginDeviceCheckSavedResults(
-                store = { if (::postLoginDeviceCheckResultStore.isInitialized) postLoginDeviceCheckResultStore else null },
-                acceptsRuntimeChoice = { result ->
-                    PostLoginDeviceCheckFeature.OBSTACLE_DETECTION in result.disabledFeatures ||
-                        hasStoredJointRuntimeChoice()
-                }),
+            savedResults = authorityDeviceCheckResults,
             probes = postLoginDeviceProbes,
             permissions = object : PostLoginDeviceCheckPermissionPort {
                 override fun acknowledgeVoiceDisclosure() = acknowledgeHandsFreeVoiceDisclosure()
@@ -4453,6 +4702,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                 }
             },
             elapsedRealtimeMs = SystemClock::elapsedRealtime,
+            dispatch = { action -> runOnUiThread { action() } },
             config = PostLoginDeviceCheckController.Config(POST_LOGIN_DEVICE_CHECK_TIMEOUT_MS,
                 developmentQuickStartEnabled, developmentPostLoginDeviceCheckBypassed),
         )
@@ -4504,7 +4754,10 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
             voiceOutputSuppressed = ::isHandsFreeVoiceOutputActive,
             stopVoiceService = ::stopHandsFreeVoiceService,
             support = object : PostLoginProbeRuntimeSupport {
+                override val requiresJointRuntimeCheck = true
                 override val capabilityProbeStarted get() = startupCapabilityProbeStarted
+                override fun prepareRuntimeLease(binding: PostLoginDeviceCheckBinding, onReady: (Boolean) -> Unit) =
+                    prepareDeviceRuntimeLease(binding, onReady)
                 override fun restartCapabilityAndResources(binding: PostLoginDeviceCheckBinding, onChanged: () -> Unit) {
                     if (::startupCapabilityProbe.isInitialized) privacyStartupResources.releaseOnUiThread(startupCapabilityProbe)
                     startupCapabilityProbe = privacyStartupResources.acquireOnUiThread(create = { AndroidStartupCapabilityProbe(this@MainActivity) {
@@ -4516,7 +4769,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                 }
                 override fun prepareVoiceModelAndDetector() {
                     prepareHandsFreeVoiceModel()
-                    loadDetectorForPostLoginDeviceCheck()
+                    // Native models are prepared together only after metric support has retired.
                 }
                 override fun startAutomaticProbes(binding: PostLoginDeviceCheckBinding) {
                     maybeStartFirstRunDeviceCheckProbes()
@@ -5266,7 +5519,8 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
 
     private val runtimeMetricSupportProbeDelegate = lazy {
         RemoteMetricSupportProbe(applicationContext,
-            absoluteDeadlineMs = { postLoginDeviceCheckController.runtimeDeadlineMs })
+            absoluteDeadlineMs = { postLoginDeviceCheckController.runtimeDeadlineMs },
+            ownerRef = { mainRuntimeSource?.owner }, authority = deviceCheckAuthority)
     }
 
     private fun cancelMetricSupportCheck() {
@@ -5467,6 +5721,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                 override fun activeOrPausedWalk() = ::walkSessionLifecycle.isInitialized &&
                     walkSessionLifecycle.snapshot().state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
                 override fun showVerificationFailure(walking: Boolean) {
+                    mainPairPreparation?.adoption?.poll()
                     if (::debugBboxOverlay.isInitialized) debugBboxOverlay.clear()
                     if (::statusText.isInitialized) updateStatus(
                         if (walking) "객체 탐지 모델 확인 실패 · 안전 중지" else "객체 탐지 모델 확인 실패",
@@ -5497,6 +5752,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                 override fun stopDepthSession() { this@MainActivity.stopDepthSession(closeSession = true) }
                 override fun blockReportCandidates() = reportCandidateController.setStatus("reportCandidate=blocked:camera_non_metric_unavailable")
                 override fun showDetectorUnavailable() {
+                    retireOperationalRuntime("detector_runtime_failed")
                     setActionButton("카메라 보조 경고 사용 불가", ActionMode.START, enabled = false)
                     updateStatus(if (developmentGuidanceStartBypassEnabled) "객체 탐지 중지" else "객체 탐지 중지 · 안전 중지",
                         if (developmentGuidanceStartBypassEnabled) "객체 탐지를 실행하지 못했습니다. 길안내 테스트는 계속합니다."
@@ -5526,7 +5782,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
         }
         firstRunOnboardingController.initializeEmailAccount(SystemClock.elapsedRealtimeNanos().coerceAtLeast(1L))
         stepLengthPrefs = getSharedPreferences("walksafe", MODE_PRIVATE)
-        postLoginDeviceCheckResultStore = AndroidDeviceCheckResultStore(stepLengthPrefs)
+        postLoginDeviceCheckResultStore = AndroidDeviceCheckResultStore(deviceCheckAuthority)
         initializeRouteSnapshotOnIoWorker()
         accountDeletionRecoveryStore.bindIntentFence(AccountDeletionIntentFence(
             read = {
@@ -7545,6 +7801,8 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
         val startedAt = SystemClock.elapsedRealtime()
         reportApkSha256 = computeApkSha256()
         reportRuntimeConfig = loadReportRuntimeConfig()
+        val owner = java.lang.ref.WeakReference(this)
+        runOnUiThread { owner.get()?.refreshDeviceAuthorityBinding() }
         recordStartupPreparationDuration("REPORT_METADATA", startedAt)
     }
 
@@ -7619,6 +7877,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
             completePrivacyStartupReadyIfForeground()
             return
         }
+        if (beginCameraRuntimeReturnIfPending()) return
         restorePrimaryAfterCameraScreenIfReady()
         resumeWalkSafeRuntimeAfterPrivacyStartupInspection()
     }
@@ -7642,6 +7901,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
     }
 
     private fun resumeWalkSafeRuntimeAfterPrivacyStartupInspection() {
+        if (beginCameraRuntimeReturnIfPending()) return
         retryPendingGatewayRenewal()
         retryPendingBackendDeviceRestore()
         permissionFlowController.requirePermissionRecoveryRecheckAfterPrivacyInspection()
@@ -8092,6 +8352,8 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
     }
 
     override fun onDestroy() {
+        runtimeUiCompletionsClosed = true
+        runtimeUiCompletions.clear()
         cancelMetricSupportCheck()
         cameraRetirementSerial++
         cameraRetirementContinuation = null
@@ -8289,6 +8551,14 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
     @Deprecated("Activity result API retained for the existing SAF document flow")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == cameraPairRequestCode) {
+            cameraEntryReleasePending = false
+            cameraReturnTicketId = if (resultCode == RESULT_OK)
+                data?.getStringExtra(kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionPairTransfers.EXTRA_TICKET) else null
+            if (cameraReturnTicketId == null) failCameraRuntimeReturn("camera_result_missing")
+            else if (isActivityForeground) beginCameraRuntimeReturnIfPending()
+            return
+        }
         if (requestCode == REQUEST_POSITION_FIELD_EXPORT) {
             handlePositionFieldExportResult(resultCode, data)
         }
@@ -10767,7 +11037,10 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
 
     private fun currentPostLoginDeviceCheckResultBinding(actorId: String): PostLoginDeviceCheckResultBinding? = postLoginDeviceCheckBindingFactory.create(actorId)
 
-    private fun bindPostLoginDeviceCheckSession(actorId: String?, sessionGeneration: Long?) = postLoginDeviceCheckController.bindSession(actorId, sessionGeneration)
+    private fun bindPostLoginDeviceCheckSession(actorId: String?, sessionGeneration: Long?) {
+        postLoginDeviceCheckController.bindSession(actorId, sessionGeneration)
+        refreshDeviceAuthorityBinding()
+    }
 
     private fun prepareStoredMetricDepthRefresh(snapshot: PostLoginDeviceCheckSnapshot, cameraDependentChecksDeferred: Boolean) = postLoginDeviceCheckController.prepareStoredMetricRefresh(snapshot, cameraDependentChecksDeferred)
 
@@ -10860,7 +11133,10 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
 
     private fun startPostLoginDeviceCheckRuntime(binding: PostLoginDeviceCheckBinding) = postLoginDeviceCheckController.startRuntime(binding)
 
-    private fun maybeContinuePostLoginDeviceCheck(expectedBinding: PostLoginDeviceCheckBinding? = null) = postLoginDeviceCheckController.maybeContinue(expectedBinding)
+    private fun maybeContinuePostLoginDeviceCheck(expectedBinding: PostLoginDeviceCheckBinding? = null) {
+        refreshDeviceAuthorityBinding()
+        postLoginDeviceCheckController.maybeContinue(expectedBinding)
+    }
 
     private fun evaluatePostLoginDeviceCheck(expectedBinding: PostLoginDeviceCheckBinding? = null, observation: PostLoginDeviceCheckObservation = currentPostLoginDeviceCheckObservation()) = postLoginDeviceCheckController.evaluate(expectedBinding, observation)
 
@@ -11067,11 +11343,26 @@ private fun observeWalkRuntimeResourceSafety(
         resources: WalkSessionDeviceResourceSnapshot? = null,
     ): Boolean = startupResourceSafetyAdmission.observeWalkRuntimeResourceSafety(expectedEpoch, resources)
 
-    private fun startPostLoginDeviceCheckFromPrimaryAction() = postLoginDeviceCheckController.beginFromPrimaryAction()
+    /** Reconcile only an existing captured cleanup; these calls cannot bind or start models. */
+    private fun recheckPendingDeviceRuntimeCleanup() {
+        RemoteMetricSupportProbe.recheckPendingRelease()
+        RemoteVisionClient.recheckPendingRelease()
+    }
 
-    private fun handlePostLoginDeviceCheckPrimaryAction() = postLoginDeviceCheckController.handlePrimaryAction(deferredCameraDependentChecksCanBeRetried())
+    private fun startPostLoginDeviceCheckFromPrimaryAction() {
+        recheckPendingDeviceRuntimeCleanup()
+        postLoginDeviceCheckController.beginFromPrimaryAction()
+    }
 
-    private fun beginPostLoginDeviceCheckFromUserAction(expectedSession: PostLoginDeviceCheckBinding) = postLoginDeviceCheckController.beginFromUserAction(expectedSession)
+    private fun handlePostLoginDeviceCheckPrimaryAction() {
+        recheckPendingDeviceRuntimeCleanup()
+        postLoginDeviceCheckController.handlePrimaryAction(deferredCameraDependentChecksCanBeRetried())
+    }
+
+    private fun beginPostLoginDeviceCheckFromUserAction(expectedSession: PostLoginDeviceCheckBinding) {
+        recheckPendingDeviceRuntimeCleanup()
+        postLoginDeviceCheckController.beginFromUserAction(expectedSession)
+    }
 
     private fun completePostLoginDeviceCheckPermissionObservation(expectedBinding: PostLoginDeviceCheckBinding? = null) = postLoginDeviceCheckController.completePermissionObservation(expectedBinding)
 
@@ -11138,6 +11429,8 @@ private fun createVoiceDataSettingsRecovery(): VoiceDataSettingsRecoveryControll
         override fun status(title: String, detail: String) = updateStatus(title, detail)
         override fun speak(message: String) { speakInteraction(message) }
         override fun recoverPassedGate() = postLoginDeviceCheckController.recoverKoreanSpeechPassedGate()
+        override fun recoverPassedGate(onCompleted: (Boolean) -> Unit) =
+            postLoginDeviceCheckController.recoverKoreanSpeechPassedGate(onCompleted)
     },
     settings = StartupSettingsNavigation(AndroidStartupSettingsNative(this)),
 )
@@ -13620,7 +13913,35 @@ private fun handleStartupCapabilityConfirmAction() = startupConfirmationInteract
         if (::statusText.isInitialized && !isDestroyed) {
             updateStatus("객체 탐지 지연 · 안전 중지", "검출 기한 800ms를 넘겨 보행 기능을 안전 중지했습니다.")
         }
-        closeDetectorAsync()
+        retireOperationalRuntime("detector_stalled")
+    }
+
+    /** Runtime failure keeps the host queues reusable after exact physical recovery. */
+    private fun retireOperationalRuntime(reason: String) {
+        val runtime = mainPreparedRuntime ?: return
+        val client = RemoteVisionClient.forMainProcess(applicationContext)
+        val observed = client.retirementSnapshot(runtime.source.owner) ?:
+            kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRetirementSnapshot(
+                runtime.consumerLease.runtime.lease, runtime.consumerLease.nativeReleased,
+                client.whenAvailable(runtime.consumerLease.runtime.lease.cohortId))
+        val captured = pendingRuntimeRetirement?.takeIf {
+            it.lease.cohortId == observed.lease.cohortId && it.actualReleased === observed.actualReleased
+        } ?: observed
+        pendingRuntimeRetirement = captured
+        runtime.pair.proof.revoke()
+        mainPreparedRuntime = null
+        // Metadata revocation precedes EXIT/cleanup writes, so restart cannot reuse this failure.
+        deviceCheckAuthority.retireChoice(runtime.pair.choice)
+        val host = if (isDestroyed || isFinishing) primaryDetectorOwner.hostDrainedFuture()
+            else primaryDetectorLifecycleController.quiesceForRuntimeError(captured)
+        val auxiliary = unknownServiceOwner.releaseBeforePrimaryCalibrationAsync()
+        val consumers = runtime.consumerDrained
+        runtime.consumerLease.retire(consumers)
+        CompletableFuture.allOf(host.toCompletableFuture(), auxiliary.toCompletableFuture()).whenComplete { _, error ->
+            if (error == null) consumers.complete(Unit) else consumers.completeExceptionally(error)
+        }
+        client.requestExit(observed.lease, reason)
+        postLoginDeviceCheckController.reportRuntimeLost(runtime.binding)
     }
 
     private fun tryStartDetectionWork(nowElapsedRealtimeMs: Long): InferencePacingTicket? {
@@ -13950,14 +14271,14 @@ generation != cameraFallbackGeneration
     }
 
     private fun loadDetectorForPostLoginDeviceCheck() {
-        if (postLoginDeviceCheckSnapshot.state != PostLoginDeviceCheckState.RUNNING || deviceCompositeAttempt != null) return
-        if (deferPrimaryForCameraRelease(allowComparison = true)) return
-        primaryDetectorLifecycleController.loadForCurrentProcess(allowComparison = true)
+        // The explicit check proceeds metric -> fixture selection -> actual pair. No CPU bootstrap.
+        if (postLoginDeviceCheckSnapshot.state != PostLoginDeviceCheckState.RUNNING) loadDetectorForCurrentProcess()
     }
 
     private fun loadDetectorForCurrentProcess() {
         if (cameraEntryReleasePending || deviceCompositeAttempt != null || deferPrimaryForCameraRelease()) return
-        primaryDetectorLifecycleController.loadForCurrentProcess()
+        refreshDeviceAuthorityBinding()
+        maybePrepareHistoricalRuntime()
     }
 
     private fun deferPrimaryForCameraRelease(allowComparison: Boolean = false): Boolean {
@@ -13986,11 +14307,124 @@ generation != cameraFallbackGeneration
         return true
     }
 
+    private fun failCameraRuntimeReturn(reason: String) {
+        val journey = cameraRuntimeJourney
+        val transfers = kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionPairTransfers.forApp(applicationContext)
+        val client = RemoteVisionClient.forMainProcess(applicationContext)
+        val returned = cameraReturnTicketId?.let(transfers::pending)
+        val ticket = returned ?: journey?.ticket
+        val latest = ticket?.let { client.retirementSnapshot(it.targetOwner) ?: client.retirementSnapshot(it.source.owner) }
+        val fallback = ticket?.let {
+            kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRetirementSnapshot(it.source.runtime.lease,
+                it.source.nativeReleased, client.whenAvailable(it.source.runtime.lease.cohortId))
+        }
+        val canonical = latest ?: fallback
+        val recovery = pendingRuntimeRetirement?.takeIf { old -> canonical?.let {
+            old.lease.cohortId == it.lease.cohortId && old.actualReleased === it.actualReleased
+        } == true } ?: canonical
+        returned?.let { transfers.cancel(it, reason) }
+        journey?.let { transfers.cancel(it.ticket, reason) }
+        canonical?.let { client.requestExit(it.lease, reason) }
+        if (recovery != null) {
+            pendingRuntimeRetirement = recovery
+            if (!isDestroyed && !isFinishing) primaryDetectorLifecycleController.quiesceForRuntimeError(recovery)
+        }
+        cameraEntryReleasePending = false
+        primaryRestoreAfterCameraScreen = false
+        cameraReturnPreparing = false
+        cameraReturnTicketId = null
+        cameraReturnWaitId = null
+        cameraReturnMetadataWaitId = null
+        cameraRuntimeJourney = null
+        journey?.binding?.let(postLoginDeviceCheckController::reportRuntimeLost)
+        if (isActivityForeground && !isDestroyed && !isFinishing &&
+            (ticket == null || GatewaySessionProcessCoordinator.snapshot().generation == ticket.targetOwner.sessionGeneration))
+            updateStatus("인식 모델 복귀 확인 필요", "모델 종료를 확인한 뒤 기기 점검을 다시 진행해 주세요.")
+    }
+
+    private fun beginCameraRuntimeReturnIfPending(): Boolean {
+        if (cameraReturnPreparing) return true
+        val id = cameraReturnTicketId ?: run {
+            val journey = cameraRuntimeJourney ?: return false
+            if (isActivityForeground && cameraReturnWaitId != journey.ticket.id) {
+                val waitingId = journey.ticket.id
+                cameraReturnWaitId = waitingId
+                val owner = java.lang.ref.WeakReference(this)
+                reportCleanupCallbackHandler.postDelayed({ owner.get()?.let { current ->
+                    if (current.cameraReturnWaitId != waitingId) return@let
+                    current.cameraReturnWaitId = null
+                    if (current.isActivityForeground && !current.isDestroyed && !current.isFinishing &&
+                        current.cameraRuntimeJourney?.ticket?.id == waitingId && current.cameraReturnTicketId == null)
+                        current.failCameraRuntimeReturn("camera_result_deadline")
+                } }, 5_000L)
+            }
+            return true
+        }
+        if (!isActivityForeground || isDestroyed || isFinishing) return true
+        val transfers = kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionPairTransfers.forApp(applicationContext)
+        val ticket = transfers.pending(id) ?: run { failCameraRuntimeReturn("return_ticket_expired"); return false }
+        if (GatewaySessionProcessCoordinator.snapshot().generation != ticket.targetOwner.sessionGeneration) {
+            failCameraRuntimeReturn("return_session_changed"); return false
+        }
+        val actor = postLoginDeviceCheckController.currentSessionBinding()
+        val config = reportRuntimeConfig
+        if (actor == null || config == null) {
+            if (cameraReturnMetadataWaitId != id) {
+                cameraReturnMetadataWaitId = id
+                val weakOwner = java.lang.ref.WeakReference(this)
+                reportCleanupCallbackHandler.postDelayed({ weakOwner.get()?.let { owner ->
+                    if (owner.cameraReturnMetadataWaitId != id) return@let
+                    owner.cameraReturnMetadataWaitId = null
+                    if (owner.cameraReturnTicketId == id && owner.isActivityForeground && !owner.isDestroyed && !owner.isFinishing)
+                        owner.beginCameraRuntimeReturnIfPending()
+                } }, 50L)
+            }
+            return true // The ticket's original five-second deadline is never extended.
+        }
+        val binding = actor.copy(attemptGeneration = actor.attemptGeneration.coerceAtLeast(1L))
+        val choice = cameraRuntimeJourney?.choice ?: AndroidJointRuntimeChoiceStore(applicationContext).load(config)
+        if (choice == null || choice.measurementId != ticket.witness.measurementId ||
+            binding.sessionGeneration != ticket.targetOwner.sessionGeneration || !deviceAuthorityBindingCurrent(binding)) {
+            failCameraRuntimeReturn("return_binding_changed"); return false
+        }
+        val source = MainRuntimeSource(binding, ticket.targetOwner, VisionRuntimeContext(applicationContext, ticket.targetOwner))
+        mainRuntimeSource = source
+        cameraReturnPreparing = true
+        primaryRestoreAfterCameraScreen = true
+        updateStatus("인식 모델 복귀 중", "카메라에서 사용한 두 모델을 홈에 연결하고 있습니다.")
+        fun current() = cameraReturnPreparing && cameraReturnTicketId == id && mainRuntimeSource === source &&
+            deviceAuthorityBindingCurrent(binding)
+        prepareMainRuntimePair(binding, config, choice, source, SystemClock.elapsedRealtime() + 20_000L,
+            ::current, onReady = {
+                if (!current()) return@prepareMainRuntimePair
+                cameraReturnPreparing = false
+                cameraReturnTicketId = null
+                cameraRuntimeJourney = null
+                cameraEntryReleasePending = false
+                primaryRestoreAfterCameraScreen = false
+                postLoginDeviceCheckController.restoreBoundResultIfPossible()
+                val cameraReleased = CameraRuntimeHandoff.pendingRelease()
+                if (cameraReleased == null) resumeWalkSafeRuntimeAfterPrivacyStartupInspection()
+                else observeRuntimeCompletion(cameraReleased) { error ->
+                    if (error == null && deviceAuthorityBindingCurrent(binding)) resumeWalkSafeRuntimeAfterPrivacyStartupInspection()
+                }
+            }, onFailed = {
+                if (cameraReturnTicketId == id && mainRuntimeSource === source)
+                    failCameraRuntimeReturn("return_pair_adoption_failed")
+            }, transfer = ticket)
+        return true
+    }
+
     private fun restorePrimaryAfterCameraScreenIfReady() {
+        if (cameraRuntimeJourney != null || cameraReturnTicketId != null || cameraReturnPreparing) {
+            beginCameraRuntimeReturnIfPending()
+            return
+        }
         if (!primaryRestoreAfterCameraScreen || cameraEntryReleasePending || !isActivityForeground ||
             isFinishing || isDestroyed || !firstRunOnboardingComplete() || deferPrimaryForCameraRelease()) return
         primaryRestoreAfterCameraScreen = false
-        primaryDetectorLifecycleController.finishCompositeCheck(reload = true)
+        primaryDetectorLifecycleController.finishCompositeCheck(reload = false)
+        loadDetectorForCurrentProcess()
     }
 
     /**
@@ -14050,88 +14484,111 @@ generation != cameraFallbackGeneration
 
 
     private fun openLiveCameraScreen() {
-        if (!shouldShowNativeHome() || !isActivityForeground) return
-        if (!BuildConfig.DEBUG) return
-        if (CameraRuntimeHandoff.pendingRelease() != null) {
-            updateStatus("카메라 종료 중", "이전 카메라와 모델의 종료가 끝난 뒤 다시 열어 주세요.")
+        if (!BuildConfig.DEBUG || !shouldShowNativeHome() || !isActivityForeground ||
+            cameraEntryReleasePending || primaryRestoreAfterCameraScreen || deviceCompositeAttempt != null ||
+            mainPairPreparation != null) return
+        val runtime = mainPreparedRuntime
+        val config = reportRuntimeConfig
+        if (runtime == null || config == null || !runtime.pair.proof.isCurrent() || !runtime.consumerLease.permits() ||
+            !postLoginDeviceCheckController.passesFeatureGate()) {
+            updateStatus("기기 점검 필요", "두 인식 모델의 준비를 확인한 뒤 카메라를 열어 주세요.")
             return
         }
-        if (cameraEntryReleasePending || primaryRestoreAfterCameraScreen || deviceCompositeAttempt != null) return
-        // Transfer the native budget only after the production primary/auxiliary have released.
-        if (unknownServiceOwnerLazy.isInitialized() &&
-            (unknownServiceOwner.closing || unknownServiceOwner.hasCalibration)) {
-            updateStatus("카메라 성능 점검 정리 중", "점검용 모델의 종료를 확인한 뒤 카메라를 다시 열어 주세요.")
+        if (CameraRuntimeHandoff.pendingRelease() != null || runtimeArSessionCleanupPending() ||
+            arSessionOwner.observe().session != null) {
+            updateStatus("이전 카메라 종료 대기", "기존 카메라의 종료를 확인한 뒤 다시 열어 주세요.")
             return
         }
-        cancelDeviceRuntimeCalibration("live_camera_requested")
+        val target = deviceCheckAuthority.registerOwner("camera-${java.util.UUID.randomUUID()}",
+            runtime.source.owner.source, runtime.binding.sessionGeneration) ?: return
+        val witness = runtime.pair.proof.claimForTransfer() ?: return
+        val transfers = kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionPairTransfers.forApp(applicationContext)
+        val hostDrained = runtime.consumerDrained
+        val ticket = transfers.reserve(runtime.consumerLease, witness, target, runtime.consumerLease.claim.owner.authority,
+            hostDrained, SystemClock.elapsedRealtime() + 5_000L)
+        if (ticket == null) {
+            pendingRuntimeRetirement = kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRetirementSnapshot(
+                runtime.consumerLease.runtime.lease, runtime.consumerLease.nativeReleased,
+                RemoteVisionClient.forMainProcess(applicationContext).whenAvailable(runtime.consumerLease.runtime.lease.cohortId))
+            mainPreparedRuntime = null
+            val captured = requireNotNull(pendingRuntimeRetirement)
+            val primaryHost = primaryDetectorLifecycleController.quiesceForRuntimeError(captured)
+            val auxiliary = unknownServiceOwner.releaseBeforePrimaryCalibrationAsync()
+            runtime.consumerLease.retire(runtime.consumerDrained)
+            val host = runtime.consumerDrained
+            CompletableFuture.allOf(primaryHost.toCompletableFuture(), auxiliary.toCompletableFuture())
+                .whenComplete { _, error -> if (error == null) host.complete(Unit) }
+            RemoteVisionClient.forMainProcess(applicationContext).requestExit(captured.lease, "camera_reservation_rejected")
+            postLoginDeviceCheckController.reportRuntimeLost(runtime.binding)
+            updateStatus("카메라 인계 확인 필요", "인식 모델 인계를 시작하지 못했습니다. 다시 점검해 주세요.")
+            return
+        }
+        val journey = CameraRuntimeJourney(runtime.binding, runtime.source, config, runtime.pair.choice, ticket, hostDrained)
+        cameraRuntimeJourney = journey
         cameraEntryReleasePending = true
-        val requestedLifecycle = feedbackLifecycleGeneration
-        val requestedPage = statusPresentationOwner
-        val requestedActor = GatewaySessionProcessCoordinator.snapshot().generation
-        val current = { isActivityForeground && !isFinishing && !isDestroyed && shouldShowNativeHome() &&
-            feedbackLifecycleGeneration == requestedLifecycle && statusPresentationOwner === requestedPage &&
-            GatewaySessionProcessCoordinator.snapshot().generation == requestedActor }
-        primaryDetectorLifecycleController.cancelPendingLoadAfterDrain { drained ->
-            if (!drained) {
-                if (!isDestroyed && !isFinishing) updateStatus("카메라 준비 확인 필요",
-                    "기존 모델의 종료를 확인하지 못했습니다. 앱을 완전히 종료한 뒤 다시 실행해 주세요.")
-                return@cancelPendingLoadAfterDrain
+        primaryRestoreAfterCameraScreen = true
+        mainPreparedRuntime = null
+        val sourceTokens = try {
+            val primary = primaryDetectorLifecycleController.detachForTransferAfterDrain()
+            val auxiliary = unknownServiceOwner.detachPreparedPairForTransfer(runtime.pair.auxiliary)
+            primary.toCompletableFuture().thenCombine(auxiliary.toCompletableFuture()) { p, a ->
+                hostDrained.complete(Unit)
+                kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionPairDetachTokens(p, a)
             }
-            primaryDetectorLifecycleController.releaseForCompositeCheck(current) { released ->
-                if (!released) {
-                    cameraEntryReleasePending = primaryDetectorOwner.projection().closing
-                    if (cameraEntryReleasePending) {
-                        if (!isDestroyed && !isFinishing) updateStatus("카메라 준비 종료 확인 필요",
-                            "기본 인식 모델의 종료를 확인하지 못했습니다. 앱을 완전히 종료한 뒤 다시 실행해 주세요.")
-                    } else {
-                        primaryDetectorLifecycleController.finishCompositeCheck(reload = false)
-                        primaryRestoreAfterCameraScreen = true
-                        restorePrimaryAfterCameraScreenIfReady()
-                    }
-                    return@releaseForCompositeCheck
-                }
-                primaryRestoreAfterCameraScreen = true
-                try { primaryDetectorOwner.tuningLane.execute {
-                    val auxiliaryReleased = runCatching {
-                        !unknownServiceOwnerLazy.isInitialized() || unknownServiceOwner.releaseBeforePrimaryCalibration()
-                    }.getOrDefault(false)
-                    runOnUiThread {
-                        if (!auxiliaryReleased) {
-                            if (!isDestroyed && !isFinishing) updateStatus("카메라 준비 종료 확인 필요",
-                                "추가 인식 모델의 종료를 확인하지 못했습니다. 앱을 완전히 종료한 뒤 다시 실행해 주세요.")
-                            return@runOnUiThread
-                        }
-                        retireVisionOwnerBeforeCamera { cohortReleased ->
-                            if (!cohortReleased) {
-                                if (!isDestroyed && !isFinishing) updateStatus("카메라 준비 종료 확인 필요",
-                                    "이전 인식 실행부의 실제 종료를 확인하지 못했습니다.")
-                                return@retireVisionOwnerBeforeCamera
-                            }
-                            cameraEntryReleasePending = false
-                            primaryDetectorLifecycleController.finishCompositeCheck(reload = false)
-                            if (current()) try {
-                                startActivity(Intent().setClassName(this, "$packageName.CameraTestActivity"))
-                            } catch (error: RuntimeException) {
-                                if (error is android.content.ActivityNotFoundException || error is SecurityException) {
-                                    // These failures reject the launch before CameraTest obtains native ownership.
-                                    primaryRestoreAfterCameraScreen = true
-                                    restorePrimaryAfterCameraScreenIfReady()
-                                    updateStatus("카메라 화면 열기 실패", "기본 인식 모델을 다시 준비합니다.")
-                                } else {
-                                    cameraEntryReleasePending = true
-                                    updateStatus("카메라 전환 확인 필요",
-                                        "화면 전환 완료를 확인하지 못했습니다. 앱을 완전히 종료한 뒤 다시 실행해 주세요.")
-                                }
-                            }
-                            else restorePrimaryAfterCameraScreenIfReady()
-                        }
-                    }
-                } } catch (_: RuntimeException) {
-                    if (!isDestroyed && !isFinishing) updateStatus("카메라 준비 종료 확인 필요",
-                        "모델 종료 작업을 시작하지 못했습니다. 앱을 완전히 종료한 뒤 다시 실행해 주세요.")
-                }
+        } catch (error: Throwable) {
+            CompletableFuture<kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionPairDetachTokens>().also {
+                it.completeExceptionally(error)
             }
         }
+        val client = RemoteVisionClient.forMainProcess(applicationContext)
+        fun fail() {
+            transfers.cancel(ticket, "main_camera_transition_failed")
+            if (cameraRuntimeJourney !== journey || mainRuntimeSource !== runtime.source) return
+            val captured = kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRetirementSnapshot(
+                runtime.consumerLease.runtime.lease, runtime.consumerLease.nativeReleased,
+                client.whenAvailable(runtime.consumerLease.runtime.lease.cohortId))
+            pendingRuntimeRetirement = captured
+            val tearingDown = isDestroyed || isFinishing
+            val primaryHost = if (tearingDown) primaryDetectorOwner.hostDrainedFuture()
+                else primaryDetectorLifecycleController.quiesceForRuntimeError(captured)
+            val auxiliaryReleased = if (tearingDown) {
+                unknownServiceOwner.currentService?.closeAsync()?.handle { _, _ -> Unit }
+                    ?: unknownServiceOwner.transferredHostDrain()?.toCompletableFuture()
+                    ?: CompletableFuture.completedFuture(Unit)
+            } else unknownServiceOwner.releaseBeforePrimaryCalibrationAsync().toCompletableFuture()
+            val completeHost = CompletableFuture.allOf(primaryHost.toCompletableFuture(), auxiliaryReleased)
+            completeHost.whenComplete { _, error -> if (error == null) hostDrained.complete(Unit) }
+            runtime.consumerLease.retire(hostDrained)
+            cameraEntryReleasePending = false
+            primaryRestoreAfterCameraScreen = false
+            cameraRuntimeJourney = null
+            postLoginDeviceCheckController.reportRuntimeLost(journey.binding)
+            if (deviceAuthorityBindingCurrent(journey.binding)) updateStatus("카메라 인계 실패",
+                "인식 작업 종료를 확인한 뒤 기기 점검을 다시 진행해 주세요.")
+        }
+        try { primaryDetectorOwner.tuningLane.execute {
+            val result = runCatching {
+                transfers.prepare(ticket, object : kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionPairTransferSourceEffects {
+                    override fun drainSource(deadlineMs: Long) = sourceTokens
+                    override fun park(lease: kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionCohortLease,
+                        deadlineMs: Long) = client.park(lease, deadlineMs)
+                    override fun transfer(lease: kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionCohortLease,
+                        owner: DeviceCheckOwnerRef, deadlineMs: Long) = client.transfer(lease, owner, deadlineMs)
+                })
+            }
+            runOnUiThread {
+                val current = cameraRuntimeJourney === journey && deviceAuthorityBindingCurrent(journey.binding) &&
+                    shouldShowNativeHome() && !isDestroyed && !isFinishing
+                if (result.isFailure || !current) { fail(); return@runOnUiThread }
+                try {
+                    startActivityForResult(Intent().setClassName(this, "$packageName.CameraTestActivity")
+                        .putExtra(kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionPairTransfers.EXTRA_TICKET,
+                            ticket.id), cameraPairRequestCode)
+                    cameraEntryReleasePending = false
+                } catch (_: RuntimeException) { fail() }
+            }
+        } } catch (_: RuntimeException) { fail() }
+        updateStatus("인식 모델 전달 중", "기기 점검에서 준비한 두 모델을 카메라 화면으로 전달합니다.")
     }
 
     private fun closeLiveCameraScreen() {
@@ -14244,6 +14701,320 @@ generation != cameraFallbackGeneration
         recognitionControls.postDelayed(recognitionRefresh, delay)
     }
 
+    private class MainPairPreparation(
+        val binding: PostLoginDeviceCheckBinding, val config: TwoModelRuntimeConfig,
+        val source: MainRuntimeSource,
+        val primarySlot: kr.co.hanium.dreamup.walksafe.runtime.vision.primary.PrimaryPreparedPairSlot,
+        val auxiliarySlot: UnknownRuntimeServiceOwner.PreparedPairSlot,
+        val current: () -> Boolean,
+    ) {
+        val workerFinished = CompletableFuture<Unit>()
+        val retired = CompletableFuture<Unit>()
+        val cleanupStarted = java.util.concurrent.atomic.AtomicBoolean()
+        val consumerDrained = CompletableFuture<Unit>()
+        @Volatile var auxiliary: FastSamRuntimeService<UnknownRuntimeAttachment>? = null
+        var pair: AndroidJointRuntimeLoader.PreparedPair<UnknownRuntimeAttachment>? = null
+        var consumerLease: VisionConsumerLease? = null
+        @Volatile var sampleHost: kr.co.hanium.dreamup.walksafe.inference.composite.JointRuntimeSampleHost<UnknownRuntimeAttachment>? = null
+        var selectionClaim: kr.co.hanium.dreamup.walksafe.inference.composite.JointRuntimeCheckedSelection.Claim? = null
+        lateinit var adoption: DevicePreparedPairAdoption<AndroidJointRuntimeLoader.PreparedPair<UnknownRuntimeAttachment>>
+    }
+    private var mainPairPreparation: MainPairPreparation? = null
+
+    /** Register both receiver reservations before the worker can create either native model. */
+    private fun prepareMainRuntimePair(binding: PostLoginDeviceCheckBinding, config: TwoModelRuntimeConfig,
+        choice: ValidatedJointRuntimeChoice?, source: MainRuntimeSource, deadlineMs: Long,
+        current: () -> Boolean, onReady: () -> Unit, onFailed: (String) -> Unit,
+        transfer: kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionPairConsumerTransferTicket? = null,
+        measured: kr.co.hanium.dreamup.walksafe.inference.composite.JointRuntimeCheckedSelection.Claim? = null): MainPairPreparation? {
+        fun rejectPreparation(reason: String): MainPairPreparation? {
+            measured?.close()
+            onFailed(reason)
+            return null
+        }
+        if (mainPairPreparation != null || !current() || SystemClock.elapsedRealtime() >= deadlineMs) {
+            return rejectPreparation("pair_preparation_unavailable")
+        }
+        val transferredRuntime = transfer?.let { ticket ->
+            runCatching {
+                val client = RemoteVisionClient.forMainProcess(applicationContext)
+                val lease = requireNotNull(client.retirementSnapshot(ticket.targetOwner)?.lease)
+                val pair = client.validatePair(lease, ticket.witness.primaryHandle.modelInstanceId,
+                    ticket.witness.auxiliaryHandle.modelInstanceId)
+                kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionTransferResult(lease,
+                    listOf(pair.primaryHandle, pair.auxiliaryHandle))
+            }.getOrElse { return rejectPreparation("transferred_cohort_missing") }
+        }
+        if (transferredRuntime != null && primaryDetectorOwner.projection().closing &&
+            !primaryDetectorLifecycleController.resumeTransferredHost(transferredRuntime, current)) {
+            return rejectPreparation("primary_return_reservation_rejected")
+        }
+        val primarySlot = primaryDetectorLifecycleController.reservePreparedPair(current)
+            ?: return rejectPreparation("primary_pair_receiver_unavailable")
+        if (transferredRuntime != null && unknownServiceOwner.transferredHostDrain() != null &&
+            !unknownServiceOwner.resumeTransferredHost(transferredRuntime, current)) {
+            primaryDetectorLifecycleController.finishPreparedNotStarted(primarySlot)
+            primaryDetectorLifecycleController.rollbackPreparedLoad(primarySlot)
+            return rejectPreparation("auxiliary_return_reservation_rejected")
+        }
+        val auxiliarySlot = unknownServiceOwner.reservePreparedPair(current)
+        if (auxiliarySlot == null) {
+            primaryDetectorLifecycleController.finishPreparedNotStarted(primarySlot)
+            primaryDetectorLifecycleController.rollbackPreparedLoad(primarySlot)
+            return rejectPreparation("auxiliary_pair_receiver_unavailable")
+        }
+        val preparation = MainPairPreparation(binding, config, source, primarySlot, auxiliarySlot, current)
+        preparation.selectionClaim = measured
+        mainPairPreparation = preparation
+        fun live() = mainPairPreparation === preparation && !preparation.cleanupStarted.get() && current() &&
+            deviceAuthorityBindingCurrent(binding) && mainRuntimeSource === source &&
+            SystemClock.elapsedRealtime() < deadlineMs
+        preparation.adoption = DevicePreparedPairAdoption(
+            current = ::live,
+            adoptPrimary = { pair, done -> primaryDetectorLifecycleController.adoptPreparedLoad(
+                primarySlot, pair.load, pair.choice, onAdopted = done) },
+            adoptAuxiliary = { pair -> unknownServiceOwner.adoptPreparedPair(auxiliarySlot, pair.auxiliary, pair.choice) },
+            verification = { pair ->
+                val projection = primaryDetectorOwner.projection()
+                if (projection.detector !== pair.load.detector || !projection.available ||
+                    unknownServiceOwner.currentService !== pair.auxiliary || !pair.auxiliary.isReady)
+                    DevicePreparedPairAdoption.Verification.FAILED
+                else when (primaryDetectorLifecycleController.verificationState(projection.detector)) {
+                    RunningDetectorVerificationState.VERIFIED -> DevicePreparedPairAdoption.Verification.VERIFIED
+                    RunningDetectorVerificationState.NONE, RunningDetectorVerificationState.PENDING -> DevicePreparedPairAdoption.Verification.PENDING
+                    else -> DevicePreparedPairAdoption.Verification.FAILED
+                }
+            },
+            publish = { pair -> publishMainRuntimePair(preparation, pair) },
+            onReady = {
+                if (mainPairPreparation === preparation) mainPairPreparation = null
+                onReady()
+            },
+            onFailure = { reason ->
+                retireMainPairPreparation(preparation)
+                onFailed(reason)
+            },
+        )
+        try { primaryDetectorOwner.tuningLane.execute {
+            val boundary = if (transfer == null && measured == null) null else
+                kr.co.hanium.dreamup.walksafe.device.postlogin.DeviceRuntimeCreationBoundary {
+                    primaryDetectorLifecycleController.finishPreparedNotStarted(primarySlot)
+                }
+            val result = runCatching { try {
+                if (measured != null) {
+                    check(transfer == null && measured.bindingHash == source.owner.source.binding.jointBindingHash)
+                    val host = kr.co.hanium.dreamup.walksafe.inference.composite.JointRuntimeSampleHost.create(
+                        source.context, config, deviceCheckAuthority, measured.fixtures, auxiliarySlot.epoch, auxiliarySlot.listener)
+                    preparation.sampleHost = host
+                    boundary?.enteredAttachment()
+                    kr.co.hanium.dreamup.walksafe.inference.composite.JointRuntimeFinalPairPreparation.prepare(host,
+                        measured.plan.candidate, measured.references, measured.plan.budget, ::live,
+                        kr.co.hanium.dreamup.walksafe.inference.composite.JointRuntimeSampleHooks(
+                            onPrimaryCreated = { primaryDetectorLifecycleController.retainCreatedLoad(primarySlot, it) },
+                            onPrimaryCreationFinished = { primaryDetectorLifecycleController.finishPreparedCreation(primarySlot, it) },
+                            onPrimaryCreationNotStarted = { primaryDetectorLifecycleController.finishPreparedNotStarted(primarySlot) },
+                            onAuxiliaryCreated = {
+                                preparation.auxiliary = it
+                                unknownServiceOwner.registerPreparedPair(auxiliarySlot, it)
+                            })).prepared
+                } else if (transfer == null) {
+                AndroidJointRuntimeLoader.preparePair(source.context, config, requireNotNull(choice), auxiliarySlot.epoch,
+                    auxiliarySlot.listener, deadlineMs, deviceCheckAuthority, isCurrent = ::live,
+                    onPrimaryCreated = { primaryDetectorLifecycleController.retainCreatedLoad(primarySlot, it) },
+                    onPrimaryCreationFinished = { primaryDetectorLifecycleController.finishPreparedCreation(primarySlot, it) },
+                    onAuxiliaryCreated = {
+                        preparation.auxiliary = it
+                        unknownServiceOwner.registerPreparedPair(auxiliarySlot, it)
+                    },
+                    onPrimaryCreationNotStarted = { primaryDetectorLifecycleController.finishPreparedNotStarted(primarySlot) })
+                } else {
+                    val transfers = kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionPairTransfers.forApp(applicationContext)
+                    check(transfers.take(transfer.id, source.owner, transfer.authorityTag) === transfer)
+                    var attachment: kr.co.hanium.dreamup.walksafe.inference.composite.TransferredJointRuntimeAttachment<UnknownRuntimeAttachment>? = null
+                    var transferred: AndroidJointRuntimeLoader.PreparedPair<UnknownRuntimeAttachment>? = null
+                    val adoption = transfers.adopt(transfer, source.owner, transfer.authorityTag,
+                        preparation.consumerDrained,
+                        object : kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionPairTransferTargetEffects {
+                            override fun attachBoth(tokens: kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionPairDetachTokens,
+                                runtime: kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionTransferResult,
+                                deadline: Long): java.util.concurrent.CompletionStage<Set<String>> {
+                                boundary?.enteredAttachment()
+                                attachment = kr.co.hanium.dreamup.walksafe.inference.composite.TransferredJointRuntimeAttachment.attach(
+                                    source.context, config, requireNotNull(choice), deviceCheckAuthority, tokens.primary, tokens.auxiliary, runtime,
+                                    auxiliarySlot.epoch, auxiliarySlot.listener, deadline, ::live,
+                                    onPrimaryCreated = { primaryDetectorLifecycleController.retainCreatedLoad(primarySlot, it) },
+                                    onPrimaryCreationFinished = { primaryDetectorLifecycleController.finishPreparedCreation(primarySlot, it) },
+                                    onPrimaryCreationNotStarted = { primaryDetectorLifecycleController.finishPreparedNotStarted(primarySlot) },
+                                    onAuxiliaryCreated = {
+                                        preparation.auxiliary = it
+                                        unknownServiceOwner.registerPreparedPair(auxiliarySlot, it)
+                                    })
+                                return CompletableFuture.completedFuture(requireNotNull(attachment).modelIds)
+                            }
+                            override fun activateAndReissue(witness: kr.co.hanium.dreamup.walksafe.inference.composite.JointPairTransferWitness,
+                                runtime: kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionTransferResult,
+                                deadline: Long): JointPairReadyProof {
+                                transferred = requireNotNull(attachment).activateAndProve(witness)
+                                return requireNotNull(transferred).proof
+                            }
+                        })
+                    preparation.consumerLease = adoption.consumer
+                    requireNotNull(transferred)
+                }
+            } finally { boundary?.finish(); measured?.close() } }
+            preparation.workerFinished.complete(Unit)
+            runOnUiThread {
+                result.fold(onSuccess = { pair ->
+                    preparation.pair = pair
+                    if (live()) preparation.adoption.prepared(pair)
+                    else { pair.proof.revoke(); preparation.adoption.fail("pair_creation_retired") }
+                }, onFailure = { preparation.adoption.fail("pair_creation_failed:${it.javaClass.simpleName}") })
+            }
+        } } catch (_: RuntimeException) {
+            measured?.close()
+            primaryDetectorLifecycleController.finishPreparedNotStarted(primarySlot)
+            preparation.workerFinished.complete(Unit)
+            preparation.adoption.fail("pair_creation_queue_rejected")
+        }
+        return preparation
+    }
+
+    private fun publishMainRuntimePair(preparation: MainPairPreparation,
+        pair: AndroidJointRuntimeLoader.PreparedPair<UnknownRuntimeAttachment>): Boolean {
+        if (!preparation.current() || mainPairPreparation !== preparation || preparation.cleanupStarted.get()) return false
+        val snapshot = pair.proof.snapshot
+        preparation.consumerLease?.let { transferred ->
+            if (transferred.owner !== preparation.source.owner || transferred.runtime.lease !== snapshot.lease ||
+                !transferred.permits() || !pair.proof.isCurrent()) return false
+            mainPreparedRuntime = MainPreparedRuntime(preparation.binding, preparation.source, pair, transferred,
+                preparation.consumerDrained, preparation.primarySlot, preparation.auxiliarySlot)
+            return true
+        }
+        val registry = VisionConsumerRegistry.process
+        val tag = DeviceCheckAuthorityValidation.digest("${preparation.binding.actorId}\u0000${preparation.binding.sessionGeneration}" +
+            "\u0000${pair.choice.measurementId}\u0000${pair.choice.bindingHash}")
+        val claim = registry.acquire(VisionConsumerRegistry.Owner(preparation.source.owner.ownerId, tag), snapshot.lease,
+            listOf(snapshot.primaryHandle, snapshot.auxiliaryHandle)) ?: return false
+        val nativeReleased = RemoteVisionClient.forMainProcess(applicationContext).actualReleasedFuture(snapshot.lease.cohortId)
+        val consumerReleased = checkNotNull(registry.pendingRelease())
+        val lease = VisionConsumerLease(preparation.source.owner, snapshot, claim, nativeReleased, consumerReleased)
+        preparation.consumerLease = lease
+        val primaryOwner = java.lang.ref.WeakReference(primaryDetectorOwner)
+        val primaryLifecycle = java.lang.ref.WeakReference(primaryDetectorLifecycleController)
+        val auxiliaryOwner = java.lang.ref.WeakReference(unknownServiceOwner)
+        val detector = java.lang.ref.WeakReference(pair.load.detector)
+        val service = java.lang.ref.WeakReference(pair.auxiliary)
+        // This callback is retained by a process-local proof. It captures no Activity or receiver.
+        val bound = pair.proof.bindConsumerGateOnce {
+            val primary = primaryOwner.get()?.projection()
+            val auxiliary = service.get()
+            registry.permits(claim) && primary?.available == true && !primary.closing &&
+                detector.get()?.let { primary.detector === it } == true &&
+                primaryLifecycle.get()?.verifiedForOutput() == true && auxiliary != null && auxiliary.isReady &&
+                auxiliaryOwner.get()?.currentService === auxiliary
+        }
+        if (!bound || !pair.proof.isCurrent() || !preparation.current()) return false
+        mainPreparedRuntime = MainPreparedRuntime(preparation.binding, preparation.source, pair, lease,
+            preparation.consumerDrained, preparation.primarySlot, preparation.auxiliarySlot)
+        return true
+    }
+
+    /** A semantic close error is not physical release. Wait for the actual model and cohort receipts. */
+    private fun retireMainPairPreparation(preparation: MainPairPreparation): CompletableFuture<Unit> {
+        if (!preparation.cleanupStarted.compareAndSet(false, true)) return preparation.retired
+        preparation.sampleHost?.cancel("pair_preparation_retired")
+        preparation.selectionClaim?.close()
+        preparation.pair?.proof?.revoke()
+        if (mainPreparedRuntime?.pair === preparation.pair) mainPreparedRuntime = null
+        val client = if (Build.VERSION.SDK_INT >= 31) RemoteVisionClient.forMainProcess(applicationContext) else null
+        preparation.workerFinished.whenComplete { _, _ -> runOnUiThread {
+            unknownServiceOwner.abortPreparedPair(preparation.auxiliarySlot)
+            if (unknownServiceOwner.currentService === preparation.auxiliary)
+                unknownServiceOwner.closeActiveForDetector()
+            val primaryHost = CompletableFuture<Unit>()
+            primaryDetectorLifecycleController.rollbackPreparedLoad(preparation.primarySlot).whenComplete { _, error ->
+                var cause = error
+                while (cause is java.util.concurrent.CompletionException || cause is java.util.concurrent.ExecutionException)
+                    cause = cause.cause ?: break
+                if (cause !is java.util.concurrent.RejectedExecutionException) primaryHost.complete(Unit)
+                else if (isDestroyed || isFinishing) primaryDetectorOwner.closedFuture().whenComplete { _, closedError ->
+                    if (closedError == null) primaryHost.complete(Unit)
+                }
+                // A rejected task is not consumer drain, even if the child later dies.
+            }
+            val auxiliary = preparation.auxiliary?.releasedFuture() ?: CompletableFuture.completedFuture(null)
+            val sampleReleased = preparation.sampleHost?.actualReleasedFuture?.toCompletableFuture()
+                ?: CompletableFuture.completedFuture(Unit)
+            val hostAndModels = CompletableFuture.allOf(primaryHost,
+                preparation.primarySlot.actualReleasedFuture.toCompletableFuture(), auxiliary, sampleReleased).thenApply { Unit }
+            val owner = preparation.source.owner
+            val consumers = preparation.consumerDrained
+            val consumerLease = preparation.consumerLease
+            val retired = preparation.retired
+            // These continuations contain application-client metadata and receipt futures only.
+            hostAndModels.whenComplete { _, error -> if (error == null) consumers.complete(Unit) }
+            consumerLease?.retire(hostAndModels)
+            val physical = DeviceRuntimeLeaseRetirement.afterHostDrain(owner, hostAndModels,
+                snapshot = { captured -> client?.retirementSnapshot(captured) },
+                actualReleased = { it.actualReleased },
+                requestExit = { client?.requestExit(it.lease, "prepared_pair_retired"); Unit })
+            val settled = CompletableFuture.allOf(physical,
+                consumerLease?.consumerReleased?.toCompletableFuture() ?: CompletableFuture.completedFuture(Unit))
+            observeRuntimeCompletion(settled, onOwnerGone = { error -> if (error == null) retired.complete(Unit) }) { error ->
+                if (error == null) {
+                    if (mainPairPreparation === preparation) mainPairPreparation = null
+                    retired.complete(Unit)
+                }
+            }
+        } }
+        return preparation.retired
+    }
+
+    /** Historical FULL is only an input to fresh actual preparation, never current runtime evidence. */
+    private fun maybePrepareHistoricalRuntime() {
+        if (cameraRuntimeJourney != null || cameraReturnTicketId != null || cameraReturnPreparing ||
+            VisionConsumerRegistry.process.pendingRelease() != null && mainPreparedRuntime == null) return
+        if (!isActivityForeground || isDestroyed || isFinishing || cameraEntryReleasePending ||
+            primaryRestoreAfterCameraScreen || deviceCompositeAttempt != null || runtimeLeasePreparation != null ||
+            mainPairPreparation != null || mainPreparedRuntime?.pair?.proof?.isCurrent() == true ||
+            postLoginDeviceCheckSnapshot.state != PostLoginDeviceCheckState.NOT_RUN || !hasCameraPermission()) return
+        val config = reportRuntimeConfig ?: return
+        val read = authorityDeviceCheckResults.historical() ?: return
+        val current = postLoginDeviceCheckController.currentSessionBinding() ?: return
+        val binding = current.copy(attemptGeneration = current.attemptGeneration.coerceAtLeast(1L))
+        if (!deviceAuthorityBindingCurrent(binding)) return
+        val deadline = SystemClock.elapsedRealtime() + POST_LOGIN_DEVICE_CHECK_TIMEOUT_MS
+        prepareDeviceRuntimeLease(binding) { leased ->
+            val source = mainRuntimeSource?.takeIf { it.binding == binding }
+            if (!leased || source == null || !deviceAuthorityBindingCurrent(binding)) return@prepareDeviceRuntimeLease
+            val budget = CameraRuntimeHandoff.begin() ?: return@prepareDeviceRuntimeLease
+            val guard = { deviceAuthorityBindingCurrent(binding) &&
+                postLoginDeviceCheckSnapshot.state == PostLoginDeviceCheckState.NOT_RUN &&
+                authorityDeviceCheckResults.historical()?.bundleRef === read.bundleRef }
+            var preparation: MainPairPreparation? = null
+            preparation = prepareMainRuntimePair(binding, config, read.choice, source, deadline, guard,
+                onReady = {
+                    if (postLoginDeviceCheckController.restoreBoundResultIfPossible()) {
+                        budget.complete()
+                        if (advanceEmailStagesWithRestoredDeviceCheck()) onFirstRunOnboardingStateChanged(
+                            announcement = "저장된 기기 점검 결과를 적용했습니다. 안전교육을 완료하세요.", preservePostLoginDeviceCheck = true)
+                    } else {
+                        preparation?.let { retireMainPairPreparation(it).whenComplete { _, _ -> budget.complete() } }
+                        if (deviceAuthorityBindingCurrent(binding) && mainRuntimeSource === source &&
+                            isActivityForeground && !isFinishing && !isDestroyed)
+                            updateStatus("기기 점검 재확인 필요", "현재 계정과 인식 모델 준비 상태를 다시 확인해 주세요.")
+                    }
+                }, onFailed = { reason ->
+                    val failed = preparation ?: mainPairPreparation?.takeIf { it.source === source }
+                    failed?.let { retireMainPairPreparation(it).whenComplete { _, _ -> budget.complete() } }
+                        ?: budget.complete()
+                    if (deviceAuthorityBindingCurrent(binding) && mainRuntimeSource === source &&
+                        isActivityForeground && !isFinishing && !isDestroyed)
+                        updateStatus("인식 모델 준비 확인 필요", "두 모델의 준비를 확인하지 못했습니다. 기기 점검을 다시 진행해 주세요. ($reason)")
+                })
+        }
+    }
+
     private class DeviceCompositeAttempt(
         val binding: PostLoginDeviceCheckBinding,
         val config: TwoModelRuntimeConfig,
@@ -14251,22 +15022,15 @@ generation != cameraFallbackGeneration
         val budget: CameraRuntimeHandoff.Claim,
         finished: (PostLoginCompositeCameraCheckResult) -> Unit,
     ) {
-        val state = DeviceCompositeAttemptState<ValidatedJointRuntimeChoice> { result ->
+        val id = java.util.UUID.randomUUID().toString()
+        val state = DeviceCompositeAttemptState<kr.co.hanium.dreamup.walksafe.inference.composite.JointRuntimeCheckedSelection> { result ->
             finished(PostLoginCompositeCameraCheckResult(result.success, metricDepth = null,
                 reason = result.reason, releaseConfirmed = result.releaseConfirmed))
         }
         var runner: AndroidJointRuntimeCheck? = null
-        val storage = Executors.newSingleThreadExecutor { Thread(it, "WalkSafeCompositeMetadata") }
-        val cleanup = Executors.newSingleThreadExecutor { Thread(it, "WalkSafeCompositeCleanup") }
+        var pairPreparation: MainPairPreparation? = null
     }
     @Volatile private var deviceCompositeAttempt: DeviceCompositeAttempt? = null
-
-    /** Metadata lookup only; model bytes are verified again before actual adoption. */
-    private fun hasStoredJointRuntimeChoice(): Boolean = runCatching {
-        val config = reportRuntimeConfig ?: assets.open("model-config/two_model_runtime.json")
-            .bufferedReader().use { TwoModelRuntimeConfig.parse(it.readText()) }
-        AndroidJointRuntimeChoiceStore(applicationContext).load(config) != null
-    }.getOrDefault(false)
 
     private fun compositeAttemptCurrent(attempt: DeviceCompositeAttempt): Boolean =
         deviceCompositeAttempt === attempt && !attempt.state.cancelled && isActivityForeground &&
@@ -14277,18 +15041,15 @@ generation != cameraFallbackGeneration
     private fun startDeviceCompositeCameraCheck(binding: PostLoginDeviceCheckBinding,
         finished: (PostLoginCompositeCameraCheckResult) -> Unit) {
         val config = reportRuntimeConfig
-        val candidate = primaryRuntimeCalibrationOwner.projection().activeCandidate
+        val source = mainRuntimeSource?.takeIf { it.binding == binding }
         val deadline = postLoginDeviceCheckController.runtimeDeadlineMs
-        val otherOwner = CameraRuntimeHandoff.pendingRelease() != null || cameraEntryReleasePending || deviceCompositeAttempt != null || runtimeArSessionCleanupPending() ||
-            cameraXReleaseBlocked || officialEnvironmentCameraPreflightActive || officialEnvironmentCameraCleanupPending ||
-            cameraFallbackRequested || cameraFallbackRunning || cameraFallbackHasCamera || cameraFallbackCleanupPending ||
-            arSessionOwner.observe().session != null || arSessionOwner.observe().purpose != ArSessionPurpose.NONE ||
+        val otherOwner = CameraRuntimeHandoff.pendingRelease() != null || cameraEntryReleasePending ||
+            deviceCompositeAttempt != null || mainPairPreparation != null || runtimeArSessionCleanupPending() ||
             metricPreflightOwner != RuntimeMetricPreflightOwner.NONE ||
-            primaryRuntimeCalibrationOwner.projection().session != null || primaryRuntimeCalibrationOwner.projection().preparing ||
-            (unknownServiceOwnerLazy.isInitialized() && unknownServiceOwner.hasCalibration)
-        val budget = if (config != null && candidate != null && deadline != null && !otherOwner &&
+            RemoteMetricSupportProbe.hasPendingRelease()
+        val budget = if (config != null && source != null && deadline != null && !otherOwner &&
             postLoginDeviceCheckController.isRunningBindingCurrent(binding) && isActivityForeground) CameraRuntimeHandoff.begin() else null
-        if (config == null || candidate == null || deadline == null || budget == null) {
+        if (config == null || source == null || deadline == null || budget == null) {
             finished(PostLoginCompositeCameraCheckResult(false, reason = "joint_runtime_start_unavailable"))
             return
         }
@@ -14296,162 +15057,126 @@ generation != cameraFallbackGeneration
         deviceCompositeAttempt = attempt
         stopHandsFreeVoiceService()
         updateStatus("내장 이미지로 인식 성능 점검", "앱에 포함된 테스트 이미지로 기본 인식과 추가 인식을 함께 확인합니다. 카메라를 비출 필요가 없습니다.")
-        primaryDetectorLifecycleController.releaseForCompositeCheck({ compositeAttemptCurrent(attempt) }) { released ->
-            if (deviceCompositeAttempt !== attempt) return@releaseForCompositeCheck
-            if (!released) {
-                publishDeviceCompositeReleaseFailure(attempt, "primary_release_unconfirmed")
-                return@releaseForCompositeCheck
-            }
-            if (attempt.state.cancelled) return@releaseForCompositeCheck
-            try { attempt.cleanup.execute {
-                val auxiliaryReleased = runCatching {
-                    !unknownServiceOwnerLazy.isInitialized() || unknownServiceOwner.releaseBeforePrimaryCalibration()
-                }.getOrDefault(false)
-                runOnUiThread {
-                    if (deviceCompositeAttempt !== attempt) return@runOnUiThread
-                    if (!auxiliaryReleased) publishDeviceCompositeReleaseFailure(attempt, "auxiliary_release_unconfirmed")
-                    else if (!compositeAttemptCurrent(attempt)) publishDeviceCompositeReleaseFailure(attempt, "joint_runtime_retired")
-                    else if (attempt.state.beginRunning()) {
-                        val runner = AndroidJointRuntimeCheck(applicationContext, config, candidate, deadline,
-                            isCurrent = { compositeAttemptCurrent(attempt) }, speechActive = ::isHandsFreeVoiceOutputActive,
-                            onReleaseConfirmed = { acknowledgeDeviceCompositeLateRelease(attempt) },
-                            onProgress = { message ->
-                                if (compositeAttemptCurrent(attempt)) updateStatus("내장 이미지로 인식 성능 점검", message)
-                            }, onFinished = { result ->
-                                if (deviceCompositeAttempt === attempt) {
-                                    if (!result.releaseConfirmed) publishDeviceCompositeReleaseFailure(attempt, result.reason)
-                                    else attempt.state.receiveReleasedCandidate(result.choice,
-                                        isCurrent = { compositeAttemptCurrent(attempt) },
-                                        apply = { choice ->
-                                            // Apply/verify in memory first. A process death before this point
-                                            // must never pair an older FULL result with an unapplied new choice.
-                                            primaryDetectorLifecycleController.finishCompositeCheck(reload = true, choiceOverride = choice)
-                                            finishDeviceCompositeApplicationIfReady()
-                                        }, onRejected = {
-                                            completeDeviceCompositeAttempt(attempt, false,
-                                                result.reason.ifBlank { "joint_runtime_application_admission_retired" })
-                                        }, onBlocked = { publishDeviceCompositeReleaseFailure(attempt, it) })
-                                }
-                            })
-                        attempt.runner = runner
-                        if (!runner.start()) completeDeviceCompositeAttempt(attempt, false, "joint_runtime_start_failed")
-                    }
+        if (!attempt.state.beginRunning()) return
+        val weakOwner = java.lang.ref.WeakReference(this)
+        val attemptId = attempt.id
+        // The constructor captures this attempt's immutable source before worker dispatch.
+        val runner = AndroidJointRuntimeCheck(source.context, config,
+            RuntimeCandidate(kr.co.hanium.dreamup.walksafe.inference.RuntimeBackend.CPU, 1), deadline,
+            isCurrent = { weakOwner.get()?.let { owner -> owner.deviceCompositeAttempt?.let {
+                it.id == attemptId && owner.compositeAttemptCurrent(it)
+            } } == true },
+            onReleaseConfirmed = {
+                val owner = weakOwner.get()
+                val old = owner?.deviceCompositeAttempt?.takeIf { it.id == attemptId }
+                if (owner != null && old != null) owner.acknowledgeDeviceCompositeLateRelease(old)
+                else budget.complete()
+            },
+            onProgress = { message -> weakOwner.get()?.let { owner ->
+                owner.deviceCompositeAttempt?.takeIf { it.id == attemptId && owner.compositeAttemptCurrent(it) }?.let {
+                    owner.updateStatus("내장 이미지로 인식 성능 점검", message)
                 }
-            } } catch (_: RuntimeException) { publishDeviceCompositeReleaseFailure(attempt, "auxiliary_release_schedule_failed") }
-        }
+            } },
+            onFinished = { result ->
+                val owner = weakOwner.get()
+                if (owner?.deviceCompositeAttempt?.id == attemptId) owner.receiveCompositeSelection(attemptId, result)
+                else {
+                    result.selection?.discardIfUnclaimed()
+                    if (result.releaseConfirmed) budget.complete()
+                }
+            })
+        attempt.runner = runner
+        if (!runner.start()) completeDeviceCompositeAttempt(attempt, false, "joint_runtime_start_failed")
+    }
+
+    private fun receiveCompositeSelection(attemptId: String,
+        result: kr.co.hanium.dreamup.walksafe.inference.composite.JointRuntimeCheckResult) {
+        val attempt = deviceCompositeAttempt?.takeIf { it.id == attemptId }
+            ?: run { result.selection?.discardIfUnclaimed(); return }
+        if (!result.releaseConfirmed) { result.selection?.discardIfUnclaimed(); publishDeviceCompositeReleaseFailure(attempt, result.reason); return }
+        attempt.state.receiveReleasedCandidate(result.selection,
+            isCurrent = { compositeAttemptCurrent(attempt) },
+            apply = { selection ->
+                val source = mainRuntimeSource?.takeIf { it.binding == attempt.binding }
+                val claim = source?.let { selection.claimForFinal(it.owner.source,
+                    attempt.binding.sessionGeneration, SystemClock.elapsedRealtime()) }
+                if (source == null || claim == null) {
+                    selection.discardIfUnclaimed()
+                    publishDeviceCompositeReleaseFailure(attempt, "final_reference_or_source_retired")
+                } else {
+                    val final = prepareMainRuntimePair(attempt.binding, attempt.config, null, source,
+                        minOf(attempt.deadlineMs, claim.plan.budget.deadlineMs),
+                        current = { compositeAttemptCurrent(attempt) },
+                        onReady = { finishDeviceCompositeApplicationIfReady() },
+                        onFailed = { publishDeviceCompositeReleaseFailure(attempt, it) }, measured = claim)
+                    attempt.pairPreparation = final
+                    if (final == null) claim.close()
+                }
+            }, onRejected = {
+                result.selection?.discardIfUnclaimed()
+                completeDeviceCompositeAttempt(attempt, false, result.reason.ifBlank { "joint_runtime_final_admission_retired" })
+            }, onBlocked = {
+                result.selection?.discardIfUnclaimed()
+                publishDeviceCompositeReleaseFailure(attempt, it)
+            })
     }
 
     private fun finishDeviceCompositeApplicationIfReady() {
+        mainPairPreparation?.adoption?.poll()
         val attempt = deviceCompositeAttempt ?: return
         if (!attempt.state.applying) return
-        if (!compositeAttemptCurrent(attempt)) {
-            publishDeviceCompositeReleaseFailure(attempt, "joint_runtime_application_retired")
-            return
+        val runtime = mainPreparedRuntime ?: return
+        val selected = attempt.state.choice ?: return
+        val qualification = runtime.pair.proof.qualification ?: return
+        if (runtime.binding != attempt.binding || runtime.pair.choice.candidate != selected.plan.candidate ||
+            !qualification.matches(runtime.pair.choice, runtime.pair.proof.snapshot)) return
+        val verified = primaryDetectorLifecycleController.verificationState(runtime.pair.load.detector!!)
+        if (verified != RunningDetectorVerificationState.VERIFIED || !runtime.pair.proof.isCurrent()) return
+        if (!attempt.state.acceptPrepared { compositeAttemptCurrent(attempt) }) {
+            publishDeviceCompositeReleaseFailure(attempt, "joint_runtime_completion_retired"); return
         }
-        val metadata = primaryDetectorLifecycleController.metadata()
-        if (metadata.loadInFlight) return
-        val choice = attempt.state.choice ?: return
-        val detector = primaryDetectorOwner.projection()
-        val verified = primaryDetectorLifecycleController.verificationState(detector.detector)
-        if (detector.available && verified in setOf(RunningDetectorVerificationState.NONE, RunningDetectorVerificationState.PENDING)) return
-        val applied = detector.available && verified == RunningDetectorVerificationState.VERIFIED &&
-            !metadata.fallbackUsed && metadata.loadReason == "DeviceCheckJointRuntimeChoice" &&
-            primaryRuntimeCalibrationOwner.projection().activeCandidate == choice.candidate.primary
-        if (!applied) {
-            publishDeviceCompositeReleaseFailure(attempt, "joint_runtime_application_failed")
-            return
-        }
-        attempt.state.persistVerified(
-            isCurrent = { compositeAttemptCurrent(attempt) },
-            executeStorage = { action -> attempt.storage.execute { action() } },
-            postUi = { action -> runOnUiThread { action() } },
-            save = { AndroidJointRuntimeChoiceStore(applicationContext).save(attempt.config, it) },
-            retireIfCurrent = { AndroidJointRuntimeChoiceStore(applicationContext).retireIfCurrent(it) },
-            onComplete = { success, reason ->
-                if (deviceCompositeAttempt === attempt) {
-                    if (!success || !compositeAttemptCurrent(attempt)) publishDeviceCompositeReleaseFailure(attempt, reason)
-                    completeDeviceCompositeAttempt(attempt, success, reason)
-                }
-            }, onBlocked = { publishDeviceCompositeReleaseFailure(attempt, it) })
+        completeDeviceCompositeAttempt(attempt, true, "actual_both_models_prepared")
     }
 
     private fun completeDeviceCompositeAttempt(attempt: DeviceCompositeAttempt, success: Boolean, reason: String) {
         if (deviceCompositeAttempt !== attempt || !attempt.state.canComplete()) return
         val accepted = success && compositeAttemptCurrent(attempt)
         if (success && !accepted) {
-            publishDeviceCompositeReleaseFailure(attempt, "joint_runtime_completion_retired")
-            return
+            publishDeviceCompositeReleaseFailure(attempt, "joint_runtime_completion_retired"); return
         }
-        val completed = attempt.state.complete(accepted, reason,
+        attempt.state.complete(accepted, reason,
             beforeNotify = {
-                // Receipt completion can reenter another Activity's native preparation.
                 deviceCompositeAttempt = null
                 if (!accepted) primaryDetectorLifecycleController.finishCompositeCheck(reload = false)
-                attempt.storage.shutdown()
-                attempt.cleanup.shutdown()
-            }, onPreviouslyPublishedRelease = {
-                postLoginDeviceProbes.confirmCompositeRuntimeRelease(attempt.binding)
-            }, releaseBudget = { attempt.budget.complete() })
-        if (!completed) return
-        if (postLoginDeviceCheckSnapshot.state == PostLoginDeviceCheckState.RUNNING &&
-            postLoginDeviceCheckSnapshot.bindingOrNull != attempt.binding) loadDetectorForPostLoginDeviceCheck()
+            }, onPreviouslyPublishedRelease = { postLoginDeviceProbes.confirmCompositeRuntimeRelease(attempt.binding) },
+            releaseBudget = { attempt.budget.complete() })
     }
 
     private fun publishDeviceCompositeReleaseFailure(attempt: DeviceCompositeAttempt, reason: String) {
         if (deviceCompositeAttempt !== attempt) return
-        val currentBinding = postLoginDeviceCheckController.isRunningBindingCurrent(attempt.binding)
         attempt.runner?.cancel(reason)
+        attempt.state.choice?.discardIfUnclaimed()
         val first = attempt.state.fail(reason) { requestDeviceCompositeNativeCleanup(attempt) }
         if (deviceCompositeAttempt !== attempt) return
-        // Result failure and actual release are separate. A late physical ACK may recover this
-        // pending receipt; fail() on the process receipt would make that recovery impossible.
-        if (first && currentBinding && isActivityForeground && !isDestroyed && !isFinishing) {
-            updateStatus("성능 점검 종료 확인 필요",
-                "인식 작업 또는 설정 정리의 완료를 확인하지 못했습니다. 종료 확인 전에는 다시 점검하지 않습니다. 계속 대기하면 앱을 완전히 종료한 뒤 다시 실행해 주세요.")
-        }
+        if (first && isActivityForeground && !isDestroyed && !isFinishing) updateStatus("성능 점검 종료 확인 필요",
+            "인식 작업의 실제 종료를 확인한 뒤 다시 점검합니다. 계속 대기하면 앱을 완전히 종료한 뒤 다시 실행해 주세요.")
         if (attempt.state.hasWorkerReleaseAcknowledgement()) acknowledgeDeviceCompositeLateRelease(attempt)
     }
 
     private fun requestDeviceCompositeNativeCleanup(attempt: DeviceCompositeAttempt) {
-        val authority = { deviceCompositeAttempt === attempt }
-        fun auxiliaryAfterPrimary() {
-            try { attempt.cleanup.execute {
-                val released = runCatching {
-                    !unknownServiceOwnerLazy.isInitialized() || unknownServiceOwner.releaseBeforePrimaryCalibration()
-                }.getOrDefault(false)
-                runOnUiThread {
-                    if (!authority()) return@runOnUiThread
-                    if (!released) publishDeviceCompositeReleaseFailure(attempt, "auxiliary_cleanup_unconfirmed")
-                    else {
-                        attempt.state.nativeCleanupConfirmed()
-                        completeDeviceCompositeAttempt(attempt, false, "joint_runtime_cancelled_released")
-                    }
-                }
-            } } catch (_: RuntimeException) { publishDeviceCompositeReleaseFailure(attempt, "auxiliary_cleanup_schedule_failed") }
+        val pair = attempt.pairPreparation ?: mainPairPreparation
+        if (pair == null) {
+            attempt.state.nativeCleanupConfirmed()
+            completeDeviceCompositeAttempt(attempt, false, "joint_runtime_no_pair_created")
+            return
         }
-        fun destroyedPrimary() {
-            primaryDetectorOwner.closedFuture().whenComplete { _, error -> runOnUiThread {
-                if (!authority()) return@runOnUiThread
-                if (error != null) publishDeviceCompositeReleaseFailure(attempt, "primary_shutdown_unconfirmed")
-                else auxiliaryAfterPrimary()
-            } }
-        }
-        if (isFinishing || isDestroyed) { destroyedPrimary(); return }
-        primaryDetectorLifecycleController.cancelPendingLoadAfterDrain { drained ->
-            if (!authority()) return@cancelPendingLoadAfterDrain
-            if (isFinishing || isDestroyed) { destroyedPrimary(); return@cancelPendingLoadAfterDrain }
-            if (!drained) {
-                publishDeviceCompositeReleaseFailure(attempt, "application_drain_unconfirmed")
-                return@cancelPendingLoadAfterDrain
-            }
-            // A queue barrier alone does not close an already-adopted candidate.
-            primaryDetectorLifecycleController.finishCompositeCheck(reload = false)
-            primaryDetectorLifecycleController.releaseForCompositeCheck(authority) { released ->
-                if (!authority()) return@releaseForCompositeCheck
-                if (released) auxiliaryAfterPrimary()
-                else if (isFinishing || isDestroyed) destroyedPrimary()
-                else publishDeviceCompositeReleaseFailure(attempt, "application_release_unconfirmed")
-            }
+        pair.adoption.fail("joint_runtime_pair_cancelled")
+        val budget = attempt.budget
+        observeRuntimeCompletion(retireMainPairPreparation(pair),
+            onOwnerGone = { error -> if (error == null) budget.complete() }) { error ->
+            if (deviceCompositeAttempt !== attempt || error != null) return@observeRuntimeCompletion
+            attempt.state.nativeCleanupConfirmed()
+            completeDeviceCompositeAttempt(attempt, false, "joint_runtime_pair_released")
         }
     }
 
@@ -14461,8 +15186,7 @@ generation != cameraFallbackGeneration
     }
 
     private fun cancelDeviceCompositeCameraCheck(reason: String) {
-        val attempt = deviceCompositeAttempt ?: return
-        publishDeviceCompositeReleaseFailure(attempt, reason)
+        deviceCompositeAttempt?.let { publishDeviceCompositeReleaseFailure(it, reason) }
     }
 
     private fun deviceRuntimeCalibrationContextAvailable(): Boolean =
@@ -14484,18 +15208,14 @@ generation != cameraFallbackGeneration
             metricPreflightOwner == RuntimeMetricPreflightOwner.NONE
 
     /** Wait only for owners already draining. This never polls or benchmarks during a walk. */
+    @Suppress("UNUSED_PARAMETER")
     private fun scheduleDeviceRuntimeCalibration(
         manual: Boolean = false,
         requestDeadlineMs: Long = SystemClock.elapsedRealtime() + 300_000L,
     ) {
         primaryRuntimeCalibrationOwner.clearScheduledPreparation()
-        // Only an explicit check opens the live camera. Ordinary HOME restoration remains cache-only.
-        if (manual && SystemClock.elapsedRealtime() < requestDeadlineMs) {
-            prepareDeviceRuntimeCalibration(manual = true, requestDeadlineMs = requestDeadlineMs)
-        }
-        else if (isActivityForeground && postLoginDeviceCheckSnapshot.passesFeatureGate && !isWalkSessionRuntimeActive()) {
-            loadDetectorForCurrentProcess()
-        }
+        // Production restores only a complete historical pair; there is no independent calibration.
+        loadDetectorForCurrentProcess()
     }
 
     private fun cancelDeviceRuntimeCalibration(reason: String) {

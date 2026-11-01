@@ -10,6 +10,33 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AndroidPostLoginDeviceProbesTest {
+    @Test fun jointCheckRejectingTheHookNeverFallsBackToPhysicalCameraOrNeedsAnInitialDetector() {
+        val f = Fixture()
+        f.support.requiresJointRuntimeCheck = true
+        f.probes.startCamera(f.binding)
+        f.ui.drain()
+        assertTrue(f.camera.requests.isEmpty())
+        assertEquals(PostLoginDeviceCheckSignal.UNAVAILABLE, f.probes.signals.cameraPipeline)
+        assertEquals(PostLoginCameraPipelineFailure.COMPOSITE_RUNTIME_UNAVAILABLE, f.probes.cameraFailure)
+    }
+
+    @Test fun jointHookThrowKeepsReleasePendingAndNeverStartsPhysicalCamera() {
+        val f = Fixture()
+        f.support.requiresJointRuntimeCheck = true
+        f.support.compositeHandled = true
+        f.support.compositeThrow = AssertionError("source failed after reservation")
+        f.probes.startCamera(f.binding)
+        f.ui.fire(15_000L)
+        f.ui.drain()
+        assertTrue(f.camera.requests.isEmpty())
+        assertTrue(f.probes.cameraCleanupPending)
+        assertEquals(listOf("composite_start_failed"), f.support.compositeCancellations)
+        f.support.compositeRequests.single().finished(PostLoginCompositeCameraCheckResult(false))
+        f.ui.drain()
+        assertFalse(f.probes.cameraCleanupPending)
+        assertTrue(f.camera.requests.isEmpty())
+    }
+
     @Test fun constructionDoesNotReadOwnersOrStartNativeSources() {
         val f = Fixture()
         assertEquals(0, f.ownerReads)
@@ -513,6 +540,8 @@ class AndroidPostLoginDeviceProbesTest {
             val finished: (PostLoginCompositeCameraCheckResult) -> Unit)
         var calls = 0
         var compositeHandled = false
+        var compositeThrow: Throwable? = null
+        override var requiresJointRuntimeCheck = false
         var compositeSynchronousResult: PostLoginCompositeCameraCheckResult? = null
         val compositeRequests = mutableListOf<CompositeRequest>()
         val compositeCancellations = mutableListOf<String>()
@@ -525,6 +554,7 @@ class AndroidPostLoginDeviceProbesTest {
             onFinished: (PostLoginCompositeCameraCheckResult) -> Unit): Boolean {
             if (!compositeHandled) return false
             compositeRequests += CompositeRequest(binding, onFinished)
+            compositeThrow?.let { throw it }
             compositeSynchronousResult?.let(onFinished)
             return true
         }

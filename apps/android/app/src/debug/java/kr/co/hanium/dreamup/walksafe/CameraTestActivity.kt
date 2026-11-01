@@ -4,6 +4,7 @@ import kr.co.hanium.dreamup.walksafe.depth.FrozenImageToTextureCoordinateMapper
 import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.RectF
 import android.opengl.GLES11Ext
@@ -44,6 +45,12 @@ import kr.co.hanium.dreamup.walksafe.inference.RuntimeCandidate
 import kr.co.hanium.dreamup.walksafe.inference.composite.AndroidJointRuntimeChoiceStore
 import kr.co.hanium.dreamup.walksafe.inference.composite.AndroidJointRuntimeLoader
 import kr.co.hanium.dreamup.walksafe.inference.composite.ValidatedJointRuntimeChoice
+import kr.co.hanium.dreamup.walksafe.inference.composite.TransferredJointRuntimeAttachment
+import kr.co.hanium.dreamup.walksafe.inference.composite.JointPairTransferWitness
+import kr.co.hanium.dreamup.walksafe.inference.composite.JointRuntimeAttachmentReservation
+import kr.co.hanium.dreamup.walksafe.device.AndroidDeviceCheckAuthority
+import kr.co.hanium.dreamup.walksafe.network.GatewaySessionProcessCoordinator
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.*
 import kr.co.hanium.dreamup.walksafe.depth.TrackedObjectDepth
 import kr.co.hanium.dreamup.walksafe.inference.AndroidDetectorLoadTiming
 import kr.co.hanium.dreamup.walksafe.inference.AndroidDetectorLoadPhase
@@ -244,6 +251,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         create = ::createUnknownService,
         dispatch = { action -> runOnUiThread { action() } },
         changed = ::showUnknownRuntimeStatus,
+        requiresTransferredPair = true,
     )
     private val auxiliaryStartup = CameraAuxiliaryStartupCoordinator()
     private var auxiliaryRetryRequested = false
@@ -310,8 +318,19 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
     private var waitingHandoff: CompletableFuture<Unit>? = null
     private val cameraNativeReleases = ConcurrentHashMap<Long, CompletableFuture<Unit>>()
     private val retiredPrimaryReleases = ConcurrentLinkedQueue<CompletableFuture<Unit>>()
-    private val visionRuntimeOwnerId = "camera-${UUID.randomUUID()}"
-    private val visionRuntimeContext by lazy { VisionRuntimeContext(applicationContext, visionRuntimeOwnerId) }
+    private var entryTransfer: VisionPairConsumerTransferTicket? = null
+    private var scopedVisionContext: VisionRuntimeContext? = null
+    private val visionRuntimeOwnerId get() = scopedVisionContext?.let(VisionRuntimeContext::ownerId) ?: "unclaimed-camera"
+    private val visionRuntimeContext get() = requireNotNull(scopedVisionContext) { "Camera pair ownership missing" }
+    @Volatile private var cameraPair: AndroidJointRuntimeLoader.PreparedPair<UnknownCapture>? = null
+    @Volatile private var cameraConsumer: VisionConsumerLease? = null
+    private var cameraConsumerDrained = CompletableFuture<Unit>()
+    private var cameraAttachmentReservation: JointRuntimeAttachmentReservation<UnknownCapture>? = null
+    private val pairPreparationPending = AtomicBoolean()
+    private var returningPair = false
+    private var returnTransfer: VisionPairConsumerTransferTicket? = null
+    private var returnPrepared = false
+    private var returnHostDrained: CompletableFuture<Unit>? = null
     private val closingCamera get() = cameraRelease.blocksStart
     private var startingCamera = false
     private var installRequested = false
@@ -332,6 +351,12 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val ticketId = intent.getStringExtra(VisionPairTransfers.EXTRA_TICKET)
+        entryTransfer = ticketId?.let { VisionPairTransfers.forApp(applicationContext).pending(it) }
+        entryTransfer?.let { ticket ->
+            if (GatewaySessionProcessCoordinator.snapshot().generation == ticket.targetOwner.sessionGeneration)
+                scopedVisionContext = VisionRuntimeContext(applicationContext, ticket.targetOwner)
+        }
         runtimeHandoff = CameraRuntimeHandoff.begin()
         surface = GLSurfaceView(this).apply {
             setEGLContextClientVersion(2)
@@ -393,92 +418,131 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         })
     }
 
-    /** Restore sample-measured execution settings; live geometry/depth keep their own source gates. */
+    /** Only the already-warmed pair may enter this screen; historical settings cannot OPEN models. */
     private fun prepareCameraDetector() {
-        if (detector != null && preparedCameraGeneration == generation && jointChoice != null) return
-        val epoch = generation
-        val activityRef = WeakReference(this)
-        val handler = feedbackHandler
-        if (deferCameraRuntimeUntilAuxiliaryReleased(unknownRuntime.service,
-                dispatch = { action -> handler.post { action() }; Unit },
-                isCurrent = { activityRef.get()?.let {
-                    it.foreground && !it.isDestroyed && !it.isFinishing && it.generation == epoch
-                } == true },
-                onReleased = { activityRef.get()?.prepareCameraDetector(); Unit },
-                onReleaseFailure = {
-                    activityRef.get()?.status?.text = "이전 추가 인식 모델의 해제가 확인되지 않아 시작할 수 없습니다. 화면을 닫아 주세요."
-                })) {
-            status.text = "이전 추가 인식 모델의 종료를 기다리는 중"
+        val prepared = cameraPair
+        if (prepared != null) {
+            if (!cameraPairCurrent()) {
+                invalidateJointRuntime(prepared.choice, "camera_pair_ownership_lost")
+                return
+            }
+            preparedCameraGeneration = generation
             return
         }
+        val ticket = entryTransfer
+        val context = scopedVisionContext
+        if (ticket == null || context == null) {
+            status.text = "검증한 인식 모델을 전달받지 못했습니다. 홈에서 다시 점검한 뒤 카메라를 열어 주세요."
+            return
+        }
+        if (!foreground || isDestroyed || isFinishing || !pairPreparationPending.compareAndSet(false, true)) return
+        val epoch = generation
+        val auxiliaryEpoch = unknownRuntime.reserveTransferredEpoch()
+        if (auxiliaryEpoch == null) { pairPreparationPending.set(false); return }
         val request = primaryRuntimeAuthority.beginPreparation()
-        val modelQueuedNs = System.nanoTime()
-        worker.execute {
+        val reservation = JointRuntimeAttachmentReservation<UnknownCapture>()
+        cameraAttachmentReservation = reservation
+        val targetDrained = reservation.hostDrained
+        cameraConsumerDrained = targetDrained
+        val transfers = VisionPairTransfers.forApp(applicationContext)
+        val authority = AndroidDeviceCheckAuthority.forApp(applicationContext)
+        val client = RemoteVisionClient.forMainProcess(applicationContext)
+        try { worker.execute {
+            var attachment: TransferredJointRuntimeAttachment<UnknownCapture>? = null
+            var adoption: VisionPairConsumerAdoption? = null
+            var pair: AndroidJointRuntimeLoader.PreparedPair<UnknownCapture>? = null
             fun current() = foreground && !isDestroyed && !isFinishing && epoch == generation &&
-                primaryRuntimeAuthority.isCurrent(request) && runtimeHandoff?.released?.isCompletedExceptionally != true
-            if (!current()) return@execute
-            if (detector != null && preparedCameraGeneration == epoch && jointChoice != null) return@execute
-            logCameraQueue("model_load_queue", generation, modelQueuedNs)
-            val previous = detector
-            detector = null
-            var owned: TfliteAndroidFrameDetector? = null
-            var preparationFailure: Throwable? = null
-            val loaded = runCatching {
-                // A semantic close error is reported separately; only actual release admits a replacement.
-                closePrimaryNative(previous).get()
-                CompletableFuture.allOf(*retiredPrimaryReleases.toTypedArray()).get()
-                val config = TwoModelRuntimeConfig.load(applicationContext)
-                val prepared = requireNotNull(AndroidJointRuntimeLoader.restore(visionRuntimeContext,
-                    config, ::current)) { "Device check joint runtime required" }
-                owned = prepared.load.detector
-                if (!primaryRuntimeAuthority.publish(request, ::current) {
-                    primaryInferencePacing.configureMinimumInterval(prepared.choice.candidate.primaryIntervalMs)
-                    jointChoice = prepared.choice
-                    primaryCandidate = prepared.choice.candidate.primary
-                    auxiliaryCandidate = prepared.choice.candidate.auxiliary
-                    primarySetting = "샘플 이미지 성능 점검 설정 · ${prepared.choice.candidate.primaryIntervalMs}ms 간격"
-                    auxiliarySetting = "샘플 이미지 성능 점검 설정 · ${prepared.choice.candidate.auxiliaryIntervalMs}ms 간격"
-                    preparedCameraGeneration = epoch
-                    detector = prepared.load.detector
-                }) throw CancellationException("Camera model preparation retired")
-                prepared.load
-            }.onFailure {
-                preparationFailure = it
-                primaryRuntimeAuthority.clearFailed(request) {
-                    primaryCandidate = null
-                    auxiliaryCandidate = null
-                    preparedCameraGeneration = -1
-                    jointChoice = null
-                    detector = null
+                primaryRuntimeAuthority.isCurrent(request) && !reservation.stopping &&
+                GatewaySessionProcessCoordinator.snapshot().generation == ticket.targetOwner.sessionGeneration &&
+                authority.ownerRef(ticket.targetOwner.ownerId) === ticket.targetOwner
+            val result = runCatching {
+                check(current()) { "Camera transfer target retired" }
+                check(transfers.take(ticket.id, ticket.targetOwner, ticket.authorityTag) === ticket)
+                val config = TwoModelRuntimeConfig.load(context)
+                val choice = requireNotNull(AndroidJointRuntimeChoiceStore(context).load(config))
+                check(choice.measurementId == ticket.witness.measurementId && choice.candidate == ticket.witness.candidate)
+                adoption = transfers.adopt(ticket, ticket.targetOwner, ticket.authorityTag, targetDrained,
+                    object : VisionPairTransferTargetEffects {
+                        override fun attachBoth(tokens: VisionPairDetachTokens, runtime: VisionTransferResult,
+                            deadlineMs: Long): CompletionStage<Set<String>> {
+                            attachment = TransferredJointRuntimeAttachment.attach(context, config, choice, authority,
+                                tokens.primary, tokens.auxiliary, runtime, auxiliaryEpoch,
+                                unknownListener(auxiliaryEpoch, choice), deadlineMs, ::current,
+                                onPrimaryCreated = reservation::retainPrimary,
+                                onAuxiliaryCreated = reservation::retainAuxiliary)
+                            return CompletableFuture.completedFuture(requireNotNull(attachment).modelIds)
+                        }
+                        override fun activateAndReissue(witness: JointPairTransferWitness,
+                            runtime: VisionTransferResult, deadlineMs: Long): kr.co.hanium.dreamup.walksafe.inference.composite.JointPairReadyProof {
+                            pair = requireNotNull(attachment).activateAndProve(witness)
+                            return requireNotNull(pair).proof
+                        }
+                    })
+                // Register metadata before posting UI. Teardown's worker barrier sees an adopted
+                // claim even when publication never ran on the screen thread.
+                cameraConsumer = adoption?.consumer
+                check(current()) { "Camera transfer publication retired" }
+                requireNotNull(pair)
+            }
+            fun discard() {
+                pair?.proof?.revoke()
+                adoption?.consumer?.retire(targetDrained)
+                transfers.cancel(ticket, "camera_target_retired")
+                client.retirementSnapshot(ticket.targetOwner)?.let { client.requestExit(it.lease, "camera_target_retired") }
+                reservation.closeHost()
+            }
+            if (result.isFailure) {
+                discard()
+                runOnUiThread {
+                    pairPreparationPending.set(false)
+                    unknownRuntime.cancelTransferredEpoch(auxiliaryEpoch)
+                    if (foreground && generation == epoch && !isDestroyed && !isFinishing)
+                        status.text = "인식 모델 인계를 확인하지 못했습니다. 홈에서 다시 점검해 주세요."
                 }
-                runCatching { closePrimaryNative(owned) }
-                owned = null
-                Log.e("WalkSafeCameraTest", "Model initialization failed", it)
-            }.getOrNull()
-            if (primaryRuntimeAuthority.isCurrent(request)) primaryInferencePacing.reset()
-            Log.i("WalkSafeCameraTest", "Model initialization: ${loaded?.reason ?: "exception"} " +
-                "measurement=sample_images primary=$primaryCandidate primarySetting=$primarySetting auxiliary=$auxiliaryCandidate")
-            logDetectorTiming("model_load", loaded?.loadTiming)
-            runOnUiThread {
-                if (!foreground || isDestroyed || isFinishing || generation != epoch ||
-                    !primaryRuntimeAuthority.isCurrent(request)) return@runOnUiThread
-                if (detector == null) {
-                    val busy = VisionRuntimeFailures.busy(preparationFailure)
-                    if (busy != null) {
-                        status.text = "이전 화면의 모델 종료를 기다리는 중 · 점검 설정은 유지됩니다."
-                        unknownStatus.text = "모델을 사용할 수 있을 때 추가 인식을 준비합니다."
-                        awaitModelAvailability(busy.availabilityReceipt, epoch, request)
-                    } else {
-                        status.text = "기기 점검 설정을 준비하지 못했습니다. 이전 모델 해제가 확인된 뒤 홈에서 다시 점검해 주세요."
-                        unknownStatus.text = "모델 준비 실패로 추가 인식을 시작하지 않았습니다."
+            } else runOnUiThread {
+                val ready = requireNotNull(result.getOrNull())
+                val accepted = current() && unknownRuntime.adoptTransferred(auxiliaryEpoch, ready.auxiliary) &&
+                    primaryRuntimeAuthority.publish(request, ::current) {
+                        detector = ready.load.detector
+                        jointChoice = ready.choice
+                        cameraPair = ready
+                        cameraConsumer = requireNotNull(adoption).consumer
+                        primaryCandidate = ready.choice.candidate.primary
+                        auxiliaryCandidate = ready.choice.candidate.auxiliary
+                        primaryInferencePacing.configureMinimumInterval(ready.choice.candidate.primaryIntervalMs)
+                        auxiliaryPacing.begin(auxiliaryEpoch, ready.choice.candidate.auxiliaryIntervalMs)
+                        preparedCameraGeneration = epoch
+                        primarySetting = "샘플 이미지 점검 설정 · ${ready.choice.candidate.primaryIntervalMs}ms 간격"
+                        auxiliarySetting = "샘플 이미지 점검 설정 · ${ready.choice.candidate.auxiliaryIntervalMs}ms 간격"
+                    }
+                pairPreparationPending.set(false)
+                if (accepted) {
+                    status.text = "검증한 두 인식 모델 준비 완료 · $primarySetting"
+                    unknownRuntime.resume()
+                } else {
+                    unknownRuntime.cancelTransferredEpoch(auxiliaryEpoch)
+                    unknownRuntime.rollbackTransferred(auxiliaryEpoch, ready.auxiliary)
+                    reservation.revokeAdmission()
+                    try { worker.execute { discard() } } catch (_: RuntimeException) {
+                        client.requestExit(requireNotNull(adoption).consumer.runtime.lease, "camera_publication_rejected")
                     }
                 }
-                else if (foreground) {
-                    status.text = "객체 인식 준비 완료 · $primarySetting"
-                    resumeUnknownAfterPrimaryLiveAttempt()
-                }
             }
+        } } catch (error: RuntimeException) {
+            pairPreparationPending.set(false)
+            unknownRuntime.cancelTransferredEpoch(auxiliaryEpoch)
+            reservation.closeHost() // No target wrapper work entered the rejected queue.
+            transfers.cancel(ticket, "camera_target_queue_rejected")
+            status.text = "인계 작업을 시작하지 못했습니다. 홈에서 다시 점검해 주세요."
         }
+    }
+
+    private fun cameraPairCurrent(): Boolean {
+        val pair = cameraPair ?: return false
+        val consumer = cameraConsumer ?: return false
+        return pair.proof.isCurrent() && consumer.permits() && detector === pair.load.detector &&
+            unknownRuntime.service === pair.auxiliary && pair.auxiliary.isReady &&
+            GatewaySessionProcessCoordinator.snapshot().generation == consumer.owner.sessionGeneration
     }
 
     private fun awaitModelAvailability(receipt: CompletionStage<*>, epoch: Int, request: Long) {
@@ -495,21 +559,12 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         }
     }
 
-    private fun createUnknownService(epoch: Long): FastSamRuntimeService<UnknownCapture> {
-        val choice = requireNotNull(jointChoice) { "Device check joint runtime required" }
-        check(preparedCameraGeneration == generation && detector != null)
-        // Publish fresh tracker/policy state before the new service becomes visible to the GL worker.
-        unknownMaterialPoints.invalidate()
-        unknownPipeline = UnknownObjectDepthPipeline(SystemClock::elapsedRealtime)
-        unknownFeedbackPolicy = UnknownObjectFeedbackPolicy()
-        auxiliaryPacing.begin(epoch, choice.candidate.auxiliaryIntervalMs)
+    private fun createUnknownService(epoch: Long): FastSamRuntimeService<UnknownCapture> =
+        error("A camera auxiliary requires the verified transferred pair")
+
+    private fun unknownListener(epoch: Long, choice: ValidatedJointRuntimeChoice): FastSamRuntimeService.Listener<UnknownCapture> {
         val selected = choice.candidate.auxiliary
-        Log.i("WalkSafeCameraTest", "FastSAM preparation: candidate=$selected setting=$auxiliarySetting primary=$primaryCandidate")
-        return FastSamRuntimeService(visionRuntimeContext, epoch,
-            FastSamRuntimeOptions(FastSamRuntimeOptions.Backend.valueOf(selected.backend.name),
-                selected.numThreads, false,
-                SystemClock.elapsedRealtimeNanos() + 60_000_000_000L, 800L, false, false, true),
-            object : FastSamRuntimeService.Listener<UnknownCapture> {
+        return object : FastSamRuntimeService.Listener<UnknownCapture> {
                 override fun onResult(result: FastSamResult<UnknownCapture>) {
                     if (jointChoice !== choice) return
                     if (result.runtime.fallbackUsed || result.runtime.actualBackend.name != selected.backend.name ||
@@ -545,7 +600,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                     if (foreground && !isDestroyed && !isFinishing)
                         unknownMaterialPoints.cancelCapture(token) { scope -> unknownTrackingLive(scope) }
                 }
-            })
+            }
     }
 
     private fun invalidateJointRuntime(expected: ValidatedJointRuntimeChoice, reason: String) {
@@ -621,6 +676,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         super.onResume()
         foreground = true
         auxiliaryStartup.begin(generation)
+        prepareCameraDetector()
         startCamera()
         resumeUnknownAfterPrimaryLiveAttempt()
     }
@@ -814,6 +870,90 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         else status.text = "실시간 영상을 보려면 카메라 권한이 필요합니다."
     }
 
+    override fun finish() {
+        if (returnPrepared) { super.finish(); return }
+        if (returningPair) return
+        val pair = cameraPair
+        val consumer = cameraConsumer
+        val previousMainOwner = entryTransfer?.source?.owner
+        val authority = AndroidDeviceCheckAuthority.forApp(applicationContext)
+        if (pair == null || consumer == null || previousMainOwner == null || !cameraPairCurrent() ||
+            authority.ownerRef(previousMainOwner.ownerId) !== previousMainOwner || !foreground) {
+            super.finish()
+            return
+        }
+        // Keep the host ID for its return reservation, but revoke the old opaque allocation
+        // scope. A producer delayed before the outbound handoff cannot reacquire the new epoch.
+        authority.retireOwner(previousMainOwner)
+        val returnOwner = authority.registerOwner(previousMainOwner.ownerId, previousMainOwner.source,
+            previousMainOwner.sessionGeneration) ?: run { super.finish(); return }
+        val witness = pair.proof.claimForTransfer() ?: run { super.finish(); return }
+        val transfers = VisionPairTransfers.forApp(applicationContext)
+        val drained = CompletableFuture<Unit>()
+        val ticket = transfers.reserve(consumer, witness, returnOwner, consumer.claim.owner.authority,
+            drained, SystemClock.elapsedRealtime() + 5_000L)
+        if (ticket == null) { super.finish(); return }
+        returningPair = true
+        returnTransfer = ticket
+        returnHostDrained = drained
+        generation++
+        unknownMaterialPoints.invalidate()
+        jointChoice = null
+        status.text = "검증한 인식 모델을 홈으로 전달하는 중"
+        val primaryToken = CompletableFuture<kr.co.hanium.dreamup.walksafe.inference.PrimaryTransferredDetector>()
+        val auxiliaryToken = try { unknownRuntime.detachForTransfer() }
+        catch (error: Throwable) { CompletableFuture<kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamTransferredModel>().also {
+            it.completeExceptionally(error)
+        } }
+        val model = detector
+        detector = null
+        try { worker.execute {
+            try { primaryToken.complete(requireNotNull(model).detachForTransfer()) }
+            catch (error: Throwable) { primaryToken.completeExceptionally(error) }
+        } } catch (error: RuntimeException) { primaryToken.completeExceptionally(error) }
+        val sourceDrained = primaryToken.thenCombine(auxiliaryToken) { primary, auxiliary ->
+            VisionPairDetachTokens(primary, auxiliary)
+        }
+        val client = RemoteVisionClient.forMainProcess(applicationContext)
+        try { cameraWorker.execute {
+            val result = runCatching {
+                transfers.prepare(ticket, object : VisionPairTransferSourceEffects {
+                    override fun drainSource(deadlineMs: Long): CompletionStage<VisionPairDetachTokens> {
+                        return sourceDrained.thenCompose { tokens ->
+                            val host = cameraAttachmentReservation?.closeHost() ?: CompletableFuture.completedFuture(Unit)
+                            host.thenApply { drained.complete(Unit); tokens }
+                        }
+                    }
+                    override fun park(lease: VisionCohortLease, deadlineMs: Long) = client.park(lease, deadlineMs)
+                    override fun transfer(lease: VisionCohortLease, targetOwner: kr.co.hanium.dreamup.walksafe.device.DeviceCheckOwnerRef,
+                        deadlineMs: Long) = client.transfer(lease, targetOwner, deadlineMs)
+                })
+            }
+            runOnUiThread {
+                if (isDestroyed) return@runOnUiThread
+                if (result.isSuccess && !isFinishing) {
+                    returnPrepared = true
+                    setResult(RESULT_OK, Intent().putExtra(VisionPairTransfers.EXTRA_TICKET, ticket.id))
+                    super.finish()
+                } else {
+                    transfers.cancel(ticket, "camera_return_failed")
+                    // Destruction follows the ordinary physical cleanup path on a failed return.
+                    returningPair = false
+                    returnPrepared = true
+                    super.finish()
+                }
+            }
+        } } catch (_: RuntimeException) {
+            transfers.cancel(ticket, "camera_return_queue_rejected")
+            returningPair = false
+            returnPrepared = true
+            super.finish()
+        }
+    }
+
+    @Deprecated("Back remains an explicit bounded pair handoff")
+    override fun onBackPressed() { finish() }
+
     override fun onPause() {
         foreground = false
         ++handoffWaitSerial
@@ -825,7 +965,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         auxiliaryStartup.clear()
         auxiliaryRetryRequested = false
         unknownMaterialPoints.invalidate()
-        unknownRuntime.pauseAndRelease()
+        unknownRuntime.pause()
         stopFeedback()
         surface.onPause() // Stop Session.update before pausing or closing the camera.
         val camera = session
@@ -860,6 +1000,22 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         auxiliaryPacing.reset()
         loadObservations.close()
         unknownMaterialPoints.invalidate()
+        entryTransfer?.let { VisionPairTransfers.forApp(applicationContext).cancel(it, "camera_destroyed") }
+        if (returningPair && returnPrepared) {
+            val participant = runtimeHandoff ?: CameraRuntimeHandoff.joinRetirement()
+            val releases = cameraNativeReleases.values.toList() + listOfNotNull(returnHostDrained)
+            participant.completeAfter(releases)
+            runtimeHandoff = participant
+            unknownRuntime.destroy() // The transferred source slot is already empty.
+            worker.shutdown()
+            if (!startingCamera && (!closingCamera || cameraRelease.failure != null)) cameraWorker.shutdown()
+            super.onDestroy()
+            return
+        }
+        returnTransfer?.let { VisionPairTransfers.forApp(applicationContext).cancel(it, "camera_return_destroyed") }
+        cameraPair?.proof?.revoke()
+        cameraAttachmentReservation?.revokeAdmission()
+        val attachmentReservation = cameraAttachmentReservation
         // Stop auxiliary admission before the primary worker barrier returns its final Image/copy.
         val auxiliaryStop = CompletableFuture<Unit>()
         try { unknownRuntime.destroy(); auxiliaryStop.complete(Unit) }
@@ -874,17 +1030,31 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                 logCameraQueue("detector_close_queue", closingEpoch, closeQueuedNs)
                 val model = detector
                 detector = null
-                try { closePrimaryNative(model) }
+                try {
+                    val pendingHost = attachmentReservation?.closeHost() ?: CompletableFuture.completedFuture(Unit)
+                    cameraConsumer?.retire(pendingHost)
+                    CompletableFuture.allOf(closePrimaryNative(model), pendingHost).thenApply { Unit }
+                }
                 finally { logDetectorTiming("detector_close", model?.lifecycleTiming()) }
             },
             retiredReleases = { retiredPrimaryReleases.toList() },
         )
+        val hostDrained = cameraConsumerDrained
+        val failedReturnDrain = returnHostDrained
+        val allConsumers = CompletableFuture.allOf(primaryRelease,
+            *auxiliaryReleases.map { it.toCompletableFuture() }.toTypedArray()).thenApply { Unit }
+        cameraConsumer?.retire(allConsumers)
+        allConsumers.whenComplete { _, error ->
+            if (error == null) { hostDrained.complete(Unit); failedReturnDrain?.complete(Unit) }
+            else { hostDrained.completeExceptionally(error); failedReturnDrain?.completeExceptionally(error) }
+        }
         val ownerId = visionRuntimeOwnerId
+        val owner = scopedVisionContext?.let(VisionRuntimeContext::ownerRef)
         val client = if (Build.VERSION.SDK_INT >= 31) RemoteVisionClient.forMainProcess(applicationContext) else null
         // No callback below retains this Activity, a listener, an Image or a model wrapper.
         runtimeHandoff = retireCameraRuntime(ownerId, runtimeHandoff, CameraRuntimeHandoff::joinRetirement,
             primaryRelease, cameraNativeReleases.values.toList(), { auxiliaryReleases },
-            { client?.retirementSnapshot(ownerId) },
+            { owner?.let { client?.retirementSnapshot(it) } },
             { lease -> client?.requestExit(lease, "camera_destroyed"); Unit },
             { error -> Log.w("WalkSafeCameraRetirement", "Camera resource release unconfirmed", error); Unit })
         worker.shutdown()
@@ -957,6 +1127,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
             val model = detector?.takeIf { preparedCameraGeneration == epoch }
                 ?: run { recordCameraLoad(frame.timestamp); return }
             val choice = jointChoice ?: return
+            if (!cameraPairCurrent()) return
             if (!busy.compareAndSet(false, true)) { recordCameraLoad(frame.timestamp); return }
             val capturedMs = SystemClock.elapsedRealtime()
             val pacingTicket = primaryInferencePacing.tryStart(capturedMs) ?: run {
@@ -1021,7 +1192,8 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                             invalidateJointRuntime(choice, "primary_runtime_mismatch")
                             return@execute
                         }
-                        val qualifiedUnknownFrame = unknownMaterialPoints.qualifyFrame(capturedSnapshot.cameraImageTimestampNs) {
+                        val qualifiedUnknownFrame = !primaryInferencePacing.snapshot().auxiliaryHoldActive &&
+                            unknownMaterialPoints.qualifyFrame(capturedSnapshot.cameraImageTimestampNs) {
                             foreground && epoch == generation && trackingGeometryGeneration == unknownGeometryGeneration.get() &&
                                 jointChoice === choice && detector === model
                         }
@@ -1053,6 +1225,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                                     if (flight != null) runCatching {
                                         if (!unknownTrackingLive(trackingScope) || !flight.accepts ||
                                             jointChoice !== choice || detector !== model ||
+                                            primaryInferencePacing.snapshot().auxiliaryHoldActive ||
                                             !auxiliaryPacing.tryStart(auxiliary.sessionEpoch, frameId, capturedMs)) {
                                             unknownMaterialPoints.cancelFlight(trackingScope, flight) { unknownTrackingLive(trackingScope) }
                                         } else {

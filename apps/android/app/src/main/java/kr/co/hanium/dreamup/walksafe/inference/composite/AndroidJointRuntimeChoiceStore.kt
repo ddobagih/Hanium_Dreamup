@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.os.Build
 import android.os.Looper
 import kr.co.hanium.dreamup.walksafe.device.AndroidDeviceTuningProfileStore
+import kr.co.hanium.dreamup.walksafe.device.AndroidDeviceCheckAuthority
 import kr.co.hanium.dreamup.walksafe.inference.RuntimeBackend
 import kr.co.hanium.dreamup.walksafe.inference.RuntimeCalibrationFixtures
 import kr.co.hanium.dreamup.walksafe.inference.RuntimeCandidate
@@ -18,24 +19,32 @@ import java.util.WeakHashMap
 
 /** One atomic sample-measured choice, independent of physical camera/ARCore/depth admission. */
 class AndroidJointRuntimeChoiceStore internal constructor(
-    private val preferences: SharedPreferences,
+    private val preferences: SharedPreferences?,
     private val bindingFor: (TwoModelRuntimeConfig) -> String?,
     private val availableProcessors: () -> Int,
     private val isMainThread: () -> Boolean,
     private val thermalStatusSupported: () -> Boolean = { false },
+    private val authority: AndroidDeviceCheckAuthority? = null,
+    private val legacyCodecTest: Boolean = false,
 ) {
     constructor(context: Context) : this(
-        context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
+        null,
         { config -> createBinding(context.applicationContext, config) },
         { Runtime.getRuntime().availableProcessors() },
         { Looper.myLooper() == Looper.getMainLooper() },
         { Build.VERSION.SDK_INT >= 29 },
+        AndroidDeviceCheckAuthority.forApp(context.applicationContext),
     )
 
-    private val state = synchronized(states) { states.getOrPut(preferences) { State() } }
+    private val state = preferences?.let { synchronized(states) { states.getOrPut(it) { State() } } } ?: State()
 
     /** Model/device/workload compatibility only; no physical camera quality is inferred. */
     fun load(config: TwoModelRuntimeConfig): ValidatedJointRuntimeChoice? = synchronized(state) {
+        authority?.let { a ->
+            val binding = bindingFor(config) ?: return null
+            return a.cachedChoice(binding)?.takeIf { it.isValid(binding, availableProcessors()) && thermalCompatible(it) }
+        }
+        if (!legacyCodecTest) return null
         if (state.invalidated) return null
         val choice = JointRuntimeChoiceCodec.decode(read()) ?: return null
         val binding = bindingFor(config) ?: return null
@@ -45,6 +54,8 @@ class AndroidJointRuntimeChoiceStore internal constructor(
     /** Caller verifies its attempt and the trial process's release before save and again before adoption. */
     fun save(config: TwoModelRuntimeConfig, choice: ValidatedJointRuntimeChoice): Boolean {
         if (isMainThread()) return false
+        if (!legacyCodecTest) return false
+        val preferences = preferences ?: return false
         return synchronized(state) {
             val binding = bindingFor(config) ?: return false
             if (!choice.isValid(binding, availableProcessors()) || !thermalCompatible(choice)) return false
@@ -70,6 +81,8 @@ class AndroidJointRuntimeChoiceStore internal constructor(
     /** Only this runtime record is retired. A failed removal remains unusable in this process. */
     fun invalidate(): Boolean {
         if (isMainThread()) return false
+        if (!legacyCodecTest) return false
+        val preferences = preferences ?: return false
         return synchronized(state) {
             read()
             state.invalidated = true
@@ -82,6 +95,8 @@ class AndroidJointRuntimeChoiceStore internal constructor(
     /** A retired check may only retire the record it wrote, never a newer check's choice. */
     fun invalidateIfMatches(choice: ValidatedJointRuntimeChoice): Boolean {
         if (isMainThread()) return false
+        authority?.let { return it.retireChoiceBlocking(choice, requireMatch = true) }
+        if (!legacyCodecTest) return false
         return synchronized(state) {
             val expected = JointRuntimeChoiceCodec.encode(choice) ?: return false
             if (read() != expected) return false
@@ -92,6 +107,8 @@ class AndroidJointRuntimeChoiceStore internal constructor(
     /** Cleanup succeeds when this measurement is already obsolete, or its removal was committed. */
     fun retireIfCurrent(choice: ValidatedJointRuntimeChoice): Boolean {
         if (isMainThread()) return false
+        authority?.let { return it.retireChoiceBlocking(choice, requireMatch = false) }
+        if (!legacyCodecTest) return false
         return synchronized(state) {
             val expected = JointRuntimeChoiceCodec.encode(choice) ?: return false
             if (read() != expected) return true
@@ -101,7 +118,7 @@ class AndroidJointRuntimeChoiceStore internal constructor(
 
     private fun read(): String? {
         if (!state.loaded) {
-            state.text = runCatching { preferences.getString(RECORD_KEY, null) }.getOrNull()
+            state.text = runCatching { preferences?.getString(RECORD_KEY, null) }.getOrNull()
             state.loaded = true
         }
         return state.text

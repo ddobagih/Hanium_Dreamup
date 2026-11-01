@@ -8,6 +8,34 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AdaptiveInferencePacingPolicyTest {
+    @Test fun auxiliaryAdmissionWaitsForFourFreshPrimaryCompletionsAfterOverload() {
+        val policy = AdaptiveInferencePacingPolicy().apply { configureMinimumInterval(400) }
+        completeNext(policy, 801)
+        assertTrue(policy.snapshot().auxiliaryHoldActive)
+        repeat(3) {
+            completeNext(policy, 80)
+            assertTrue(policy.snapshot().auxiliaryHoldActive)
+        }
+        completeNext(policy, 80)
+        assertFalse(policy.snapshot().auxiliaryHoldActive)
+        assertTrue(policy.snapshot().targetIntervalMs >= 400)
+    }
+
+    @Test fun missingThermalAndLoadRecoveryCannotReopenAuxiliaryAdmission() {
+        val policy = AdaptiveInferencePacingPolicy()
+        completeNext(policy, 80, thermalThrottled = true)
+        repeat(6) { completeNext(policy, 80, thermalThrottled = null) }
+        assertTrue(policy.snapshot().auxiliaryHoldActive)
+        repeat(4) { completeNext(policy, 80, thermalThrottled = false) }
+        assertFalse(policy.snapshot().auxiliaryHoldActive)
+        completeWithLoad(policy) { now -> InferenceLoadObservation(now, uiDispatchDelayMs = 60, uiDispatchBudgetMs = 20) }
+        assertTrue(policy.snapshot().auxiliaryHoldActive)
+        repeat(8) { completeNext(policy, 80) }
+        assertTrue(policy.snapshot().auxiliaryHoldActive)
+        repeat(24) { completeWithLoad(policy) { now -> InferenceLoadObservation(now, uiDispatchDelayMs = 1, uiDispatchBudgetMs = 20) } }
+        assertFalse(policy.snapshot().auxiliaryHoldActive)
+    }
+
     @Test
     fun latestFrameOnlyAdmissionNeverQueuesWhileAnyWorkIsInFlight() {
         val policy = AdaptiveInferencePacingPolicy()

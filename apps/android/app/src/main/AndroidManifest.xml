@@ -54,11 +54,6 @@
             android:process=":vosk_decoder" />
 
         <service
-            android:name=".inference.composite.FixtureRuntimeService"
-            android:exported="false"
-            android:process=":fixture_runtime" />
-
-        <service
             android:name=".runtime.vision.remote.VisionRuntimeService"
             android:exported="false"
             android:process=":vision_runtime" />

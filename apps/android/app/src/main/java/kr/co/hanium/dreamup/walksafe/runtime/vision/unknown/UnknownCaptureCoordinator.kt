@@ -276,6 +276,7 @@ internal class UnknownCaptureCoordinator(
         // This walking owner never replaces an existing pending/whole consumer flight.
         val serviceState = service.stats()
         if (serviceState.stopping || serviceState.inflight || serviceState.pending || serviceState.copying) return
+        if (!scopeReader.execution().auxiliaryAdmissionAllowed) return
         val ticket = context.pacing.tryStart(capturedElapsedMs) ?: return
         val attempt = UnknownCaptureAttempt(token, ticket, context.pacing)
         context.activeAttempt = attempt

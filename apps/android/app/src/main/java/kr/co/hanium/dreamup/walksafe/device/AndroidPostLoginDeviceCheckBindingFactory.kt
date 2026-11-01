@@ -37,7 +37,7 @@ internal class AndroidPostLoginDeviceCheckBindingFactory(
             appId = context.packageName,
             appVersionCode = BuildConfig.VERSION_CODE.toLong(),
             appVersionName = BuildConfig.VERSION_NAME,
-            appSourceRevision = BuildConfig.WALKSAFE_SOURCE_COMMIT,
+            appSourceRevision = BuildConfig.WALKSAFE_RUNTIME_BUILD_ID,
             probePolicyVersion = POST_LOGIN_DEVICE_CHECK_PROBE_POLICY_VERSION,
             environmentProfileId = facts.environmentProfileId,
             environmentProfileRevision = facts.environmentProfileRevision,

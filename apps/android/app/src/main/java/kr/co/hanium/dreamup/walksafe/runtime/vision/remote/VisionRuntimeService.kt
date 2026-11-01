@@ -41,6 +41,10 @@ class VisionRuntimeService : Service() {
     private var parked = false
     private var parking = false
     private var awaitingAdoption = false
+    private var parkToken: Any? = null
+    private var parkDeadlineMs = 0L
+    private var parkWatch: java.util.concurrent.ScheduledFuture<*>? = null
+    private var parkWatchRevision = 0L
     private var retired = false
     @Volatile private var fault: String? = null
     @Volatile private var fakeEngine = false
@@ -61,7 +65,10 @@ class VisionRuntimeService : Service() {
         override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
             if (code !in VisionRuntimeProtocol.HELLO..VisionRuntimeProtocol.ADOPT) return super.onTransact(code, data, reply, flags)
             require(Build.VERSION.SDK_INT >= 31 && isChild())
-            require(Binder.getCallingUid() == Process.myUid() && Binder.getCallingPid() > 0)
+            require(Binder.getCallingUid() == Process.myUid())
+            val callerPid = Binder.getCallingPid()
+            val oneWayExit = code == VisionRuntimeProtocol.EXIT && flags and IBinder.FLAG_ONEWAY != 0 && callerPid == 0
+            require(callerPid > 0 || oneWayExit)
             require(data.dataSize() <= VisionRuntimeProtocol.MAX_CONTROL_BYTES)
             data.enforceInterface(VisionRuntimeProtocol.DESCRIPTOR)
             require(data.readInt() == VisionRuntimeProtocol.VERSION)
@@ -71,6 +78,7 @@ class VisionRuntimeService : Service() {
             val id = data.readLong()
             val deadline = data.readLong()
             if (code == VisionRuntimeProtocol.HELLO) {
+                require(flags and IBinder.FLAG_ONEWAY == 0)
                 val requestedOwner = requireNotNull(data.readString())
                 val parent = requireNotNull(data.readStrongBinder())
                 require(data.dataAvail() == 0 && now() < deadline && deadline - now() <= VisionRuntimeProtocol.HANDSHAKE_MS)
@@ -79,6 +87,11 @@ class VisionRuntimeService : Service() {
                 require(getSystemService(ActivityManager::class.java).runningAppProcesses?.any {
                     it.pid == caller && it.uid == Process.myUid() && it.processName == applicationInfo.processName
                 } == true) { "vision_parent_process_mismatch" }
+                val identity = requireNotNull(VisionProcessIdentity.captureSelf(this@VisionRuntimeService)) {
+                    "vision_child_process_identity_unavailable"
+                }
+                require(identity.pid == Process.myPid() && identity.uid == Process.myUid() &&
+                    identity.processName == packageName + VisionRuntimeProtocol.PROCESS_SUFFIX)
                 synchronized(lock) {
                     require(!retired && nonce == null && callback == null && parentPid == -1)
                     parent.linkToDeath(parentDeath, 0); callback = parent
@@ -87,12 +100,14 @@ class VisionRuntimeService : Service() {
                 admissionWatch?.cancel(false)
                 reply!!.writeNoException(); reply.writeInt(VisionRuntimeProtocol.VERSION); reply.writeString(token)
                 reply.writeInt(Process.myPid()); reply.writeInt(Process.myUid()); reply.writeString(Application.getProcessName())
+                reply.writeLong(identity.startTicks); reply.writeString(identity.bootIdentity)
                 return true
             }
-            synchronized(lock) { require(!retired && token == nonce && requestEpoch == epoch && Binder.getCallingPid() == parentPid) }
+            synchronized(lock) { require(!retired && VisionRuntimeProtocol.acceptsCaller(code, flags, callerPid,
+                Binder.getCallingUid(), parentPid, Process.myUid(), token == nonce, requestEpoch == epoch, callback != null)) }
             if (code == VisionRuntimeProtocol.EXIT) {
                 require(data.dataAvail() == 0)
-                reply!!.writeNoException(); exitSelf(); return true
+                reply?.writeNoException(); exitSelf(); return true
             }
             require(now() < deadline) { "vision_operation_expired" }
             when (code) {
@@ -119,13 +134,18 @@ class VisionRuntimeService : Service() {
                 VisionRuntimeProtocol.PARK -> park(id, requestEpoch, deadline)
                 VisionRuntimeProtocol.TRANSFER -> transfer(id, requestEpoch, deadline, requireNotNull(data.readString()))
                 VisionRuntimeProtocol.ADOPT -> {
-                    synchronized(lock) { require(awaitingAdoption && parked); awaitingAdoption = false; parked = false }
+                    synchronized(lock) {
+                        require(awaitingAdoption && parked && now() < parkDeadlineMs)
+                        awaitingAdoption = false; parked = false; parkToken = null
+                        parkWatch?.cancel(false); parkWatch = null
+                    }
                     result(id, requestEpoch, true, "{}")
                 }
                 VisionRuntimeProtocol.FAULT -> {
                     require(BuildConfig.DEBUG) { "vision_faults_disabled" }
                     val value = requireNotNull(data.readString())
-                    require(value in setOf("OPEN_HANG", "INVOKE_HANG", "CLOSE_HANG", "DIE", "CLEAR", "FAKE_ENGINE", "DROP_TRANSFER_REPLY"))
+                    require(value in setOf("OPEN_HANG", "INVOKE_HANG", "CLOSE_HANG", "DIE", "CLEAR", "FAKE_ENGINE", "DROP_TRANSFER_REPLY", "ASSERT_NO_MODELS"))
+                    if (value == "ASSERT_NO_MODELS") synchronized(lock) { require(models.isEmpty()) { "native_open_preceded_journal_ack" } }
                     if (value == "FAKE_ENGINE") fakeEngine = true
                     fault = value.takeUnless { it == "CLEAR" }
                     if (value == "DIE") exitSelf() else result(id, requestEpoch, true, "{}")
@@ -180,7 +200,11 @@ class VisionRuntimeService : Service() {
     }
     private fun park(id: Long, atEpoch: Long, deadline: Long) {
         require(deadline - now() <= VisionRuntimeProtocol.CLOSE_MS)
-        synchronized(lock) { require(!parked && !parking); parking = true }
+        val ticket = synchronized(lock) {
+            require(!parked && !parking); parking = true; parkDeadlineMs = deadline
+            Any().also { parkToken = it }
+        }
+        armParkDeadline(ticket, deadline)
         arm(id, atEpoch, deadline)
         val remaining = AtomicInteger(2)
         val barrier = Runnable {
@@ -195,7 +219,8 @@ class VisionRuntimeService : Service() {
         require(deadline - now() <= VisionRuntimeProtocol.CLOSE_MS)
         require(VisionRuntimeProtocol.KEY.matches(newOwner))
         val payload = synchronized(lock) {
-            require(parked && !parking && requests.isEmpty())
+            require(parked && !parking && requests.isEmpty() && deadline <= parkDeadlineMs)
+            parkDeadlineMs = deadline
             epoch = Math.incrementExact(epoch); owner = newOwner; awaitingAdoption = true
             JSONObject().put("ownerEpoch", epoch).put("ownerId", owner).put("handles", JSONArray().also { array ->
                 models.values.forEach { model -> array.put(JSONObject().put("modelInstanceId", model.id)
@@ -203,10 +228,8 @@ class VisionRuntimeService : Service() {
                     .put("runtimeJson", requireNotNull(model.engine).runtimeJson)) }
             }).toString()
         }
-        val adoptionEpoch = synchronized(lock) { epoch }
-        watch.schedule({ synchronized(lock) {
-            if (!retired && epoch == adoptionEpoch && awaitingAdoption) exitSelf()
-        } }, (minOf(deadline, now() + VisionRuntimeProtocol.DEATH_MS) - now()).coerceAtLeast(1), TimeUnit.MILLISECONDS)
+        synchronized(lock) { parkToken?.let { armParkDeadline(it, parkDeadlineMs) } }
+        // The original PARK ticket/deadline spans transfer and adoption; no transition extends it.
         // This response authenticates the old epoch that requested the transfer, not an old watchdog.
         if (!(BuildConfig.DEBUG && fault == "DROP_TRANSFER_REPLY")) send(id, atEpoch, true, payload)
     }
@@ -225,6 +248,32 @@ class VisionRuntimeService : Service() {
         watch.schedule({ synchronized(lock) {
             if (!retired && epoch == atEpoch && requests[id] == atEpoch) exitSelf()
         } }, (deadline - now()).coerceAtLeast(1), TimeUnit.MILLISECONDS)
+    }
+    private fun armParkDeadline(ticket: Any, deadline: Long) {
+        val plan = synchronized(lock) {
+            if (retired || parkToken !== ticket) return
+            parkWatch?.cancel(false)
+            parkWatchRevision = Math.incrementExact(parkWatchRevision)
+            parkWatchRevision to minOf(deadline, parkDeadlineMs)
+        }
+        try { val timer = watch.schedule({
+            val due = synchronized(lock) { !retired && parkToken === ticket && (parking || parked || awaitingAdoption) }
+            if (due) {
+                if (now() < plan.second) armParkDeadline(ticket, plan.second) else {
+                    val expire = synchronized(lock) {
+                        if (!retired && parkToken === ticket && (parking || parked || awaitingAdoption) && now() >= plan.second) {
+                            retired = true; true
+                        } else false
+                    }
+                    if (expire) exitSelf()
+                }
+            }
+        }, (plan.second - now()).coerceAtLeast(1), TimeUnit.MILLISECONDS)
+          synchronized(lock) {
+              if (retired || parkToken !== ticket || parkWatchRevision != plan.first) timer.cancel(false) else parkWatch = timer
+          }
+        }
+        catch (_: Throwable) { exitSelf() }
     }
     private fun result(id: Long, atEpoch: Long, success: Boolean, payload: String) {
         val current = synchronized(lock) { !retired && epoch == atEpoch && now() >= 0 }

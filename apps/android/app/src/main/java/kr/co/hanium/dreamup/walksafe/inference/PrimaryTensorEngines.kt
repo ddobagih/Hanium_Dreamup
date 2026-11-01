@@ -4,6 +4,8 @@ import android.app.Application
 import android.content.Context
 import android.os.Build
 import android.os.SystemClock
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckAuthority
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckOwnerRef
 import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.RemoteVisionClient
 import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionModelSpec
 import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionNativeEngine
@@ -12,18 +14,34 @@ import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRuntimeProtocol
 import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRuntimeCodec
 import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRuntimeOptions
 import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRuntimeContext
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionCohortLease
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionModelHandle
 
 /** The local entry point is only for authenticated child native owners and the temporary fixture child. */
 object PrimaryTensorEngines {
+    internal data class OwnerScope(val owner: DeviceCheckOwnerRef, val diagnostics: DeviceCheckAuthority?)
+    internal fun captureOwnerScope(context: Context) = OwnerScope(VisionRuntimeContext.ownerRef(context),
+        VisionRuntimeContext.diagnosticAuthority(context))
+
     internal fun remote(context: Context, deadlineMs: Long): PrimaryTensorEngineFactory {
-        val ownerId = VisionRuntimeContext.ownerId(context)
-        return RemotePrimaryTensorFactory(AndroidPrimaryTensorRemotePort(RemoteVisionClient.forMainProcess(context), ownerId),
-            SystemClock::elapsedRealtime, deadlineMs)
+        val scope = captureOwnerScope(context)
+        return RemotePrimaryTensorFactory(AndroidPrimaryTensorRemotePort(RemoteVisionClient.forMainProcess(context), scope),
+            SystemClock::elapsedRealtime, deadlineMs, arena = kr.co.hanium.dreamup.walksafe.runtime.vision.remote.ParentDirectBufferArena.process())
     }
 
     internal fun local(context: Context): PrimaryTensorEngineFactory {
         requireLocalAuthority(context)
         return LocalPrimaryTensorFactory(context.applicationContext)
+    }
+
+    internal fun attached(context: Context, scope: OwnerScope, token: PrimaryTransferredDetector, models: List<ModelRuntimeConfig>,
+        lease: VisionCohortLease, handles: List<VisionModelHandle>): PrimaryTensorEngineFactory {
+        check(scope.owner.ownerId == lease.ownerId) { "primary attachment owner scope differs" }
+        val client = RemoteVisionClient.forMainProcess(context)
+        client.validateOwner(scope.owner, lease)
+        val attachment = token.claimForAttach(models.map { spec(it, it.runtime.delegate, it.key) }, lease, handles)
+        return RemotePrimaryTensorFactory(AndroidPrimaryTensorRemotePort(client, scope),
+            SystemClock::elapsedRealtime, 0L, attachment, kr.co.hanium.dreamup.walksafe.runtime.vision.remote.ParentDirectBufferArena.process())
     }
 
     internal fun spec(model: ModelRuntimeConfig, delegate: String, modelKey: String): VisionModelSpec = VisionModelSpec(

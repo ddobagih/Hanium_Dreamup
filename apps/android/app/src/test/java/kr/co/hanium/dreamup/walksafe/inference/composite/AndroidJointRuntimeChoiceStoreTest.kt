@@ -73,6 +73,26 @@ class AndroidJointRuntimeChoiceStoreTest {
         assertNull(store(prefs).load(f.config))
     }
 
+    @Test fun canonicalV2OrInsufficientHeadroomRecordsRemainReadableDataButNeverRestoreAsUsableChoices() {
+        val original = f.choice()
+        val oldPolicy = original.copy(policyVersion = "joint-fixture-runtime-768-v2")
+        val noHeadroom = original.copy(evidence = original.evidence.copy(primaryTurnaroundMs = List(50) { 799.0 }))
+        for (rejected in listOf(oldPolicy, noHeadroom)) {
+            val text = requireNotNull(JointRuntimeChoiceCodec.encode(rejected))
+            val decoded = requireNotNull(JointRuntimeChoiceCodec.decode(text))
+            assertEquals(rejected, decoded)
+            assertFalse(decoded.isValid(f.binding, 8))
+            val prefs = Prefs()
+            prefs.values["choice"] = text; prefs.values["unrelated"] = "preserve"
+            val store = store(prefs)
+            assertNull(store.load(f.config))
+            assertFalse(store.save(f.config, decoded))
+            assertEquals(text, prefs.values["choice"])
+            assertEquals("preserve", prefs.values["unrelated"])
+            assertEquals(0, prefs.commits)
+        }
+    }
+
     @Test fun oldLiveRecordOrMissingMeasurementKindCannotBeReclassifiedAsSampleEvidence() {
         val valid = requireNotNull(JointRuntimeChoiceCodec.encode(f.choice()))
         val oldLive = JSONObject(valid).put("schema", 1).put("policy", "joint-camera-runtime-768-v1")
@@ -282,7 +302,7 @@ class AndroidJointRuntimeChoiceStoreTest {
     }
 
     private fun store(prefs: Prefs) = AndroidJointRuntimeChoiceStore(prefs.shared,
-        { config -> f.binding.takeIf { config == f.config } }, { processors }, { mainThread }, { thermalSupported })
+        { config -> f.binding.takeIf { config == f.config } }, { processors }, { mainThread }, { thermalSupported }, legacyCodecTest = true)
 
     /** commit(false) still changes process memory, matching SharedPreferences' difficult case. */
     private class Prefs {

@@ -5,11 +5,99 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 import org.junit.Test;
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionPurpose;
 
 public final class FastSamRuntimeServiceTest {
+    @Test public void a900msLiveSampleIsSoftDiscardedWithoutClosingItsPreparedNativeModel()throws Exception {
+        AtomicLong clock=new AtomicLong(1_000_000_000L);
+        FastSamRuntimeOptions o=new FastSamRuntimeOptions(FastSamRuntimeOptions.Backend.CPU,1,false,
+            clock.get()+TimeUnit.SECONDS.toNanos(60),800,false);
+        CountDownLatch discarded=new CountDownLatch(1);AtomicInteger results=new AtomicInteger();
+        AtomicReference<Engine> nativeModel=new AtomicReference<>();
+        FastSamRuntimeService<Void> service=new FastSamRuntimeService<>(12,o,new FastSamRuntimeService.Listener<Void>(){
+            public void onResult(FastSamResult<Void> result){results.incrementAndGet();}
+            public void onDiscard(FastSamFrameToken token,String reason){assertEquals("stale_after_decode",reason);discarded.countDown();}
+        },()->{
+            Engine model=new Engine(o){public Output invoke(int[] pixels,int width,int height){
+                clock.addAndGet(900_000_000L);return super.invoke(pixels,width,height);
+            }};nativeModel.set(model);return model;
+        },clock::get);
+        try {
+            service.start().get(3,TimeUnit.SECONDS);
+            FastSamFrameToken frame=new FastSamFrameToken(FastSamFrameToken.Source.LIVE_CAMERA,12,1,1,1,
+                clock.get(),"geometry",2,1);
+            assertEquals(FastSamRuntimeService.Admission.ACCEPTED,service.submitArgb(2,1,new int[2],frame,null));
+            await(discarded);service.consumerIdleFuture().get(3,TimeUnit.SECONDS);
+            assertEquals(0,results.get());assertEquals(1,service.stats().stale);
+            assertTrue(service.isReady());assertFalse(service.stats().stopping);
+            assertFalse(nativeModel.get().closed.get());assertFalse(service.releasedFuture().isDone());
+        } finally {service.closeAsync().get(3,TimeUnit.SECONDS);}
+    }
+
+    @Test public void pairSampleReadinessWaitsForTheWholeConsumerInsteadOfOnlyModelReady()throws Exception {
+        FastSamRuntimeOptions o=options(true);
+        CountDownLatch entered=new CountDownLatch(1),allowConsumerReturn=new CountDownLatch(1);
+        FastSamRuntimeService<Void> service=new FastSamRuntimeService<>(12,o,result->{
+            assertNotNull(result.rawOutputs);entered.countDown();await(allowConsumerReturn);
+        },()->new Engine(o),System::nanoTime);
+        try {
+            service.start().get(3,TimeUnit.SECONDS);
+            assertEquals(FastSamRuntimeService.Admission.ACCEPTED,
+                service.submitArgb(2,1,new int[2],token(1),null,strictJob()));
+            await(entered);
+            assertTrue(service.isReady());
+            CompletableFuture<Void> drained=service.consumerIdleFuture();
+            assertFalse("A delivered sample is not complete while its listener still owns the flight",drained.isDone());
+            allowConsumerReturn.countDown();
+            drained.get(3,TimeUnit.SECONDS);
+            assertFalse(service.stats().inflight);
+            assertFalse(service.stats().stopping);
+            assertFalse(service.releasedFuture().isDone());
+            assertTrue(service.isReady());
+        } finally {
+            allowConsumerReturn.countDown();service.closeAsync().get(3,TimeUnit.SECONDS);
+        }
+    }
+
+    @Test public void anIdlePreparedAuxiliaryStillOwnsItsNativeInstance()throws Exception {
+        FastSamRuntimeOptions o=options(false);
+        FastSamRuntimeService<Void> service=new FastSamRuntimeService<>(12,o,result->{},()->new Engine(o),System::nanoTime);
+        try {
+            service.start().get(3,TimeUnit.SECONDS);
+            service.consumerIdleFuture().get(3,TimeUnit.SECONDS);
+            assertTrue(service.isReady());
+            assertFalse(service.releasedFuture().isDone());
+            assertFalse(service.stats().nativeReleaseConfirmed);
+        } finally {service.closeAsync().get(3,TimeUnit.SECONDS);}
+    }
+
+    @Test public void aSecondPairSampleCannotReuseThePreviousConsumersIdleAcknowledgement()throws Exception {
+        FastSamRuntimeOptions o=options(true);
+        CountDownLatch firstResult=new CountDownLatch(1),secondEntered=new CountDownLatch(1),allowSecondReturn=new CountDownLatch(1);
+        FastSamRuntimeService<Void> service=new FastSamRuntimeService<>(12,o,result->{
+            if(result.token.frameId==1)firstResult.countDown();
+            else{secondEntered.countDown();await(allowSecondReturn);}
+        },()->new Engine(o),System::nanoTime);
+        try {
+            service.start().get(3,TimeUnit.SECONDS);
+            service.submitArgb(2,1,new int[2],token(1),null);await(firstResult);
+            CompletableFuture<Void> first=service.consumerIdleFuture();first.get(3,TimeUnit.SECONDS);
+            assertEquals(FastSamRuntimeService.Admission.ACCEPTED,
+                service.submitArgb(2,1,new int[2],token(2),null));
+            await(secondEntered);
+            CompletableFuture<Void> second=service.consumerIdleFuture();
+            assertNotSame(first,second);assertFalse(second.isDone());
+            allowSecondReturn.countDown();second.get(3,TimeUnit.SECONDS);
+            assertEquals(2,service.stats().cpuPostCompleted);
+            assertFalse(service.releasedFuture().isDone());
+        } finally {allowSecondReturn.countDown();service.closeAsync().get(3,TimeUnit.SECONDS);}
+    }
+
     private static void await(CountDownLatch latch)throws Exception{assertTrue(latch.await(3,TimeUnit.SECONDS));}
     private static FastSamRuntimeOptions options(boolean raw){return new FastSamRuntimeOptions(FastSamRuntimeOptions.Backend.CPU,1,false,System.nanoTime()+TimeUnit.SECONDS.toNanos(10),5000,raw);}
     private static FastSamFrameToken token(long id){return token(id,FastSamFrameToken.Source.CALIBRATION_FIXTURE);}
+    private static FastSamExecutionRequest strictJob(){return new FastSamExecutionRequest(VisionPurpose.BENCHMARK,
+        System.nanoTime()+TimeUnit.SECONDS.toNanos(10),true);}
     private static FastSamFrameToken token(long id,FastSamFrameToken.Source source){return new FastSamFrameToken(source,12,id,source==FastSamFrameToken.Source.LIVE_CAMERA?id*100:0,source==FastSamFrameToken.Source.LIVE_CAMERA?id*100:0,System.nanoTime(),"geometry",2,1);}
     private static void failed(CompletableFuture<?> f,Throwable expected)throws Exception {try{f.get(3,TimeUnit.SECONDS);fail("future succeeded");}catch(ExecutionException error){assertSame(expected,error.getCause());}}
     private static class Engine implements FastSamEngine {
@@ -35,9 +123,9 @@ public final class FastSamRuntimeServiceTest {
             assertTrue(r.rawOutputs.detections().isReadOnly());assertEquals(0,r.masks.size());frames.add(r.token.frameId);
             if(r.token.frameId==1){assertSame(first,r.token);entered.countDown();await(release);}else second.countDown();
         },()->{Engine e=new Engine(o);engine.set(e);return e;},System::nanoTime);
-        s.start().get(3,TimeUnit.SECONDS);int[] pixels={7,9};assertEquals(FastSamRuntimeService.Admission.ACCEPTED,s.submitArgb(2,1,pixels,first,attachment));pixels[0]=99;await(entered);
-        assertEquals(FastSamRuntimeService.Admission.ACCEPTED,s.submitArgb(2,1,new int[]{2,0},token(2),attachment));
-        assertEquals(FastSamRuntimeService.Admission.REPLACED_PENDING,s.submitArgb(2,1,new int[]{3,0},token(3),attachment));
+        s.start().get(3,TimeUnit.SECONDS);int[] pixels={7,9};assertEquals(FastSamRuntimeService.Admission.ACCEPTED,s.submitArgb(2,1,pixels,first,attachment,strictJob()));pixels[0]=99;await(entered);
+        assertEquals(FastSamRuntimeService.Admission.ACCEPTED,s.submitArgb(2,1,new int[]{2,0},token(2),attachment,strictJob()));
+        assertEquals(FastSamRuntimeService.Admission.REPLACED_PENDING,s.submitArgb(2,1,new int[]{3,0},token(3),attachment,strictJob()));
         assertEquals(1,engine.get().calls.get());assertTrue(s.stats().inflight&&s.stats().pending);release.countDown();await(second);
         s.closeAsync().get(3,TimeUnit.SECONDS);assertEquals(Arrays.asList(1L,3L),frames);assertEquals(Arrays.asList(7,3),engine.get().pixels);assertEquals(1,s.stats().replaced);assertTrue(s.stats().nativeReleaseConfirmed);assertTrue(engine.get().closed.get());
     }
@@ -186,7 +274,8 @@ public final class FastSamRuntimeServiceTest {
                 Output output=super.invoke(pixels,w,h);clock.addAndGet(TimeUnit.SECONDS.toNanos(6));return output;
             }},clock::get);
         baseline.start().get(3,TimeUnit.SECONDS);
-        assertEquals(FastSamRuntimeService.Admission.ACCEPTED,baseline.submitArgb(2,1,new int[2],original,null));
+        assertEquals(FastSamRuntimeService.Admission.ACCEPTED,baseline.submitArgb(2,1,new int[2],original,null,
+            new FastSamExecutionRequest(VisionPurpose.REFERENCE,fixtureDeadline,true)));
         await(referenceSeen);assertSame(original,reference.get().token);assertEquals(TimeUnit.SECONDS.toNanos(1),original.capturedElapsedNs);
         assertNotNull(reference.get().rawOutputs);assertTrue(reference.get().captureToDecodeCompleteMs>5000);
         baseline.closeAsync().get(3,TimeUnit.SECONDS);assertTrue(baseline.stats().nativeReleaseConfirmed);
@@ -218,12 +307,15 @@ public final class FastSamRuntimeServiceTest {
             public void onDiscard(FastSamFrameToken token,String reason){assertEquals(2,token.frameId);assertEquals("stale_before_inference",reason);discarded.countDown();}
         },()->{Engine e=new Engine(o);engine.set(e);return e;},clock::get);
         s.start().get(3,TimeUnit.SECONDS);
-        s.submitArgb(2,1,new int[2],timedToken(1,FastSamFrameToken.Source.CALIBRATION_FIXTURE,clock.get()),null);await(firstSeen);
+        s.submitArgb(2,1,new int[2],timedToken(1,FastSamFrameToken.Source.CALIBRATION_FIXTURE,clock.get()),null,
+            new FastSamExecutionRequest(VisionPurpose.REFERENCE,deadline,true));await(firstSeen);
         assertEquals(FastSamRuntimeService.Admission.ACCEPTED,s.submitArgb(2,1,new int[2],
-            timedToken(2,FastSamFrameToken.Source.CALIBRATION_FIXTURE,clock.get()),null));
+            timedToken(2,FastSamFrameToken.Source.CALIBRATION_FIXTURE,clock.get()),null,
+            new FastSamExecutionRequest(VisionPurpose.REFERENCE,deadline,true)));
         clock.set(deadline);release.countDown();await(discarded);
         assertEquals(FastSamRuntimeService.Admission.STALE,s.submitArgb(2,1,new int[2],
-            timedToken(3,FastSamFrameToken.Source.CALIBRATION_FIXTURE,clock.get()),null));
+            timedToken(3,FastSamFrameToken.Source.CALIBRATION_FIXTURE,clock.get()),null,
+            new FastSamExecutionRequest(VisionPurpose.REFERENCE,deadline,true)));
         assertEquals(1,results.get());assertEquals(1,engine.get().calls.get());s.closeAsync().get(3,TimeUnit.SECONDS);
     }
 
@@ -236,7 +328,8 @@ public final class FastSamRuntimeServiceTest {
             public void onResult(FastSamResult<Void> r){results.incrementAndGet();}
             public void onDiscard(FastSamFrameToken token,String reason){assertEquals("stale_after_decode",reason);discarded.countDown();}
         },()->new Engine(o){public Output invoke(int[] pixels,int w,int h){Output output=super.invoke(pixels,w,h);clock.set(deadline);return output;}},clock::get);
-        s.start().get(3,TimeUnit.SECONDS);s.submitArgb(2,1,new int[2],timedToken(1,FastSamFrameToken.Source.CALIBRATION_FIXTURE,clock.get()),null);
+        s.start().get(3,TimeUnit.SECONDS);s.submitArgb(2,1,new int[2],timedToken(1,FastSamFrameToken.Source.CALIBRATION_FIXTURE,clock.get()),null,
+            new FastSamExecutionRequest(VisionPurpose.REFERENCE,deadline,true));
         await(discarded);assertEquals(0,results.get());s.closeAsync().get(3,TimeUnit.SECONDS);assertTrue(s.stats().nativeReleaseConfirmed);
     }
 
@@ -253,5 +346,80 @@ public final class FastSamRuntimeServiceTest {
         }},clock::get);
         s.start().get(3,TimeUnit.SECONDS);s.submitArgb(2,1,new int[2],timedToken(1,FastSamFrameToken.Source.LIVE_CAMERA,clock.get()),null);
         await(discarded);assertEquals(0,results.get());s.closeAsync().get(3,TimeUnit.SECONDS);assertTrue(s.stats().nativeReleaseConfirmed);
+    }
+
+    @Test public void purposeAndRawRetentionAreFrozenPerJobAndNeverGuessedFromFixtureOptions()throws Exception {
+        AtomicLong clock=new AtomicLong(TimeUnit.SECONDS.toNanos(1));
+        FastSamRuntimeOptions o=new FastSamRuntimeOptions(FastSamRuntimeOptions.Backend.CPU,1,false,
+            TimeUnit.SECONDS.toNanos(120),800,true,false,true,TimeUnit.SECONDS.toNanos(100));
+        BlockingQueue<FastSamResult<Void>> results=new LinkedBlockingQueue<>();
+        List<FastSamExecutionRequest> jobs=Collections.synchronizedList(new ArrayList<>());
+        FastSamRuntimeService<Void> s=new FastSamRuntimeService<>(12,o,results::add,()->new Engine(o){
+            public Output invoke(int[] pixels,int w,int h,FastSamFrameToken token,FastSamExecutionRequest request){
+                jobs.add(request);return super.invoke(pixels,w,h);
+            }
+        },clock::get);
+        try {
+            s.start().get(3,TimeUnit.SECONDS);
+            s.submitArgb(2,1,new int[2],timedToken(1,FastSamFrameToken.Source.CALIBRATION_FIXTURE,clock.get()),null);
+            FastSamResult<Void> performance=results.poll(3,TimeUnit.SECONDS);assertNotNull(performance);assertNull(performance.rawOutputs);
+            assertEquals(VisionPurpose.BENCHMARK,jobs.get(0).purpose);assertFalse(jobs.get(0).captureRawOutputs);
+            FastSamExecutionRequest strict=new FastSamExecutionRequest(VisionPurpose.BENCHMARK,TimeUnit.SECONDS.toNanos(4),true);
+            s.submitArgb(2,1,new int[2],timedToken(2,FastSamFrameToken.Source.CALIBRATION_FIXTURE,clock.get()),null,strict);
+            FastSamResult<Void> verified=results.poll(3,TimeUnit.SECONDS);assertNotNull(verified);assertNotNull(verified.rawOutputs);
+            assertSame(strict,jobs.get(1));assertEquals(VisionPurpose.BENCHMARK,jobs.get(1).purpose);
+            FastSamExecutionRequest reference=new FastSamExecutionRequest(VisionPurpose.REFERENCE,TimeUnit.SECONDS.toNanos(10),true);
+            s.submitArgb(2,1,new int[2],timedToken(3,FastSamFrameToken.Source.CALIBRATION_FIXTURE,clock.get()),null,reference);
+            FastSamResult<Void> referenced=results.poll(3,TimeUnit.SECONDS);assertNotNull(referenced);assertNotNull(referenced.rawOutputs);
+            assertSame(reference,jobs.get(2));
+        } finally {s.closeAsync().get(3,TimeUnit.SECONDS);}
+    }
+
+    @Test public void preDispatchJobExpiryIsDiscardedWithoutRetiringThePreparedModel()throws Exception {
+        FastSamRuntimeOptions o=options(false);
+        CountDownLatch discarded=new CountDownLatch(1),delivered=new CountDownLatch(1);
+        AtomicReference<Engine> engine=new AtomicReference<>();
+        FastSamRuntimeService<Void> s=new FastSamRuntimeService<>(12,o,new FastSamRuntimeService.Listener<Void>(){
+            public void onResult(FastSamResult<Void> r){delivered.countDown();}
+            public void onDiscard(FastSamFrameToken token,String reason){assertEquals("execution_deadline_before_dispatch",reason);discarded.countDown();}
+        },()->{
+            Engine value=new Engine(o){public Output invoke(int[] pixels,int w,int h,FastSamFrameToken token,FastSamExecutionRequest request){
+                if(token.frameId==1)throw new FastSamExecutionRequest.Expired();
+                return super.invoke(pixels,w,h);
+            }};engine.set(value);return value;
+        },System::nanoTime);
+        try {
+            s.start().get(3,TimeUnit.SECONDS);s.submitArgb(2,1,new int[2],token(1),null);await(discarded);
+            s.consumerIdleFuture().get(3,TimeUnit.SECONDS);
+            assertTrue(s.isReady());assertFalse(s.stats().stopping);assertFalse(engine.get().closed.get());assertFalse(s.releasedFuture().isDone());
+            s.submitArgb(2,1,new int[2],token(2),null);await(delivered);assertEquals(1,engine.get().calls.get());
+        } finally {s.closeAsync().get(3,TimeUnit.SECONDS);}
+    }
+
+    @Test public void aRawRequestCannotExposeOutputsWhenTheFactoryCaptureOptionIsDisabled()throws Exception {
+        FastSamRuntimeOptions o=options(false);BlockingQueue<FastSamResult<Void>> seen=new LinkedBlockingQueue<>();
+        FastSamRuntimeService<Void> s=new FastSamRuntimeService<>(12,o,seen::add,()->new Engine(o),System::nanoTime);
+        try {
+            s.start().get(3,TimeUnit.SECONDS);s.submitArgb(2,1,new int[2],token(1),null,strictJob());
+            FastSamResult<Void> result=seen.poll(3,TimeUnit.SECONDS);assertNotNull(result);assertNull(result.rawOutputs);
+        } finally {s.closeAsync().get(3,TimeUnit.SECONDS);}
+    }
+
+    @Test public void oversizedGeometryIsRejectedBeforeArgbCopyAndDoesNotRetireTheReadyModel()throws Exception {
+        FastSamRuntimeOptions o=options(false);AtomicReference<Engine> engine=new AtomicReference<>();CountDownLatch delivered=new CountDownLatch(1);
+        FastSamRuntimeService<Void> s=new FastSamRuntimeService<>(12,o,r->delivered.countDown(),()->{
+            Engine value=new Engine(o);engine.set(value);return value;
+        },System::nanoTime);
+        try {
+            s.start().get(3,TimeUnit.SECONDS);
+            FastSamFrameToken tooWide=new FastSamFrameToken(FastSamFrameToken.Source.CALIBRATION_FIXTURE,12,1,0,0,
+                System.nanoTime(),"original-geometry",2049,1);
+            try {s.submitArgb(2049,1,new int[0],tooWide,null,strictJob());fail("Oversized geometry accepted");}
+            catch(IllegalArgumentException expected){assertTrue(expected.getMessage().contains("2048"));}
+            assertEquals(2049,tooWide.width);assertEquals("original-geometry",tooWide.geometryId);
+            assertEquals(0,s.stats().admitted);assertEquals(0,engine.get().calls.get());
+            assertTrue(s.isReady());assertFalse(s.stats().stopping);assertFalse(s.releasedFuture().isDone());
+            s.submitArgb(2,1,new int[2],token(2),null);await(delivered);assertEquals(1,engine.get().calls.get());
+        } finally {s.closeAsync().get(3,TimeUnit.SECONDS);}
     }
 }

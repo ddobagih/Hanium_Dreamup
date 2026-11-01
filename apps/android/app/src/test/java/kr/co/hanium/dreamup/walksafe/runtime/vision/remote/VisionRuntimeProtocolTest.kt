@@ -4,6 +4,22 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class VisionRuntimeProtocolTest {
+    @Test fun oneWayPidZeroIsOnlyAnAuthenticatedCurrentEpochExitCapability() {
+        fun accepts(code: Int = VisionRuntimeProtocol.EXIT, flags: Int = 1, pid: Int = 0, uid: Int = 10001,
+            nonce: Boolean = true, epoch: Boolean = true, parentBound: Boolean = true) =
+            VisionRuntimeProtocol.acceptsCaller(code, flags, pid, uid, 42, 10001, nonce, epoch, parentBound)
+        assertTrue(accepts())
+        assertTrue(accepts(flags = 0, pid = 42))
+        assertFalse(accepts(flags = 0))
+        assertFalse(accepts(pid = 43))
+        assertFalse(accepts(uid = 10002))
+        assertFalse(accepts(nonce = false))
+        assertFalse(accepts(epoch = false))
+        assertFalse(accepts(parentBound = false))
+        assertFalse(accepts(code = VisionRuntimeProtocol.OPEN))
+        assertFalse(accepts(code = VisionRuntimeProtocol.INVOKE, pid = 42))
+        assertTrue(accepts(code = VisionRuntimeProtocol.INVOKE, flags = 0, pid = 42))
+    }
     @Test fun busyBeforeLeaseCarriesOnlyAvailabilityAndCannotPoisonOwnReleaseLedger() {
         val previous = java.util.concurrent.CompletableFuture<VisionReleaseReceipt>()
         val failure: Throwable = VisionCohortBusyException(previous)

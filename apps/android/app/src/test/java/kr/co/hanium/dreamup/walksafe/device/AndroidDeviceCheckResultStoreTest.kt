@@ -9,9 +9,20 @@ import org.junit.Test
 
 class AndroidDeviceCheckResultStoreTest {
     @Test
+    fun legacyPreferenceConstructorIsReadOnlyAndCannotRestoreAnAuthoritativePass() {
+        val values = validRecord() + ("account_education_marker" to "preserved")
+        val preferences = FakeSharedPreferences(values)
+        val store = AndroidDeviceCheckResultStore(preferences)
+        assertNull(store.restore(binding()))
+        assertFalse(store.hasCurrentPolicyResultCandidate())
+        assertFalse(store.save(snapshot(PostLoginDeviceCheckState.FULL), binding()))
+        assertEquals(values, preferences.all)
+        assertEquals(0, preferences.commitCount)
+    }
+    @Test
     fun runtimeChoiceGuardRejectsRestoreWithoutDeletingAccountOrMeasuredResult() {
         val preferences = FakeSharedPreferences(mapOf("account_education_marker" to "preserved"))
-        val store = AndroidDeviceCheckResultStore(preferences)
+        val store = AndroidDeviceCheckResultStore.forLegacyCodecTest(preferences)
         assertTrue(store.save(snapshot(PostLoginDeviceCheckState.FULL), binding()))
         val savedValues = preferences.all.toMap()
         var inspected: PersistedPostLoginDeviceCheckResult? = null
@@ -33,7 +44,7 @@ class AndroidDeviceCheckResultStoreTest {
     @Test
     fun basicModelOnlyProbePolicyCannotRestoreAsTheCompositePolicy() {
         val preferences = FakeSharedPreferences()
-        val store = AndroidDeviceCheckResultStore(preferences)
+        val store = AndroidDeviceCheckResultStore.forLegacyCodecTest(preferences)
         assertTrue(store.save(snapshot(PostLoginDeviceCheckState.FULL),
             binding(probePolicyVersion = "20260912-device-function-v1")))
         val savedValues = preferences.all.toMap()
@@ -46,13 +57,13 @@ class AndroidDeviceCheckResultStoreTest {
     @Test
     fun currentPolicyCandidateRequiresEveryStoredResultField() {
         assertFalse(
-            AndroidDeviceCheckResultStore(FakeSharedPreferences())
+            AndroidDeviceCheckResultStore.forLegacyCodecTest(FakeSharedPreferences())
                 .hasCurrentPolicyResultCandidate(),
         )
 
         val valid = validRecord()
         assertTrue(
-            AndroidDeviceCheckResultStore(FakeSharedPreferences(valid))
+            AndroidDeviceCheckResultStore.forLegacyCodecTest(FakeSharedPreferences(valid))
                 .hasCurrentPolicyResultCandidate(),
         )
 
@@ -65,13 +76,13 @@ class AndroidDeviceCheckResultStoreTest {
         )
         requiredKeys.forEach { missingKey ->
             assertFalse(
-                AndroidDeviceCheckResultStore(
+                AndroidDeviceCheckResultStore.forLegacyCodecTest(
                     FakeSharedPreferences(valid - missingKey),
                 ).hasCurrentPolicyResultCandidate(),
             )
         }
         assertFalse(
-            AndroidDeviceCheckResultStore(
+            AndroidDeviceCheckResultStore.forLegacyCodecTest(
                 FakeSharedPreferences(valid + (POLICY_VERSION_KEY to "2")),
             ).hasCurrentPolicyResultCandidate(),
         )
@@ -80,7 +91,7 @@ class AndroidDeviceCheckResultStoreTest {
     @Test
     fun fullRoundTripCommitsOnlyTheCanonicalResultValues() {
         val preferences = FakeSharedPreferences()
-        val store = AndroidDeviceCheckResultStore(preferences)
+        val store = AndroidDeviceCheckResultStore.forLegacyCodecTest(preferences)
 
         assertTrue(
             store.save(
@@ -121,7 +132,7 @@ class AndroidDeviceCheckResultStoreTest {
     @Test
     fun limitedRoundTripStoresAStableSortedFeatureCsv() {
         val preferences = FakeSharedPreferences()
-        val store = AndroidDeviceCheckResultStore(preferences)
+        val store = AndroidDeviceCheckResultStore.forLegacyCodecTest(preferences)
         val disabledFeatures = linkedSetOf(
             PostLoginDeviceCheckFeature.VOICE_GUIDANCE,
             PostLoginDeviceCheckFeature.HAPTIC_FEEDBACK,
@@ -153,7 +164,7 @@ class AndroidDeviceCheckResultStoreTest {
     @Test
     fun cameraPermissionDeferredResultRoundTripsWithoutClaimingCameraFeatureSupport() {
         val preferences = FakeSharedPreferences()
-        val store = AndroidDeviceCheckResultStore(preferences)
+        val store = AndroidDeviceCheckResultStore.forLegacyCodecTest(preferences)
 
         assertTrue(
             store.save(
@@ -194,7 +205,7 @@ class AndroidDeviceCheckResultStoreTest {
 
         rejected.forEach { snapshot ->
             val preferences = FakeSharedPreferences()
-            assertFalse(AndroidDeviceCheckResultStore(preferences).save(snapshot, binding()))
+            assertFalse(AndroidDeviceCheckResultStore.forLegacyCodecTest(preferences).save(snapshot, binding()))
             assertTrue(preferences.all.isEmpty())
             assertEquals(0, preferences.commitCount)
         }
@@ -205,7 +216,7 @@ class AndroidDeviceCheckResultStoreTest {
         val preferences = FakeSharedPreferences(commitResult = false)
 
         assertFalse(
-            AndroidDeviceCheckResultStore(preferences)
+            AndroidDeviceCheckResultStore.forLegacyCodecTest(preferences)
                 .save(snapshot(PostLoginDeviceCheckState.FULL), binding()),
         )
 
@@ -220,7 +231,7 @@ class AndroidDeviceCheckResultStoreTest {
             commitResult = false,
             mutateMemoryOnCommitFailure = true,
         )
-        val store = AndroidDeviceCheckResultStore(preferences)
+        val store = AndroidDeviceCheckResultStore.forLegacyCodecTest(preferences)
 
         assertFalse(store.save(snapshot(PostLoginDeviceCheckState.FULL), binding()))
         assertEquals("FULL", preferences.getString(TIER_KEY, null))
@@ -267,7 +278,7 @@ class AndroidDeviceCheckResultStoreTest {
 
         invalidRecords.forEach { values ->
             val preferences = FakeSharedPreferences(initialValues = values)
-            assertNull(AndroidDeviceCheckResultStore(preferences).restore(binding()))
+            assertNull(AndroidDeviceCheckResultStore.forLegacyCodecTest(preferences).restore(binding()))
         }
     }
 
@@ -282,13 +293,13 @@ class AndroidDeviceCheckResultStoreTest {
             ),
         )
 
-        assertNull(AndroidDeviceCheckResultStore(oldLimitedResult).restore(binding()))
+        assertNull(AndroidDeviceCheckResultStore.forLegacyCodecTest(oldLimitedResult).restore(binding()))
     }
 
     @Test
     fun legacyDepthPolicyResultRestoresForSelectiveMetricDepthRefresh() {
         val legacyRecord = validRecord() - METRIC_DEPTH_PROBE_POLICY_VERSION_KEY
-        val restored = AndroidDeviceCheckResultStore(
+        val restored = AndroidDeviceCheckResultStore.forLegacyCodecTest(
             FakeSharedPreferences(legacyRecord),
         ).restore(binding())
 
@@ -300,7 +311,7 @@ class AndroidDeviceCheckResultStoreTest {
     @Test
     fun onlyExplicitSupportResultsCountAsCurrentMetricDepthPolicyEvidence() {
         PostLoginMetricDepthState.entries.forEach { metricDepthState ->
-            val store = AndroidDeviceCheckResultStore(FakeSharedPreferences())
+            val store = AndroidDeviceCheckResultStore.forLegacyCodecTest(FakeSharedPreferences())
             val unsupported = metricDepthState == PostLoginMetricDepthState.EXPLICITLY_UNSUPPORTED
             val snapshot = if (unsupported) {
                 snapshot(
@@ -345,7 +356,7 @@ class AndroidDeviceCheckResultStoreTest {
             val preferences = FakeSharedPreferences(
                 initialValues = validRecord(tier = "LIMITED", disabledFeaturesCsv = csv),
             )
-            assertNull(AndroidDeviceCheckResultStore(preferences).restore(binding()))
+            assertNull(AndroidDeviceCheckResultStore.forLegacyCodecTest(preferences).restore(binding()))
         }
     }
 
@@ -361,8 +372,8 @@ class AndroidDeviceCheckResultStoreTest {
             initialValues = validRecord(tier = "LIMITED", disabledFeaturesCsv = ""),
         )
 
-        assertNull(AndroidDeviceCheckResultStore(fullWithDisabledFeature).restore(binding()))
-        assertNull(AndroidDeviceCheckResultStore(limitedWithoutDisabledFeature).restore(binding()))
+        assertNull(AndroidDeviceCheckResultStore.forLegacyCodecTest(fullWithDisabledFeature).restore(binding()))
+        assertNull(AndroidDeviceCheckResultStore.forLegacyCodecTest(limitedWithoutDisabledFeature).restore(binding()))
     }
 
     @Test
@@ -376,9 +387,9 @@ class AndroidDeviceCheckResultStoreTest {
             ),
         )
 
-        assertNull(AndroidDeviceCheckResultStore(conflicting).restore(binding()))
+        assertNull(AndroidDeviceCheckResultStore.forLegacyCodecTest(conflicting).restore(binding()))
         assertFalse(
-            AndroidDeviceCheckResultStore(FakeSharedPreferences()).save(
+            AndroidDeviceCheckResultStore.forLegacyCodecTest(FakeSharedPreferences()).save(
                 snapshot(
                     PostLoginDeviceCheckState.LIMITED,
                     setOf(
@@ -394,7 +405,7 @@ class AndroidDeviceCheckResultStoreTest {
         val permanentlyDistanceLimited = setOf(
             PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE,
         )
-        val allowed = AndroidDeviceCheckResultStore(FakeSharedPreferences())
+        val allowed = AndroidDeviceCheckResultStore.forLegacyCodecTest(FakeSharedPreferences())
         assertTrue(
             allowed.save(
                 snapshot(
@@ -412,7 +423,7 @@ class AndroidDeviceCheckResultStoreTest {
     @Test
     fun restoreRejectsAnotherActorWithoutPersistingTheActorValue() {
         val preferences = FakeSharedPreferences()
-        val store = AndroidDeviceCheckResultStore(preferences)
+        val store = AndroidDeviceCheckResultStore.forLegacyCodecTest(preferences)
 
         assertTrue(store.save(snapshot(PostLoginDeviceCheckState.FULL), binding()))
 
@@ -424,7 +435,7 @@ class AndroidDeviceCheckResultStoreTest {
     @Test
     fun restoreRejectsAnotherInstallationWithoutPersistingTheInstallationId() {
         val preferences = FakeSharedPreferences()
-        val store = AndroidDeviceCheckResultStore(preferences)
+        val store = AndroidDeviceCheckResultStore.forLegacyCodecTest(preferences)
 
         assertTrue(store.save(snapshot(PostLoginDeviceCheckState.FULL), binding()))
 
@@ -435,7 +446,7 @@ class AndroidDeviceCheckResultStoreTest {
 
     @Test
     fun restoreRejectsAppOsSdkAndProfilePolicyChanges() {
-        val store = AndroidDeviceCheckResultStore(FakeSharedPreferences())
+        val store = AndroidDeviceCheckResultStore.forLegacyCodecTest(FakeSharedPreferences())
         assertTrue(store.save(snapshot(PostLoginDeviceCheckState.FULL), binding()))
 
         val mismatches = listOf(
@@ -451,7 +462,7 @@ class AndroidDeviceCheckResultStoreTest {
 
     @Test
     fun restoreKeepsMeasuredResultAcrossMutableRuntimePrerequisiteChanges() {
-        val store = AndroidDeviceCheckResultStore(FakeSharedPreferences())
+        val store = AndroidDeviceCheckResultStore.forLegacyCodecTest(FakeSharedPreferences())
         assertTrue(
             store.save(
                 snapshot(PostLoginDeviceCheckState.FULL),
@@ -501,7 +512,7 @@ class AndroidDeviceCheckResultStoreTest {
     ): Map<String, Any> {
         val preferences = FakeSharedPreferences()
         assertTrue(
-            AndroidDeviceCheckResultStore(preferences).save(
+            AndroidDeviceCheckResultStore.forLegacyCodecTest(preferences).save(
                 snapshot(PostLoginDeviceCheckState.FULL),
                 binding(),
                 metricDepthState = PostLoginMetricDepthState.SUPPORTED,

@@ -223,9 +223,13 @@ class PostLoginSpeechRecoveryBehaviorTest {
                 }
             }
             d.running(); d.ready(); d.controller.maybeContinue()
-            assertEquals(loss, if (loss == "session") PostLoginDeviceCheckState.NOT_RUN else PostLoginDeviceCheckState.FULL,
+            assertEquals(loss, if (loss == "session") PostLoginDeviceCheckState.NOT_RUN else PostLoginDeviceCheckState.FAIL,
                 d.controller.snapshot.state)
             if (loss == "session") assertEquals(2L, d.controller.snapshot.sessionGeneration)
+            else assertEquals(PostLoginDeviceCheckFailure.ONBOARDING_TRANSITION_REJECTED, d.controller.snapshot.failure)
+            // The durable result was accepted before close reentry; the rejected continuation
+            // must not keep the current screen passed or undo another session's state.
+            assertEquals(1, d.store.saves)
             assertNull(loss, o.controller.currentActuatorOrNull())
             assertEquals(loss, 1, o.runtimes.size)
             assertEquals(loss, 0, f.replacements)

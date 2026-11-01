@@ -41,13 +41,21 @@ data class PersistedPostLoginDeviceCheckResult(
     val metricDepthState: PostLoginMetricDepthState = PostLoginMetricDepthState.PENDING,
 )
 
-class AndroidDeviceCheckResultStore(
-    private val preferences: SharedPreferences,
+class AndroidDeviceCheckResultStore private constructor(
+    private val preferences: SharedPreferences?,
+    private val authority: AndroidDeviceCheckAuthority?,
+    private val legacyCodecTest: Boolean,
 ) {
+    /** Legacy records are deliberately read-only and cannot authorize an application pass. */
+    constructor(preferences: SharedPreferences) : this(preferences, null, false)
+    constructor(authority: AndroidDeviceCheckAuthority) : this(null, authority, false)
     @Volatile
     private var saveFailedInProcess = false
 
     fun hasCurrentPolicyResultCandidate(): Boolean {
+        authority?.let { return it.hasCachedResult() }
+        if (!legacyCodecTest) return false
+        val preferences = preferences ?: return false
         val stored = runCatching { preferences.all }.getOrNull() ?: return false
         return stored[POLICY_VERSION_KEY] == POST_LOGIN_DEVICE_CHECK_RESULT_POLICY_VERSION &&
             stored[BINDING_SHA256_KEY] is String &&
@@ -62,6 +70,9 @@ class AndroidDeviceCheckResultStore(
         cameraDependentChecksDeferred: Boolean = false,
         metricDepthState: PostLoginMetricDepthState = PostLoginMetricDepthState.PENDING,
     ): Boolean {
+        // The final result and choice are published only by authority.commitSuccess.
+        if (!legacyCodecTest) return false
+        val preferences = preferences ?: return false
         val state = snapshot.state
         val disabledFeatures = snapshot.disabledFeatures
         val bindingSha256 = binding.sha256OrNull()
@@ -101,6 +112,9 @@ class AndroidDeviceCheckResultStore(
     fun restore(
         expectedBinding: PostLoginDeviceCheckResultBinding,
     ): PersistedPostLoginDeviceCheckResult? {
+        authority?.let { return bindingHash(expectedBinding)?.let(it::cachedResult) }
+        if (!legacyCodecTest) return null
+        val preferences = preferences ?: return null
         if (saveFailedInProcess) return null
         val expectedBindingSha256 = expectedBinding.sha256OrNull() ?: return null
         val stored = runCatching { preferences.all }.getOrNull() ?: return null
@@ -227,7 +241,11 @@ class AndroidDeviceCheckResultStore(
         (first == null && second == null) ||
             (!first.isNullOrBlank() && !second.isNullOrBlank())
 
-    private companion object {
+    companion object {
+        /** Only in-memory preference doubles in codec regression tests may use the retired format. */
+        internal fun forLegacyCodecTest(preferences: SharedPreferences) = AndroidDeviceCheckResultStore(preferences, null, true)
+        fun bindingHash(binding: PostLoginDeviceCheckResultBinding): String? =
+            AndroidDeviceCheckResultStore(null, null, false).run { binding.sha256OrNull() }
         const val POLICY_VERSION_KEY = "device_check_result_policy_v1"
         const val BINDING_SHA256_KEY = "device_check_result_binding_sha256_v4"
         const val TIER_KEY = "device_check_result_tier_v1"

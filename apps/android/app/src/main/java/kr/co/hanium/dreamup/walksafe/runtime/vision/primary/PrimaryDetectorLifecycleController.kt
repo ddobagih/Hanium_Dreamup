@@ -3,6 +3,7 @@ package kr.co.hanium.dreamup.walksafe.runtime.vision.primary
 import java.io.Closeable
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletionStage
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
 import kr.co.hanium.dreamup.walksafe.device.RunningDetectorReadiness
@@ -11,6 +12,8 @@ import kr.co.hanium.dreamup.walksafe.inference.composite.ValidatedJointRuntimeCh
 import kr.co.hanium.dreamup.walksafe.runtime.vision.frame.FrameSynthesisController
 import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionCohortBusyException
 import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRuntimeFailures
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionTransferResult
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRetirementSnapshot
 import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
 
 /** Load/verification metadata and orchestration; the primary execution owner alone holds the native slot. */
@@ -53,6 +56,216 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
     private class AvailabilityWait(val request: Long, val detectorGeneration: Long,
         val window: AvailabilityWindow, val retry: Runnable) { var timeout: Runnable? = null }
     private var availabilityWait: AvailabilityWait? = null
+    private var transferredHostDrain: CompletionStage<PrimaryTransferredDetector>? = null
+    private val preparedReceiverKey = Any()
+    private var preparedPairSlot: PrimaryPreparedPairSlot? = null
+
+    fun reservePreparedPair(current: () -> Boolean): PrimaryPreparedPairSlot? = synchronized(frameStateLock) {
+        if (loadInFlight || currentness.destroyed() ||
+            detector.projection().detector !is NoopAndroidFrameDetector || !current()) return@synchronized null
+        if (detector.projection().closing && !detector.consumeTransferredResumeAuthorization() &&
+            !detector.consumeQuiescedRecheckAuthorization()) return@synchronized null
+        loadRequestGeneration += 1L
+        loadInFlight = true
+        loadAttempted = true
+        loadAdoptionCommitted = false
+        configLoaded = false
+        val slot = PrimaryPreparedPairSlot(preparedReceiverKey, loadRequestGeneration, detector.beginLoad(), current)
+        preparedPairSlot = slot
+        transferredHostDrain = null
+        // This receipt is present before the caller starts its independent pair-creation worker.
+        detector.retainPhysicalRelease(slot.actualReleasedFuture)
+        slot
+    }
+
+    /** Stage a single explicit return reservation; automatic loading cannot consume this fence. */
+    fun resumeTransferredHost(receipt: VisionTransferResult, currentGuard: () -> Boolean): Boolean {
+        val previous = synchronized(frameStateLock) { transferredHostDrain }
+        if (!detector.resumeTransferredHost(receipt) { !currentness.destroyed() && currentGuard() }) return false
+        synchronized(frameStateLock) { if (transferredHostDrain === previous) transferredHostDrain = null }
+        return true
+    }
+
+    /** The caller supplies the old current runtime's captured cohort; this never means Activity teardown. */
+    fun quiesceForRuntimeError(captured: VisionRetirementSnapshot): CompletionStage<Unit> {
+        val drained = detector.quiesceForRuntimeError(captured)
+        synchronized(frameStateLock) {
+            loadRequestGeneration += 1L
+            loadInFlight = false
+            loadAttempted = true
+            configLoaded = false
+            comparisonRequested = false
+            comparisonAttempted = false
+            preparedPairSlot?.phase = PrimaryPreparedPairSlot.Phase.RETIRED
+            preparedPairSlot = null
+            availabilityWait?.timeout?.let { runCatching { scheduler.remove(it) } }
+            availabilityWait = null
+            verification.invalidate()
+            frame().clearDetectionSnapshot()
+            loadReason = "runtime_error_quiesced"
+            statusText = "객체 인식 오류 · 이전 작업 정리 확인 후 기기 점검이 필요합니다."
+        }
+        auxiliary.releaseLoadingIfInitialized()
+        auxiliary.closeActiveOrInvalidateObservations()
+        return drained
+    }
+
+    /** Guard must include a new AuthorityAttempt, an explicit recheck action and auxiliary drains. */
+    fun resumeQuiescedForRecheck(currentGuard: () -> Boolean): Boolean =
+        detector.resumeQuiescedForRecheck { !currentness.destroyed() && currentGuard() }
+
+    private fun preparedCurrent(slot: PrimaryPreparedPairSlot) = slot.ownerKey === preparedReceiverKey &&
+        preparedPairSlot === slot && slot.request == loadRequestGeneration && !currentness.destroyed() &&
+        !detector.projection().closing && slot.claim.generation == detector.projection().loadGeneration && slot.current()
+
+    /** Called immediately for every returned create result, including unavailable/failure DTOs. */
+    fun retainCreatedLoad(slot: PrimaryPreparedPairSlot, load: AndroidDetectorLoadResult): Boolean = synchronized(frameStateLock) {
+        if (slot.ownerKey !== preparedReceiverKey || slot.creationFinished || slot.load != null) return@synchronized false
+        slot.load = load
+        val physical = load.actualReleasedFuture
+        when {
+            physical != null -> slot.retainPhysical(physical)
+            load.detector == null && load.reason != "DetectorNativeCleanupFailure" && load.reason != "DetectorCohortRetired" ->
+                slot.retainPhysical(CompletableFuture.completedFuture(Unit))
+            else -> {
+                slot.retainUnproven()
+                detector.recordReleaseFailure(IllegalStateException("Prepared primary physical receipt is missing"))
+            }
+        }
+        detector.retainPhysicalRelease(slot.actualReleasedFuture, load.detector)
+        val admitted = preparedCurrent(slot) && slot.phase == PrimaryPreparedPairSlot.Phase.RESERVED
+        if (admitted) slot.phase = PrimaryPreparedPairSlot.Phase.CREATED
+        admitted
+    }
+
+    /** Worker completion only; native errors still follow their independent physical receipt. */
+    fun finishPreparedCreation(slot: PrimaryPreparedPairSlot, error: Throwable? = null) = synchronized(frameStateLock) {
+        if (slot.ownerKey !== preparedReceiverKey || slot.creationFinished) return@synchronized
+        slot.creationFailed = error != null
+        if (slot.load == null) {
+            when {
+                error is DetectorCohortRetired -> slot.retainPhysical(error.actualReleasedFuture)
+                error is DetectorNativeCleanupFailure && error.actualReleasedFuture != null -> slot.retainPhysical(error.actualReleasedFuture)
+                VisionRuntimeFailures.busy(error) != null -> slot.retainPhysical(CompletableFuture.completedFuture(Unit))
+                else -> {
+                    slot.retainUnproven()
+                    detector.recordReleaseFailure(error ?: IllegalStateException("Primary creation ended without a result"))
+                }
+            }
+        }
+        slot.sealCreation()
+    }
+
+    /** Explicit producer ACK: the create effect was never called, including preflight rejection. */
+    fun finishPreparedNotStarted(slot: PrimaryPreparedPairSlot) = synchronized(frameStateLock) {
+        if (slot.ownerKey !== preparedReceiverKey || slot.creationFinished) return@synchronized
+        check(slot.load == null) { "A returned primary model cannot be acknowledged as not started" }
+        slot.creationFailed = true
+        slot.retainPhysical(CompletableFuture.completedFuture(Unit))
+        slot.sealCreation()
+    }
+
+    /** No factory or OPEN: install the exact prepared instance, then verify one fresh sample. */
+    fun adoptPreparedLoad(slot: PrimaryPreparedPairSlot, load: AndroidDetectorLoadResult,
+        choice: ValidatedJointRuntimeChoice, identity: RunningDetectorIdentity? = null,
+        onAdopted: (Boolean) -> Unit,
+    ) {
+        val instance = synchronized(frameStateLock) {
+            val created = slot.load
+            if (!preparedCurrent(slot) || slot.phase != PrimaryPreparedPairSlot.Phase.CREATED ||
+                !slot.creationFinished || slot.creationFailed || !load.configLoaded || !load.detectorAvailable || load.fallbackUsed ||
+                load.detector == null || created?.detector !== load.detector || created?.actualReleasedFuture !== load.actualReleasedFuture ||
+                (identity != null && (identity.modelKey != load.modelKey || identity.configSha256 != configuration.sha256() ||
+                    identity.activeDelegate != choice.candidate.primary.backend.delegate))) {
+                presentation.onUi { onAdopted(false) }
+                return
+            }
+            slot.phase = PrimaryPreparedPairSlot.Phase.ADOPTING
+            load.detector
+        }
+        try {
+            detector.nativeLane.execute {
+                val loaded = PrimaryLoadedDetector(instance, true)
+                val nativeAdmission = instance.isRuntimeAdmissionCurrent()
+                val adopted = synchronized(frameStateLock) {
+                    preparedCurrent(slot) && slot.phase == PrimaryPreparedPairSlot.Phase.ADOPTING &&
+                        nativeAdmission &&
+                        detector.adoptLoadedOnNativeLane(slot.claim, loaded, currentness::destroyed).also { if (it) loadAdoptionCommitted = true }
+                }
+                presentation.onUi {
+                    val uiAdmission = instance.isRuntimeAdmissionCurrent()
+                    val committed = synchronized(frameStateLock) {
+                        if (!adopted || !preparedCurrent(slot) || slot.phase != PrimaryPreparedPairSlot.Phase.ADOPTING ||
+                            !uiAdmission) false
+                        else detector.admitLoadedOnMain(slot.claim, loaded, beforeAvailability = {
+                            configLoaded = true
+                            loadInFlight = false
+                            loadAttempted = true
+                            loadedModelKey = load.modelKey
+                            fallbackUsed = load.fallbackUsed
+                            loadReason = load.reason
+                            reportModelKey = reportModelKey(load.modelKey)
+                            choiceOverrideRequestId = choice.measurementId
+                            statusText = "detector=prepared_pair_adopted model=${load.modelKey}"
+                            calibration.retainActiveCandidate(choice.candidate.primary)
+                            detector.configurePacingMinimum(choice.candidate.primaryIntervalMs)
+                            slot.phase = PrimaryPreparedPairSlot.Phase.ADOPTED
+                        }, destroyed = currentness::destroyed)
+                    }
+                    if (committed) {
+                        scheduleVerification(instance, load.modelKey, load.fallbackUsed)
+                        preparation.loaded()
+                    }
+                    onAdopted(committed)
+                }
+            }
+        } catch (_: RejectedExecutionException) { presentation.onUi { onAdopted(false) } }
+    }
+
+    /** Exact-slot host cleanup; use slot.actualReleasedFuture for physical completion. */
+    fun rollbackPreparedLoad(slot: PrimaryPreparedPairSlot): CompletionStage<Boolean> {
+        val closed = CompletableFuture<Boolean>()
+        val instance = synchronized(frameStateLock) {
+            if (slot.ownerKey !== preparedReceiverKey || slot.rollbackStarted) { closed.complete(false); return closed }
+            slot.rollbackStarted = true
+            slot.phase = PrimaryPreparedPairSlot.Phase.RETIRED
+            if (preparedPairSlot === slot && slot.request == loadRequestGeneration) {
+                preparedPairSlot = null
+                loadRequestGeneration += 1L
+                loadInFlight = false
+                loadAttempted = false
+                loadAdoptionCommitted = false
+                configLoaded = false
+                verification.invalidate()
+            }
+            slot.load?.detector
+        }
+        if (instance == null) { closed.complete(false); return closed }
+        try {
+            detector.nativeLane.execute {
+                detector.disableUnverified(instance) { }
+                try { closeRetiredLoad(instance); closed.complete(true) }
+                catch (error: Throwable) { closed.completeExceptionally(error) }
+            }
+        } catch (error: RejectedExecutionException) { closed.completeExceptionally(error) }
+        return closed
+    }
+
+    /** Consumer drain, never a physical native-release receipt or another model preparation. */
+    fun detachForTransferAfterDrain(): CompletionStage<PrimaryTransferredDetector> = synchronized(frameStateLock) {
+        transferredHostDrain?.let { return@synchronized it }
+        check(!loadInFlight && !currentness.destroyed() && !detector.projection().closing && detector.projection().available) {
+            "primary transfer requires a completed live owner"
+        }
+        verification.invalidate()
+        frame().clearDetectionSnapshot()
+        configLoaded = false
+        statusText = "detector=transferred_host_draining"
+        detector.detachAfterCalibrationDrains { instance ->
+            require(instance is TfliteAndroidFrameDetector)
+            instance.detachForTransfer()
+        }.also { transferredHostDrain = it }
+    }
 
     fun metadata() = PrimaryLifecycleMetadata(configLoaded, reportModelKey, loadedModelKey, fallbackUsed,
         loadReason, loadAttempted, loadInFlight, statusText, fixedFixtureRunning)
@@ -222,13 +435,13 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
             detector.recordDetectorReleaseFailure(instance, error)
             detector.fenceForClose()
             throw error
-        }
+        } finally { detector.forgetReleasedDetector(instance) }
     }
 
     private fun failedPreparationRelease(error: Throwable, proof: CompletionStage<Unit>?, request: Long,
         reason: String, metricDistanceWasEnabled: Boolean) {
         // Ownership survives cancellation, while obsolete requests have no authority over the UI.
-        detector.recordReleaseFailure(error, proof ?: (error as? DetectorCohortRetired)?.actualReleasedFuture)
+        if (proof != null) detector.recordReleaseFailure(error, proof) else detector.recordReleaseFailure(error)
         val ownsRequest = synchronized(frameStateLock) {
             detector.fenceForClose()
             (request == loadRequestGeneration && !currentness.destroyed()).also { owns -> if (owns) {

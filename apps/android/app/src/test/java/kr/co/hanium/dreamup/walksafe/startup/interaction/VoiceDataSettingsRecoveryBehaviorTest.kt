@@ -93,7 +93,8 @@ class VoiceDataSettingsRecoveryBehaviorTest {
         val f=VoiceSettingsFixture(); f.open(); f.onRecheck={ f.controller.completeVoiceDataInstallRecheckIfPossible() }
         f.trace.clear(); f.controller.recheckVoiceDataAfterSettingsIfNeeded()
         assertEquals(true,f.override); assertTrue(f.statuses.last().first.contains("재점검 완료"))
-        assertEquals(1,f.trace.count { it=="status" }); assertTrue(f.trace.indexOf("recoverPassedGate")<f.trace.indexOf("status"))
+        assertFalse(f.statuses.any { it.first == "한국어 음성 데이터 확인 중" })
+        assertEquals(1,f.trace.count { it=="recoverPassedGate" })
     }
     @Test fun unknownProbeResultKeepsAttemptPendingUntilMeasuredTerminalResult() {
         val f=VoiceSettingsFixture(); f.open(); f.available=null; f.controller.recheckVoiceDataAfterSettingsIfNeeded()
@@ -116,8 +117,11 @@ class VoiceDataSettingsRecoveryBehaviorTest {
     @Test fun stoppedProbeReplacementClosesBeforeReplaceAndMarksStartedBeforeStart() {
         val f=VoiceSettingsFixture(); f.open(); f.started=false; f.trace.clear()
         f.onStart={ f.changed!!() }; f.controller.recheckVoiceDataAfterSettingsIfNeeded()
-        assertEquals(listOf("getInitialized","setOfflineTtsOverride","getStarted","close","replace","setStarted","start","snapshot","recoverPassedGate","setOfflineTtsOverride","status","refresh"),f.trace)
+        val ordered = listOf("close", "replace", "setStarted", "start")
+        assertTrue(ordered.map(f.trace::indexOf).zipWithNext().all { (a, b) -> a >= 0 && a < b })
+        assertEquals(1, f.trace.count { it == "recoverPassedGate" })
         assertEquals(true,f.override)
+        assertTrue(f.statuses.last().first.contains("재점검 완료"))
     }
     @Test fun nativeRecheckFailureClosesProbeAndEndsAttemptWithoutFalseRecovery() {
         val f=VoiceSettingsFixture(); f.open(); f.onRecheck={ error("native failure") }; f.trace.clear()
@@ -125,6 +129,49 @@ class VoiceDataSettingsRecoveryBehaviorTest {
         assertEquals(listOf("getInitialized","setOfflineTtsOverride","getStarted","recheck","setStarted","close","status"),f.trace)
         assertFalse(f.started); assertNull(f.override)
         f.trace.clear(); f.controller.completeVoiceDataInstallRecheckIfPossible(); f.controller.recheckVoiceDataAfterSettingsIfNeeded(); assertTrue(f.trace.isEmpty())
+    }
+
+    @Test fun measuredSpeechDoesNotBecomeEnabledBeforeTheDurableRecoveryAcknowledgement() {
+        val f = VoiceSettingsFixture(); f.deferRecovery = true; f.open()
+        f.controller.recheckVoiceDataAfterSettingsIfNeeded()
+        f.controller.completeVoiceDataInstallRecheckIfPossible()
+        assertNull(f.override)
+        assertEquals("음성 기능 복구 저장 확인 중", f.statuses.last().first)
+        requireNotNull(f.recoveryCompletion)(true)
+        assertEquals(true, f.override)
+        assertTrue(f.statuses.last().first.contains("재점검 완료"))
+    }
+
+    @Test fun rejectedDurableRecoveryNeverEnablesTheMeasuredSpeech() {
+        val f = VoiceSettingsFixture(); f.deferRecovery = true; f.open()
+        f.controller.recheckVoiceDataAfterSettingsIfNeeded()
+        f.controller.completeVoiceDataInstallRecheckIfPossible()
+        requireNotNull(f.recoveryCompletion)(false)
+        assertNull(f.override)
+        assertEquals("음성 기능 복구 저장 실패", f.statuses.last().first)
+    }
+
+    @Test fun aNewSettingsAttemptRejectsThePreviousRecoveryAcknowledgement() {
+        val f = VoiceSettingsFixture(); f.deferRecovery = true; f.open()
+        f.controller.recheckVoiceDataAfterSettingsIfNeeded()
+        f.controller.completeVoiceDataInstallRecheckIfPossible()
+        val old = requireNotNull(f.recoveryCompletion)
+        f.open()
+        val before = f.statuses.size
+        old(true)
+        assertNull(f.override)
+        assertEquals(before, f.statuses.size)
+    }
+
+    @Test fun aNewSessionRejectsThePreviousRecoveryAcknowledgement() {
+        val f = VoiceSettingsFixture(); f.deferRecovery = true; f.open()
+        f.controller.recheckVoiceDataAfterSettingsIfNeeded()
+        f.controller.completeVoiceDataInstallRecheckIfPossible()
+        f.sessionGeneration++
+        val before = f.statuses.size
+        requireNotNull(f.recoveryCompletion)(true)
+        assertNull(f.override)
+        assertEquals(before, f.statuses.size)
     }
 }
 
@@ -134,6 +181,9 @@ private class VoiceSettingsFixture {
     var failure:PostLoginDeviceCheckFailure?=null; var locationFailure:PostLoginLocationFixTerminalFailure?=null; var locationReason:DeviceCheckLocationFixReason?=null
     var override:Boolean?=false; var recover=true; var launchFailures=emptySet<String>(); var changed:(()->Unit)?=null
     var onRecheck:(()->Unit)?=null; var onStart:(()->Unit)?=null
+    var deferRecovery = false
+    var recoveryCompletion: ((Boolean) -> Unit)? = null
+    var sessionGeneration = 1L
     val navigation=StartupSettingsNavigation(startupPort<StartupSettingsNative<String>> { name,args ->
         val target=when(name){"installVoiceData"->"install";"chooseVoiceEngine"->"engine";"applicationSettings"->"app";"locationSettings"->"location";"developmentSettings"->"development";else->null}
         if(target!=null){trace+="build:$target";target}else if(name=="start") { val intent=args[0] as String; trace+="start:$intent"; if(intent in launchFailures) error("unavailable"); Unit }else error(name)
@@ -146,12 +196,18 @@ private class VoiceSettingsFixture {
             "start"->{onStart?.invoke();Unit};else->error(name)
         }},
         startupPort<VoiceSettingsFacts>{name,_->trace+=name;when(name){
-            "getSnapshot"->PostLoginDeviceCheckSnapshot(PostLoginDeviceCheckState.FULL,"actor",1L,1L,failure)
+            "getSnapshot"->PostLoginDeviceCheckSnapshot(PostLoginDeviceCheckState.FULL,"actor",sessionGeneration,1L,failure)
             "getLocationTerminalFailure"->locationFailure;"getLocationReason"->locationReason;"requiredPermissions"->emptyList<String>();"locationServiceEnabled"->true;else->error(name)
         }},
         startupPort<VoiceSettingsEffects>{name,args->trace+=name;when(name){
             "getOfflineTtsOverride"->override;"setOfflineTtsOverride"->{override=args[0] as Boolean?;Unit}
-            "recoverPassedGate"->recover;"status"->{statuses+=(args[0] as String) to (args[1] as String);Unit}
+            "recoverPassedGate"->{
+                if (args.isNotEmpty()) {
+                    @Suppress("UNCHECKED_CAST") val completed = args[0] as (Boolean) -> Unit
+                    if (deferRecovery) recoveryCompletion = completed else completed(recover)
+                }
+                recover
+            };"status"->{statuses+=(args[0] as String) to (args[1] as String);Unit}
             "refresh","speak"->Unit;else->error(name)
         }},navigation,
     )

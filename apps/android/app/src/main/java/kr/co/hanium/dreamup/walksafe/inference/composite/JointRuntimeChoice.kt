@@ -81,8 +81,10 @@ data class ValidatedJointRuntimeChoice internal constructor(
 
 /** Engineering admission limits for two-model sample processing, not field-accuracy thresholds. */
 object JointRuntimeChoicePolicy {
-    const val VERSION = "joint-fixture-runtime-768-v2"
+    const val VERSION = "joint-fixture-runtime-768-v3-headroom600"
     const val MAXIMUM_TURNAROUND_MS = 800L
+    /** Sample P95 leaves 200ms engineering headroom; it promises neither camera latency nor CPU/GPU utilization. */
+    const val MAXIMUM_SAMPLE_P95_MS = 600L
     const val MINIMUM_DURATION_MS = 10_000L
     const val MINIMUM_COMPLETIONS = 10
     const val MAXIMUM_SAMPLES = 4096
@@ -130,6 +132,8 @@ object JointRuntimeChoicePolicy {
         if (!positive(e.primaryLongestGapMs) || !positive(e.auxiliaryLongestGapMs) ||
             e.primaryLongestGapMs > minOf(e.durationMs, candidate.primaryIntervalMs + MAXIMUM_TURNAROUND_MS) ||
             e.auxiliaryLongestGapMs > minOf(e.durationMs, candidate.auxiliaryIntervalMs + MAXIMUM_TURNAROUND_MS)) return "completion_gap"
+        if (percentile95(e.primaryTurnaroundMs) > MAXIMUM_SAMPLE_P95_MS ||
+            percentile95(e.auxiliaryTurnaroundMs) > MAXIMUM_SAMPLE_P95_MS) return "runtime_headroom"
         return null
     }
 

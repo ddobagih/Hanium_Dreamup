@@ -56,16 +56,12 @@ internal class LocalPrimaryTensorEngine(context: Context, private val spec: Visi
     private var closed = false
 
     override val runtimeJson: String
-        get() = VisionRuntimeCodec.validateRuntimeJson(JSONObject()
-            .put("requestedDelegate", options.delegate).put("activeDelegate", options.delegate)
-            .put("numThreads", options.numThreads).put("fallbackUsed", false)
-            .put("gpuPrecisionLossAllowed", if (options.delegate == "gpu") options.gpuPrecisionLossAllowed else JSONObject.NULL)
-            .put("gpuSerializationCacheStatus", cache?.status ?: JSONObject.NULL)
-            .put("gpuSerializationCacheToken", cache?.modelToken ?: JSONObject.NULL)
-            .put("gpuSerializationCacheFailureReason", cache?.failureReason ?: JSONObject.NULL)
-            .put("modelOwnerPid", Process.myPid()).put("modelOwnerThreadId", ownerThread.id)
-            .put("nativeRuntimeVersion", nativeRuntimeVersion)
-            .put("loadMs", loadMs).toString())
+        get() = PrimaryTensorRuntime.encodeObserved(AndroidDetectorRuntime(options.delegate, options.delegate,
+            options.numThreads, gpuPrecisionLossAllowed = options.gpuPrecisionLossAllowed.takeIf { handle.gpuDelegateAttached },
+            gpuSerializationCacheStatus = cache?.status, gpuSerializationCacheToken = cache?.modelToken,
+            gpuSerializationCacheFailureReason = cache?.failureReason, modelOwnerPid = Process.myPid(),
+            modelOwnerThreadId = ownerThread.id, nativeRuntimeVersion = nativeRuntimeVersion, nativeLoadMs = loadMs),
+            options, handle.gpuDelegateAttached)
 
     override fun invoke(input: ByteBuffer, outputs: Array<ByteBuffer>, width: Int, height: Int): VisionInvokeResult {
         check(Thread.currentThread() === ownerThread) { "primary invoke must remain on its native owner" }
@@ -133,6 +129,7 @@ internal class LocalPrimaryTensorEngine(context: Context, private val spec: Visi
 }
 
 private class PrimaryInterpreterHandle(val interpreter: Interpreter, private val gpu: GpuDelegate?) : Closeable {
+    val gpuDelegateAttached get() = gpu != null
     override fun close() {
         try { interpreter.close() } finally { gpu?.close() }
     }

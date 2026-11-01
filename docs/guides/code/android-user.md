@@ -37,29 +37,30 @@ adb install -r apps/android/app/build/outputs/apk/debug/app-debug.apk
 
 통합 동의의 저장된 확인서 복원은 [`IntegratedConsentPolicy.kt`](../../../apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentPolicy.kt)의 현재 Backend 권한 확인과 분리되며, 서버 재확인 전에는 전송을 허용하지 않습니다. CAS 충돌의 거부 선택 보존과 production V2 압축 journal은 [`RejectedConsentCasJournalCodec.kt`](../../../apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/RejectedConsentCasJournalCodec.kt), 실제 prefs 저장·HTTP 연결은 `MainActivity`에서 확인합니다. 현재 연동 근거는 JVM 클라이언트→Gateway→Backend이며 실제 Activity·encrypted prefs 프로세스 재시작·최신 APK 설치는 미검증입니다.
 
-## 샘플 이미지 성능 점검 연결 (2026-11-01)
+## 샘플 이미지 성능 점검 연결 (2026-11-02)
 
-- 진입은 `MainActivity.startDeviceCompositeCameraCheck` → `inference/composite/AndroidJointRuntimeCheck`입니다. 기존 기기점검의 probe/controller가 진행과 최종 상태를 소유합니다. 점검에는 카메라·ARCore preview 또는 사용자 물체 촬영 단계가 없습니다.
-- `FixtureRuntimeService`는 비공개 `:fixture_runtime` 프로세스의 수명을 소유하고, `RemoteFixtureRuntime`/`FixtureRuntimeProtocol`은 시도·nonce에 결속한 IPC와 실제 process death 확인을 담당합니다. `FixtureRuntimeWorker`는 내장4장 검증과 두 모델의 공동 샘플 측정만 수행합니다. 큰 영상/tensor는 자식 내부에서 처리하며 결과는 제한된 수치 데이터입니다.
-- `JointRuntimeChoice`의 샘플 전용 evidence와 `AndroidJointRuntimeChoiceStore`의 schema2/모델·fixture·기기 binding이 선택 기록을 검증합니다. 카메라 mode·ARCore scope·live source age를 샘플 측정값으로 위조하지 않습니다.
-- 기본 모델은 `AndroidPrimaryLifecyclePlatform`/`AndroidJointRuntimeLoader`, 추가 모델은 `UnknownRuntimeServiceOwner`의 기존 소유자에 복원됩니다. CameraTest와 실제 보행의 원본 frame·geometry·세션·거리 freshness 검사는 이 저장 기록과 별개입니다. 기존 화면 간 `CameraRuntimeHandoff`도 유지합니다.
-- 샘플 검사 실패는 실행 실패로 유지하며 기본 모델을 잠시 해제했다는 이유로 성공한 제한 결과로 낮추지 않습니다. 실제 worker 해제가 미확인되면 실패 안내와 재할당 차단을 함께 유지합니다. 거리 지원은 기존 `runtime/metric/AndroidRuntimeMetricPreflight`의 API support-only 검사에 맡깁니다.
-- 관련 자동 회귀는 `inference/composite`의 policy/store/IPC·감독 시험, `AndroidPrimaryInitialPreparationTest`, `AndroidPostLoginDeviceProbesTest`, `PostLoginDeviceCheckControllerTest`, `CameraRuntimePreparationContractTest`입니다. 실제 기기 시험과 구분합니다.
+- 기존 기기점검의 `PostLoginDeviceCheckController`가 권한·기한·진행·저장을 소유합니다. 거리 지원 조회를 끝내고 `MainActivity.startDeviceCompositeCameraCheck` → `AndroidJointRuntimeCheck`를 실행합니다. 초기 CPU 모델 성공을 진입 조건으로 삼지 않으며, 객체 시험은 내장 이미지4장만 사용합니다. 물체 촬영·휴대폰 이동·별도 설정 성능점검 절차는 없습니다.
+- `JointRuntimeSearchPolicy`는 GPU/GPU를 먼저 실제 측정하고 혼합·CPU1/CPU2 조합과 서로 다른 처리 간격을 탐색합니다. 각 trial은 새 immutable owner scope를 받고 `JointRuntimeSampleHost`의 운영 proxy를 사용합니다. 이전 trial의 Java consumer·모델·FD·자식 종료 확인 전에는 다음 trial로 넘어가지 않습니다. `:fixture_runtime`은 debug의 명시적 레거시 진단에만 남으며 운영 점검에서는 사용하지 않습니다.
+- 잠정 성능 자료 뒤 CPU1 참조를 한 번 확보하고, `JointRuntimeCheckedSelection.Claim`이 참조와 이미지의 단독 소유권을 Main에 넘깁니다. 최종 후보는 실제 두 모델을 새로 준비해4장 raw/역할/mask를 엄격히 비교하고, 같은 PID·모델 ID로10초 이상 공동 관측한 뒤에만 `ValidatedJointRuntimeChoice`와 `JointRuntimeFinalQualification`을 발급합니다. 잠정 선택을 검증된 선택으로 위조하지 않습니다. 최종 후보가 실패하면 이번 시도는 실패합니다.
+- `JointRuntimeChoicePolicy` v3는 정확성·완료율·간격·800ms 유효시간에 더해 두 모델의 샘플 P95가600ms 이하여야 합니다. 200ms의 공학적 운영 여유이며 카메라·ARCore·화면 성능 보장은 아닙니다. REFERENCE10초·BENCHMARK2초·WARMUP15초와 호출자 절대 기한을 함께 적용하고, raw 반환 여부는 목적과 별도로 명시합니다.
+- 최종 두 실체는 기존 primary/auxiliary 소유자에 채택되어 유지됩니다. 정상 Main↔Camera 인계는 old consumer 배출 → PARK → 동일 모델 ID의 epoch+1 양도 → dormant wrapper 두 개 부착 → registry 채택 → native 확인·활성화 순서입니다. 왕복 시 Main의 host ID는 유지하되 opaque owner scope를 교체해 이전 producer의 재진입을 막습니다. 보행도 검증된 pair를 사용하며 보조 모델을 독립 생성하지 않습니다.
+- `ParentDirectBufferArena`와 `JointRuntimeMemoryLedger`는 backing을 재사용하고, 프레임·참조·이미지·mapping의 소유 한도를 검사합니다. managed heap에는 최소32MiB 또는25% 여유를 남기며 알려진 direct/shared buffer 상한을 따릅니다. GC나 null 대입을 실제 해제로 간주하지 않습니다. GPU 드라이버·native 전체 RAM을 이 원장이 측정한다고 표현하지 않습니다.
+- 실제 영상에서는 기존 frame·geometry·거리 freshness gate와 측정한 cadence floor를 유지합니다. IPC·전처리·후처리·UI/Depth 지연에 따라 입력을 늦추고, primary 과부하 때 보조 admission을 보류합니다. 새로운 정상 primary 결과4회와 필요한 온도·부하 회복을 확인해야 재개합니다. CPU/GPU 사용률을 예약하거나 고정했다고 표시하지 않습니다.
 
-### 점검의 실패·취소·재시도 처리
+### 저장·취소·복구 계약
 
-- 점검 Controller와 기본 모델 검증 gate, TTS·호출어 probe는 성공을 수용할 때 단조 시계로 원래 기한을 다시 확인합니다. timeout callback의 실행이 늦어도 기한 이후의 결과로 통과·모델 검증 토큰을 만들지 않습니다. 호출어의 준비·한정 청취 기한과 HOME의 연속 청취는 구분합니다.
-- 최초 권한 관찰과 통과 뒤 화면 전이가 거절되면 현재 시도만 실패·재시도로 끝냅니다. 이전 시도의 늦은 효과가 새 시도의 상태를 바꾸지 않도록 snapshot·binding을 확인합니다. 최종 저장 I/O 중 취소·기한의 결속은 이 앞단 수용 검사와 별개의 저장 계약입니다.
-- `device/postlogin/DeviceCompositeAttemptState`는 기존 모델 퇴역 → 샘플 측정 → 명시한 메모리 선택 적용·검증 → 설정 저장 → 최종 결과 통지를 소유합니다. 적용 전에는 새 선택을 저장하지 않으므로, 그 사이 프로세스가 종료돼도 이전 통과 결과에 미적용 선택이 결합되지 않습니다.
-- `AndroidJointRuntimeLoader.prepare`는 전달받은 선택을 저장소를 거치지 않고 검증·준비합니다. `restore`만 저장된 선택을 읽고 자신의 기록을 CAS로 무효화합니다. 취소된 저장의 `retireIfCurrent`는 이미 없거나 다른 측정으로 교체된 기록을 그대로 두며, 실제 삭제 실패와 구분합니다.
-- `FixtureRuntimeConnectionLease`는 START 전송 허가 이전의 실패와 실제 모델 작업의 종료 미확인을 구분합니다. 전자는 큐에 남은 START 허가를 취소하고 실패한 연결도 정리합니다. 후자는 실제 작업 프로세스의 종료 확인을 요구합니다. 연결 실패 자체를 후보의 성능 실패로 해석하지 않습니다.
-- 활성 점검은 기존 `CameraRuntimeHandoff`의 프로세스 범위 자원 인계에 참여합니다. 취소 시 적용된 모델의 실제 close와 저장 정리를 함께 기다리며, 화면 재생성 시 이전 작업과 새 모델 준비가 겹치지 않게 합니다. 기본 모델 소유자의 `closedFuture`는 생성 작업과 뒤늦은 채택·종료 작업까지 배출한 뒤 완료됩니다.
-- 실패 결과 통지와 물리적 해제 확인은 별개입니다. 시간 초과나 정리 실패는 즉시 실패 결과를 통지하되, 실제 종료가 불확실하면 재할당을 막습니다. 늦은 해제 확인은 원래 시도의 자원만 풀며 실패를 성공으로 바꾸지 않습니다. 최종 결과 전달 전에는 임시 모델 퇴역을 지원 불가로 오인해 LIMITED로 통과시키지 않습니다.
-- 실제 기본 모델과 FastSAM의 native 생성·추론·종료는 비공개 `:vision_runtime`의 두 owner 스레드에서 수행합니다. 부모의 `PrimaryTensorEngine`/`RemoteFastSamEngine`은 전처리·파서·CPU mask decode·listener를 기존 경로에 유지하고, 큰 입출력은 크기를 검증한 shared region으로 전달합니다. API31 미만은 native 준비 전에 지원 조건에서 거절합니다.
-- `runtime/vision/remote/RemoteVisionClient`는 기능 결과, 모델별 실제 close 확인, cohort 전체의 실제 사망·부모 mapping 회수를 구분합니다. OPEN 전송 권한을 주기 전 원자적으로 취소한 경우만 `NO_NATIVE_START`로 증명하며, 권한을 준 뒤에는 실제 child death가 필요합니다. 한 모델의 hard timeout은 두 모델을 같은 cohort로 퇴역시킵니다. 살아남은 옛 handle과 새 CPU handle을 섞는 부분 fallback은 허용하지 않습니다.
-- `VisionRuntimeContext`는 Activity를 붙잡지 않고 고유 owner ID를 worker factory에 전달합니다. 다른 owner의 자원 점유는 `Busy` 가용성 신호이며 새 factory의 미회수 native 증거가 아닙니다. 이 신호로 검증된 선택값을 무효화하지 않습니다.
-- `VisionOwnerRetirement`는 primary의 작업 배출 뒤 늦게 생성된 auxiliary receipt까지 모으고, owner별 snapshot을 한 번 캡처해 해당 lease만 EXIT합니다. `CameraRuntimeHandoff.joinRetirement`는 다른 화면의 기존 claim이 있어도 퇴역 참여자를 누락하지 않으며 모든 참여자의 실제 회수가 확인되어야 다음 할당을 허용합니다. 프로세스 종료 신호만으로 GPU/커널 전체가 회복된다고 보장하지 않습니다.
-- 지원 조회는 `:metric_support`에서 Session 생성 → AUTOMATIC 지원 API → close만 수행합니다. resume·카메라 프레임은 사용하지 않으며 설치 요청 UI와 권한은 Main이 담당합니다. API false·명시적 호환 불가와 설치/권한/정지/회수 미확인 오류를 구분하고, 오류를 미지원 성공으로 바꾸지 않습니다.
+- `AndroidDeviceCheckAuthority`의 별도 AEAD 저장소가 시도·선택·결과·native LOAD/CLOSE journal·무효화를 같은 revision에 결속합니다. LOAD_INTENT 저장 확인 전 native OPEN을 전송하지 않습니다. 기존 계정·동의·교육 저장소와 옛 키를 삭제하거나 재사용하지 않습니다.
+- 모든 필수 결과와 실제 pair 검증을 원래5분 안에 단일 결정으로 수용하면 `SAVING`으로 넘어갑니다. 이 상태는 통과가 아닙니다. 별도15초 저장 확인에서 durable ACK·현재 actor/session/source·현재 두 모델 증명이 모두 맞아야 FULL/LIMITED를 표시합니다. 늦은 timer나 성공 callback으로 기한을 늘리지 않습니다.
+- 저장 결과는 Committed/Rejected/NotPublished/Indeterminate로 구분합니다. 대기 만료를 디스크 미갱신으로 단정하지 않으며, 미확정 I/O 정산과 새 파일 readback 전에는 자동 복원과 새 저장을 막습니다. Depth/TTS 결과 갱신도 같은 비동기 revision 계약을 사용합니다.
+- 과거 COMMITTED와 현재 pair 준비 증명은 별개입니다. 앱 재시작은 같은 코드·모델·기기 binding의 기록을 읽어 실제 두 모델을 새로 준비한 후 복원합니다. 화면 인계 동안 과거 기록은 보존하지만 현재 화면의 기능 gate는 닫습니다. 실제 실행 실패·미확인 회수는 명시 재점검 상태로 끝냅니다.
+- `WALKSAFE_RUNTIME_BUILD_ID`는 운영 소스·자원·모델·variant 설정·의존성 설정 내용으로 생성합니다. 같은 debug Git 표지만으로 다른 코드를 같은 점검 결과로 복원하지 않습니다. 기존 release source SHA 검증은 유지합니다.
+- 실제 native 생성·추론·종료는 비공개 `:vision_runtime`의 두 owner 스레드에서 수행합니다. 부모는 전처리·파서·mask decode·listener를 담당합니다. hard fault는 같은 cohort의 두 모델을 퇴역시키고 실제 child death·mapping/FD 회수 전 재할당을 막습니다. 타 모델이 남은 상태의 부분 CPU fallback을 허용하지 않습니다. API31 미만은 native 준비 전에 지원 조건에서 거절합니다.
+- 정상 operation 결과, Java consumer 배출, 모델별 close, cohort 전체 실제 종료는 서로 다른 증거입니다. `VisionConsumerRegistry`, `VisionPairConsumerTransfer`, `VisionOwnerRetirement`, `CameraRuntimeHandoff`가 해당 경계를 연결합니다. Source/target 미도착·취소·지연 ACK는 원래 기한과 정확한 lease/claim만 정리합니다. 실제 종료 미확인은 실패 안내와 재할당 차단을 함께 유지합니다.
+- `VisionParentReleaseTracker`는 native 미시작과 부모의 연결 정리를 구분합니다. SDK 연결을 시도했다면 false·예외 결과도 정상 unbind와 수락된 작업의 실제 `finally` 배출을 확인합니다. `actualReleasedFuture`는 물리 회수이며 `whenAvailable`은 여기에 journal 정산까지 합류합니다. 후보·재점검은 원래 기한 안에서 후자를 기다리고, 화면 파괴의 물리 정리를 저장 대기와 혼동하지 않습니다.
+- 원 prepare가 미확정인 회수는 `settleNativeOpenRelease`의 cleanup 전용 권한으로 정산합니다. 원 source·lease·명령·프로세스와 실제 writer 종료, 새 파일 읽기를 확인하며, 기록 부재는 양성 `NO_NATIVE_START`에만 허용합니다. 정산이 새 PASS나 모델 실행 권한을 발급하지 않습니다. 미정산 capture는 상한 안에서 보존하고 재점검 진입은 기존 pending cleanup만 재확인합니다.
+- 정확한 owner별 완료 회수 이력은16개로 제한합니다. 과거 owner의 완료 receipt는 재점검을 위한 증거일 뿐 새 owner의 할당이나 EXIT 권한이 아닙니다. 실제 모델의 생성/종료가 멈추면 자식 종료를 요청하되 GPU/커널 전체 복구를 보장하지 않습니다.
+- 거리 지원 조회는 `:metric_support`의 Session 생성 → AUTOMATIC 지원 API → close만 사용하며 resume·촬영 프레임은 없습니다. 실제 회수와 journal 정산 뒤 모델 시험을 시작합니다. 명시적 false와 설치/권한/정지/미확인 오류를 구분합니다. TTS 합성은 실제 청취, 진동 요청은 체감 확인, GPS 지원 정보는 현재 위치 품질의 증거가 아닙니다.
+- 거리 조회의 부모 작업도 `MetricParentExecution`의 공용 실행기 4개로 제한합니다. bind/조회·unbind·EXIT와 조정을 분리하고 임시 스레드를 만들지 않습니다. `MetricReleaseJournal`은 정상·늦은 회수를 한 번 정산하며 실패한 옛 결과를 다시 발행하지 않습니다.
 
 ## 변경 시 확인
 

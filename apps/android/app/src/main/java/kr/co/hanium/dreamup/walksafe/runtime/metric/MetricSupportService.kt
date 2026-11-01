@@ -10,6 +10,7 @@ import android.os.SystemClock
 import com.google.ar.core.Config
 import com.google.ar.core.Session
 import kr.co.hanium.dreamup.walksafe.BuildConfig
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionProcessIdentity
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
@@ -80,9 +81,11 @@ class MetricSupportService : Service() {
                     admissionWatch = watchdog.schedule(::exitWorker,
                         minOf(MetricSupportProtocol.HANDSHAKE_MS, deadlineMs - now()).coerceAtLeast(1L), TimeUnit.MILLISECONDS)
                     requireNotNull(reply).apply {
+                        val identity = requireNotNull(VisionProcessIdentity.captureSelf(this@MetricSupportService))
                         writeNoException(); writeInt(MetricSupportProtocol.VERSION); writeString(value)
                         writeInt(Process.myPid()); writeInt(Process.myUid())
                         writeString(MetricSupportProtocol.processName(this@MetricSupportService))
+                        writeLong(identity.startTicks); writeString(identity.bootIdentity)
                     }
                 }
                 MetricSupportProtocol.QUERY -> {

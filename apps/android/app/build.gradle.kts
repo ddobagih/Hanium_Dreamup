@@ -1,6 +1,7 @@
 import java.net.URLClassLoader
 import org.gradle.api.tasks.compile.JavaCompile
 import com.android.build.api.artifact.SingleArtifact
+import com.android.build.api.variant.BuildConfigField
 import groovy.json.JsonSlurper
 import java.net.URI
 import java.io.File
@@ -616,7 +617,96 @@ android {
     }
 }
 
+/** Build input, rather than a timestamp or Git label, defines device-check compatibility. */
+abstract class GenerateRuntimeBuildIdentity : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val productionSources: ConfigurableFileCollection
+    @get:Input abstract val options: MapProperty<String, String>
+    @get:Internal abstract val sourceRoot: DirectoryProperty
+    @get:OutputDirectory abstract val outputDirectory: DirectoryProperty
+
+    @TaskAction fun generate() {
+        val digest = MessageDigest.getInstance("SHA-256")
+        fun part(value: String) {
+            val bytes = value.toByteArray(Charsets.UTF_8)
+            digest.update("${bytes.size}:".toByteArray(Charsets.UTF_8)); digest.update(bytes)
+        }
+        part("walksafe-runtime-content-v1")
+        options.get().toSortedMap().forEach { (key, value) -> part(key); part(value) }
+        val base = sourceRoot.get().asFile
+        val files = productionSources.files.flatMap { root ->
+            if (root.isDirectory) root.walkTopDown().filter(File::isFile).toList() else listOf(root)
+        }.distinctBy { it.absoluteFile.normalize() }.sortedBy { it.relativeTo(base).invariantSeparatorsPath }
+        files.forEach { input ->
+            part(input.relativeTo(base).invariantSeparatorsPath)
+            if (!input.isFile) part("absent") else {
+                part(input.length().toString())
+                input.inputStream().use { stream ->
+                    val buffer = ByteArray(64 * 1024)
+                    while (true) {
+                        val count = stream.read(buffer)
+                        if (count < 0) break
+                        digest.update(buffer, 0, count)
+                    }
+                }
+            }
+        }
+        val id = digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
+        val output = outputDirectory.file("kr/co/hanium/dreamup/walksafe/RuntimeBuildIdentity.java").get().asFile
+        check(output.parentFile.isDirectory || output.parentFile.mkdirs())
+        output.writeText("package kr.co.hanium.dreamup.walksafe;\n" +
+            "public final class RuntimeBuildIdentity {\n" +
+            "  private RuntimeBuildIdentity() {}\n" +
+            "  public static final String WALKSAFE_RUNTIME_BUILD_ID = \"$id\";\n}\n")
+    }
+}
+
 androidComponents {
+    onVariants { variant ->
+        // Runtime compatibility is bound to content, including ordinary debug builds whose
+        // source-commit label may be "unverified". Generated outputs and test sources are excluded.
+        val fields = requireNotNull(variant.buildConfigFields)
+        val sourceRoots = providers.provider {
+            val sources = variant.sources
+            buildList<File> {
+                listOf(sources.java, sources.kotlin, sources.resources, sources.aidl,
+                    sources.renderscript, sources.baselineProfiles).forEach { source ->
+                    source?.static?.get()?.forEach { add(it.asFile) }
+                }
+                listOf(sources.assets, sources.res, sources.jniLibs, sources.mlModels,
+                    sources.shaders).forEach { source ->
+                    source?.static?.get()?.flatten()?.forEach { add(it.asFile) }
+                }
+                // Manifests are static in this application. Keep the build-type overlay too.
+                val sourceSets = listOf("main") + variant.productFlavors.map { it.second } +
+                    listOfNotNull(variant.buildType) + variant.name
+                sourceSets.distinct().forEach { add(file("src/$it/AndroidManifest.xml")) }
+                add(file("build.gradle.kts")); add(file("proguard-rules.pro"))
+                add(file("gradle.lockfile"))
+                listOf("build.gradle.kts", "settings.gradle.kts", "gradle/verification-metadata.xml",
+                    "gradle/wrapper/gradle-wrapper.properties").forEach { add(rootProject.file(it)) }
+                add(file("libs"))
+            }.distinct()
+        }
+        // A generated constant avoids making BuildConfig's provider depend on itself. The
+        // task reads the final variant fields, including any plugin-provided runtime option.
+        val identity = tasks.register<GenerateRuntimeBuildIdentity>(
+            "generate${variant.name.replaceFirstChar(Char::uppercaseChar)}RuntimeBuildIdentity") {
+            productionSources.from(sourceRoots)
+            sourceRoot.set(layout.projectDirectory)
+            options.put("variant", variant.name)
+            options.putAll(fields.map { values -> values.filterKeys {
+                it != "WALKSAFE_SOURCE_COMMIT" && it != "WALKSAFE_RUNTIME_BUILD_ID"
+            }.mapValues { (_, field) -> "${field.type}:${field.value}" } })
+            outputDirectory.set(layout.buildDirectory.dir("generated/runtimeIdentity/${variant.name}"))
+        }
+        variant.sources.java!!.addGeneratedSourceDirectory(identity,
+            GenerateRuntimeBuildIdentity::outputDirectory)
+        fields.put("WALKSAFE_RUNTIME_BUILD_ID", BuildConfigField("String",
+            "kr.co.hanium.dreamup.walksafe.RuntimeBuildIdentity.WALKSAFE_RUNTIME_BUILD_ID",
+            "Production content and variant runtime options"))
+    }
     onVariants(selector().withBuildType("debug")) { variant ->
         val apkDirectory = variant.artifacts.get(SingleArtifact.APK)
         val apkLoader = variant.artifacts.getBuiltArtifactsLoader()

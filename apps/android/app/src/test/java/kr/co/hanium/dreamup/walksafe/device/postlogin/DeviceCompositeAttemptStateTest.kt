@@ -6,6 +6,84 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DeviceCompositeAttemptStateTest {
+    @Test fun preparationCallbackFailureCannotPublishSuccessOrStrandTheReleasedBudget() {
+        val notifications = mutableListOf<DeviceCompositeAttemptState.Completion>()
+        val state = prepared(notifications::add)
+        val failure = IllegalStateException("receiver callback")
+        var releases = 0
+        assertSame(failure, runCatching {
+            state.complete(true, "prepared", { throw failure }, {}, { releases++ })
+        }.exceptionOrNull())
+        assertEquals(1, notifications.size)
+        assertFalse(notifications.single().success)
+        assertTrue(notifications.single().releaseConfirmed)
+        assertEquals(1, releases)
+        assertFalse(state.complete(true, "duplicate", {}, {}, { releases++ }))
+        assertEquals(1, releases)
+    }
+
+    @Test fun throwingPublicCompletionStillReleasesTheBudgetExactlyOnce() {
+        val failure = IllegalStateException("public callback")
+        val state = prepared { throw failure }
+        var releases = 0
+        assertSame(failure, runCatching {
+            state.complete(true, "prepared", {}, {}, { releases++ })
+        }.exceptionOrNull())
+        assertEquals(1, releases)
+        assertFalse(state.complete(true, "duplicate", {}, {}, { releases++ }))
+    }
+
+    @Test fun throwingFailureNotificationStillRequestsActualCleanupAndCannotFakeItsAcknowledgement() {
+        val failure = IllegalStateException("failure callback")
+        val state = prepared { throw failure }
+        var cleanupRequests = 0
+        assertSame(failure, runCatching { state.fail("cancelled") { cleanupRequests++ } }.exceptionOrNull())
+        assertEquals(1, cleanupRequests)
+        assertFalse(state.canComplete())
+        assertFalse(state.fail("duplicate") { cleanupRequests++ })
+        assertEquals(1, cleanupRequests)
+        state.nativeCleanupConfirmed()
+        assertTrue(state.canComplete())
+    }
+
+    @Test fun lateReleaseNotificationAndBudgetErrorsPreserveTheFirstFailureAfterBothEffects() {
+        val state = prepared {}
+        assertTrue(state.fail("cancelled") {})
+        state.nativeCleanupConfirmed()
+        val first = IllegalStateException("late release callback")
+        val second = IllegalArgumentException("budget callback")
+        var releases = 0
+        assertSame(first, runCatching {
+            state.complete(false, "actual_release", {}, { throw first }, { releases++; throw second })
+        }.exceptionOrNull())
+        assertEquals(1, releases)
+        assertArrayEquals(arrayOf(second), first.suppressed)
+    }
+
+    @Test fun anAlreadyPublishedFailureIsNotRepublishedWhenFinalPreparationNotificationThrows() {
+        var publicCompletions = 0
+        val state = prepared { publicCompletions++ }
+        assertTrue(state.fail("cancelled") {})
+        state.nativeCleanupConfirmed()
+        val first = IllegalStateException("before release callback")
+        var lateReleases = 0
+        var budgetReleases = 0
+        assertSame(first, runCatching {
+            state.complete(false, "actual_release", { throw first }, { lateReleases++ }, { budgetReleases++ })
+        }.exceptionOrNull())
+        assertEquals(1, publicCompletions)
+        assertEquals(1, lateReleases)
+        assertEquals(1, budgetReleases)
+    }
+
+    private fun prepared(callback: (DeviceCompositeAttemptState.Completion) -> Unit): DeviceCompositeAttemptState<String> {
+        val state = DeviceCompositeAttemptState<String>(callback)
+        assertTrue(state.beginRunning())
+        assertTrue(state.applyCandidate("selected", { true }, {}, { fail(it) }))
+        assertTrue(state.acceptPrepared { true })
+        return state
+    }
+
     @Test fun noDurableWriteCanOccurBeforeActualApplicationVerification() {
         val f = Fixture().running()
         f.apply()

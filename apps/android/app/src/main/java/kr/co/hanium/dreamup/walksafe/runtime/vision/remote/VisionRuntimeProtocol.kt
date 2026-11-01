@@ -7,6 +7,7 @@ import java.util.concurrent.CompletionStage
 
 enum class VisionRole { PRIMARY, FASTSAM }
 enum class VisionPurpose { LIVE, BENCHMARK, WARMUP, REFERENCE }
+enum class VisionNativeFaultReason { NON_FINITE_OUTPUT, OUTPUT_SHAPE_MISMATCH, INVALID_NATIVE_OUTPUT }
 
 data class VisionModelSpec(val role: VisionRole, val modelKey: String, val assetPath: String,
     val assetSha256: String, val runtimeJson: String, val inputShape: IntArray,
@@ -27,7 +28,10 @@ enum class VisionReleaseProof { NO_NATIVE_START, CHILD_DEATH }
 data class VisionReleaseReceipt(val cohortId: String, val childPid: Int,
     val releaseProof: VisionReleaseProof = VisionReleaseProof.CHILD_DEATH)
 data class VisionRetirementSnapshot(val lease: VisionCohortLease,
-    val actualReleased: CompletionStage<VisionReleaseReceipt>)
+    val actualReleased: CompletionStage<VisionReleaseReceipt>,
+    val allocationAvailable: CompletionStage<VisionReleaseReceipt> = actualReleased)
+data class VisionPairSnapshot(val lease: VisionCohortLease, val primaryHandle: VisionModelHandle,
+    val auxiliaryHandle: VisionModelHandle, val childPid: Int)
 data class VisionModelReleaseReceipt(val cohortId: String, val modelInstanceId: String,
     val childPid: Int, val processDeath: Boolean)
 
@@ -53,6 +57,7 @@ internal class VisionDispatchAuthority {
         return epoch
     }
     @Synchronized fun provesNoNativeStart() = retired && !nativePossible
+    @Synchronized fun nativeStartPossible() = nativePossible
 }
 
 /** A semantic failure never completes the independent physical-release receipt exceptionally. */
@@ -63,6 +68,9 @@ class VisionRuntimeException(val reason: String, cause: Throwable? = null,
 class VisionCohortBusyException(val availabilityReceipt: CompletionStage<VisionReleaseReceipt>) :
     IllegalStateException("vision_cohort_busy_before_lease")
 class VisionStaleAuthorityException : IllegalStateException("vision_stale_authority")
+class VisionReceiptExpiredException : IllegalStateException("vision_completed_receipt_history_expired")
+class VisionJournalException(val outcome: kr.co.hanium.dreamup.walksafe.device.DeviceCheckAuthorityOutcome<*>) :
+    IllegalStateException("vision_native_journal_not_committed:${outcome.javaClass.simpleName}")
 
 data class VisionRuntimeOptions @JvmOverloads constructor(val delegate: String, val numThreads: Int,
     val fallbackToCpu: Boolean = false, val gpuPrecisionLossAllowed: Boolean = false,
@@ -70,6 +78,14 @@ data class VisionRuntimeOptions @JvmOverloads constructor(val delegate: String, 
 
 /** Wire options and observations use separate JSON objects; neither object grants native authority. */
 object VisionRuntimeCodec {
+    @JvmStatic fun optionsHash(json: String): String = hashBytes(encodeOptions(decodeOptions(json)))
+    /** Hash the original observed JSON; rebuilding a DTO may discard native observation fields. */
+    @JvmStatic fun runtimeHash(json: String): String {
+        validateRuntimeJson(json)
+        return hashBytes(json)
+    }
+    private fun hashBytes(value: String) = java.security.MessageDigest.getInstance("SHA-256")
+        .digest(value.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
     @JvmStatic fun encodeOptions(value: VisionRuntimeOptions): String {
         require(value.delegate in setOf("cpu", "gpu", "nnapi") && value.numThreads in 1..4)
         return JSONObject().put("delegate", value.delegate).put("numThreads", value.numThreads)
@@ -102,7 +118,7 @@ object VisionRuntimeCodec {
 
 /** Small scalar control parcels only. Pixel/tensor bytes travel through bounded SharedMemory. */
 object VisionRuntimeProtocol {
-    const val VERSION = 1
+    const val VERSION = 2
     const val DESCRIPTOR = "walksafe.vision.runtime.v1"
     const val CALLBACK = "walksafe.vision.runtime.callback.v1"
     const val PROCESS_SUFFIX = ":vision_runtime"
@@ -118,6 +134,14 @@ object VisionRuntimeProtocol {
     const val DEATH_MS = 5_000L
     val TOKEN = Regex("[a-f0-9]{64}")
     val KEY = Regex("[a-zA-Z0-9_.-]{1,80}")
+    /** Only authenticated EXIT is one-way; Binder deliberately supplies no PID for that call. */
+    internal fun acceptsCaller(code: Int, flags: Int, pid: Int, uid: Int, parentPid: Int, expectedUid: Int,
+        nonceMatches: Boolean, epochMatches: Boolean, parentBound: Boolean): Boolean {
+        if (uid != expectedUid || parentPid <= 0 || !parentBound || !nonceMatches || !epochMatches) return false
+        val oneWay = flags and android.os.IBinder.FLAG_ONEWAY != 0
+        if (oneWay) return code == EXIT && pid == 0
+        return pid > 0 && pid == parentPid
+    }
     fun operationBudget(purpose: VisionPurpose) = when (purpose) {
         VisionPurpose.LIVE, VisionPurpose.BENCHMARK -> 2_000L
         VisionPurpose.WARMUP -> 15_000L

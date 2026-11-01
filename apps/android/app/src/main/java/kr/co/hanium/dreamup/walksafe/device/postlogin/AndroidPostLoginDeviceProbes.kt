@@ -36,7 +36,7 @@ internal enum class PostLoginCameraPipelineFailure {
     NO_VALID_FRAME, DETECTOR_FAILED, COMPOSITE_RUNTIME_UNAVAILABLE, RELEASE_TIMED_OUT, TIMED_OUT,
 }
 
-/** Successful completion requires a saved/applied fixture choice and confirmed worker release. */
+/** Actual pair preparation and worker release. The Controller separately commits the final bundle. */
 internal data class PostLoginCompositeCameraCheckResult(
     val success: Boolean,
     val metricDepth: PostLoginMetricDepthState? = null,
@@ -121,9 +121,11 @@ internal data class PostLoginProbeEnvironment(
 
 /** Shared capability/resource and ARCore services retain their own actors and epoch tokens. */
 internal interface PostLoginProbeRuntimeSupport {
+    val requiresJointRuntimeCheck: Boolean get() = false
     val capabilityProbeStarted: Boolean
     fun restartCapabilityAndResources(binding: PostLoginDeviceCheckBinding, onChanged: () -> Unit)
     fun prepareVoiceModelAndDetector()
+    fun prepareRuntimeLease(binding: PostLoginDeviceCheckBinding, onReady: (Boolean) -> Unit) { onReady(true) }
     fun startAutomaticProbes(binding: PostLoginDeviceCheckBinding)
     fun startMetricPreflight(binding: PostLoginDeviceCheckBinding)
     fun startCompositeCameraCheck(binding: PostLoginDeviceCheckBinding,
@@ -178,6 +180,7 @@ internal class AndroidPostLoginDeviceProbes(
     private val support: PostLoginProbeRuntimeSupport,
     private val observer: PostLoginProbeObserver,
 ) : PostLoginDeviceCheckProbeSuite {
+    override val requiresJointRuntimeCheck get() = support.requiresJointRuntimeCheck
     private var cameraSignal = PostLoginDeviceCheckSignal.PENDING
     private var locationSignal = PostLoginDeviceCheckSignal.PENDING
     private var wakeSignal = PostLoginDeviceCheckSignal.PENDING
@@ -254,6 +257,8 @@ internal class AndroidPostLoginDeviceProbes(
         support.restartCapabilityAndResources(binding, onChanged)
     }
     override fun prepareVoiceModelAndDetector() = support.prepareVoiceModelAndDetector()
+    override fun prepareRuntimeLease(binding: PostLoginDeviceCheckBinding, onReady: (Boolean) -> Unit) =
+        support.prepareRuntimeLease(binding, onReady)
     override fun startAutomaticProbes(binding: PostLoginDeviceCheckBinding) = support.startAutomaticProbes(binding)
     override fun startMetricPreflight(binding: PostLoginDeviceCheckBinding) = support.startMetricPreflight(binding)
     override fun cancelCalibration(reason: String) {
@@ -482,8 +487,8 @@ internal class AndroidPostLoginDeviceProbes(
         if (cameraCleanupPending) { observer.navigationDiagnostic("postLoginDeviceCheck=camera_cleanup_pending"); return }
         if (sharedReleaseBlocked()) { rejectCamera(binding, PostLoginCameraPipelineFailure.RELEASE_TIMED_OUT); return }
         val env = environment()
-        if (!env.cameraPermission || !env.detectorAvailable) { rejectCamera(binding, PostLoginCameraPipelineFailure.PERMISSION_OR_MODEL_UNAVAILABLE); return }
-        if (env.otherCameraOwnerBusy) { rejectCamera(binding, PostLoginCameraPipelineFailure.CAMERA_RESOURCE_BUSY); return }
+        if (!env.cameraPermission || (!requiresJointRuntimeCheck && !env.detectorAvailable)) { rejectCamera(binding, PostLoginCameraPipelineFailure.PERMISSION_OR_MODEL_UNAVAILABLE); return }
+        if (!requiresJointRuntimeCheck && env.otherCameraOwnerBusy) { rejectCamera(binding, PostLoginCameraPipelineFailure.CAMERA_RESOURCE_BUSY); return }
         val generation = ++cameraGeneration
         cameraActive = true
         cameraSignal = PostLoginDeviceCheckSignal.PENDING
@@ -491,6 +496,10 @@ internal class AndroidPostLoginDeviceProbes(
         val terminalClaim = AtomicBoolean(false)
         cameraTerminalClaim = terminalClaim
         if (startCompositeCamera(binding, generation)) return
+        if (requiresJointRuntimeCheck) {
+            finishCamera(binding, generation, false, PostLoginCameraPipelineFailure.COMPOSITE_RUNTIME_UNAVAILABLE)
+            return
+        }
         cameraTimeout = dispatcher.schedule(CAMERA_TIMEOUT_MS, Runnable {
             if (cameraCurrent(binding, generation) && terminalClaim.compareAndSet(false, true))
                 finishCamera(binding, generation, false, PostLoginCameraPipelineFailure.TIMED_OUT)
@@ -552,7 +561,7 @@ internal class AndroidPostLoginDeviceProbes(
                 }
                 dispatchCompositeCompletion(run)
             }
-        } catch (_: RuntimeException) {
+        } catch (_: Throwable) {
             // A throwing source may already own native resources. Do not fall through to another
             // camera; cancellation and its eventual completion retain the release barrier.
             synchronized(run) { run.handled = true }

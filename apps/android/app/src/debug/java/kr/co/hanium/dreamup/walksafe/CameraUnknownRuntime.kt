@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.CompletableFuture
 import java.lang.ref.WeakReference
 import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamRuntimeService
+import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamTransferredModel
 import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRuntimeFailures
 
 /** Main-thread owner. Model failures require explicit retry; Busy waits only for foreign availability. */
@@ -11,6 +12,7 @@ internal class CameraUnknownRuntime<T>(
     private val create: (Long) -> FastSamRuntimeService<T>,
     private val dispatch: (() -> Unit) -> Unit,
     private val changed: () -> Unit,
+    private val requiresTransferredPair: Boolean = false,
 ) {
     enum class Status { IDLE, LOADING, READY, FAILED, WAITING_RELEASE, WAITING_AVAILABILITY, RELEASE_FAILED }
 
@@ -23,8 +25,78 @@ internal class CameraUnknownRuntime<T>(
     var backendName: String? = null
         private set
     private var retrySerial = 0L
+    private var transferEpoch: Long? = null
+    private var transferring = false
     // Futures contain release metadata only. A detached service/listener must not be retained here.
     private val retainedReleases = mutableListOf<CompletableFuture<Void>>()
+
+    /** Reserve listener identity before target wrappers are attached. No model is created here. */
+    fun reserveTransferredEpoch(): Long? {
+        if (destroyed || transferring || transferEpoch != null || service != null) return null
+        return nextEpoch.incrementAndGet().also { transferEpoch = it }
+    }
+
+    /** The caller has already confirmed the two-wrapper adoption and activated both consumers. */
+    fun adoptTransferred(epoch: Long, prepared: FastSamRuntimeService<T>): Boolean {
+        if (destroyed || transferring || transferEpoch != epoch || service != null ||
+            prepared.sessionEpoch != epoch || !prepared.isReady) return false
+        transferEpoch = null
+        retrySerial++
+        service = prepared
+        retain(prepared)
+        backendName = prepared.start().getNow(null)?.actualBackend?.name
+        status = Status.READY
+        if (active) changed()
+        return true
+    }
+
+    fun cancelTransferredEpoch(epoch: Long) {
+        if (transferEpoch == epoch) transferEpoch = null
+    }
+
+    /** Undo only this partially published target; a late rollback cannot remove another service. */
+    fun rollbackTransferred(epoch: Long, expected: FastSamRuntimeService<T>): Boolean {
+        if (service !== expected || expected.sessionEpoch != epoch) return false
+        retrySerial++
+        service = null
+        backendName = null
+        status = Status.FAILED
+        expected.closeAsync()
+        if (active && !destroyed) changed()
+        return true
+    }
+
+    /** Detach the old listener/worker only; its native model remains owned by the pair ticket. */
+    fun detachForTransfer(): CompletableFuture<FastSamTransferredModel> {
+        val old = service ?: return CompletableFuture<FastSamTransferredModel>().also {
+            it.completeExceptionally(IllegalStateException("No camera auxiliary consumer to transfer"))
+        }
+        check(!destroyed && !transferring && old.isReady)
+        transferring = true
+        service = null
+        backendName = null
+        retrySerial++
+        status = Status.IDLE
+        val receipt = old.releasedFuture()
+        val ownerRef = WeakReference(this)
+        val drained = old.drainForTransfer()
+        drained.whenComplete { _, error ->
+            if (error != null) old.closeAsync()
+            // The physical receipt is retained until the Java consumer drain succeeds. Keeping
+            // it afterwards would make source teardown wait for a model now owned by the target.
+            ownerRef.get()?.let { owner ->
+                if (error == null) synchronized(owner.retainedReleases) { owner.retainedReleases.remove(receipt) }
+                owner.dispatch {
+                    owner.transferring = false
+                    if (error != null) {
+                        if (!owner.destroyed) owner.status = Status.FAILED
+                    }
+                    if (owner.active && !owner.destroyed) owner.changed()
+                }
+            }
+        }
+        return drained
+    }
 
     fun resume() {
         if (destroyed || active) return
@@ -112,6 +184,7 @@ internal class CameraUnknownRuntime<T>(
         active = false
         destroyed = true
         retrySerial++
+        transferEpoch = null
         service?.closeAsync()
         service = null
     }
@@ -120,6 +193,11 @@ internal class CameraUnknownRuntime<T>(
 
     private fun startNew() {
         if (!active || destroyed) return
+        if (requiresTransferredPair || transferring || transferEpoch != null) {
+            status = Status.IDLE
+            changed()
+            return
+        }
         service = null // Retired callbacks lose ownership before the replacement is constructed.
         backendName = null
         val created = try { create(nextEpoch.incrementAndGet()) } catch (error: Exception) {
@@ -128,10 +206,7 @@ internal class CameraUnknownRuntime<T>(
             changed()
             return
         }
-        synchronized(retainedReleases) {
-            retainedReleases.removeAll { it.isDone && !it.isCompletedExceptionally && !it.isCancelled }
-            retainedReleases += created.releasedFuture()
-        }
+        retain(created)
         service = created
         status = Status.LOADING
         changed()
@@ -156,6 +231,11 @@ internal class CameraUnknownRuntime<T>(
             status = Status.FAILED
             changed()
         }
+    }
+
+    private fun retain(created: FastSamRuntimeService<T>) = synchronized(retainedReleases) {
+        retainedReleases.removeAll { it.isDone && !it.isCompletedExceptionally && !it.isCancelled }
+        retainedReleases += created.releasedFuture()
     }
 
     /** A foreign cohort is availability, not a new model failure or permission to reuse its receipt. */

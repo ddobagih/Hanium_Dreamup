@@ -6,12 +6,116 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kr.co.hanium.dreamup.walksafe.CameraUnknownRuntime
+import kr.co.hanium.dreamup.walksafe.inference.composite.JointRuntimeAttachmentReservation
 import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionCohortBusyException
 import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionReleaseReceipt
 import org.junit.Assert.*
 import org.junit.Test
 
 class CameraUnknownRuntimeTest {
+    @Test fun partialAttachmentHostCannotBeReportedDrainedBeforeTheAuxiliaryOwnerStops() = Fixture(blockClose = true).use { f ->
+        val reservation = JointRuntimeAttachmentReservation<Void>()
+        val service = f.create(1)
+        assertTrue(reservation.retainAuxiliary(service))
+        service.start().get(3, TimeUnit.SECONDS)
+        reservation.revokeAdmission()
+        val host = reservation.closeHost()
+        assertTrue(f.closeEntered.await(3, TimeUnit.SECONDS))
+        assertFalse(host.isDone)
+        assertSame(host, reservation.closeHost())
+        assertFalse(host.isDone)
+        f.closeGate.countDown()
+        host.get(3, TimeUnit.SECONDS)
+        assertTrue(service.stats().stopping)
+    }
+
+    @Test fun semanticCloseFailureCanDrainTheJavaHostWithoutInventingPhysicalRelease() = Fixture(failClose = true).use { f ->
+        val reservation = JointRuntimeAttachmentReservation<Void>()
+        val service = f.create(1)
+        assertTrue(reservation.retainAuxiliary(service))
+        service.start().get(3, TimeUnit.SECONDS)
+        reservation.closeHost().get(3, TimeUnit.SECONDS)
+        assertTrue(service.stats().stopping)
+        assertTrue(service.releasedFuture().isCompletedExceptionally)
+        assertFalse(service.stats().nativeReleaseConfirmed)
+    }
+
+    @Test fun partialPublicationRollbackRemovesOnlyItsExactServiceAndRetainsPhysicalProof() = Fixture(blockClose = true).use { f ->
+        val receiver = CameraUnknownRuntime<Void>(create = { error("Independent OPEN") },
+            dispatch = { it() }, changed = {}, requiresTransferredPair = true)
+        val epoch = requireNotNull(receiver.reserveTransferredEpoch())
+        val service = f.create(epoch)
+        service.start().get(3, TimeUnit.SECONDS)
+        assertTrue(receiver.adoptTransferred(epoch, service))
+        assertFalse(receiver.rollbackTransferred(epoch + 1, service))
+        assertSame(service, receiver.service)
+        assertFalse(service.stats().stopping)
+        assertTrue(receiver.rollbackTransferred(epoch, service))
+        assertNull(receiver.service)
+        assertFalse(receiver.rollbackTransferred(epoch, service))
+        assertTrue(f.closeEntered.await(3, TimeUnit.SECONDS))
+        assertSame(service.releasedFuture(), receiver.retainedReleaseReceipts().single())
+        assertFalse(service.releasedFuture().isDone)
+        f.closeGate.countDown()
+        service.releasedFuture().get(3, TimeUnit.SECONDS)
+        receiver.destroy()
+    }
+
+    @Test fun strictPairOwnerNeverCreatesAnIndependentAuxiliaryOnResumeOrRetry() {
+        var creates = 0
+        val runtime = CameraUnknownRuntime<Void>(create = { creates++; error("Independent OPEN") },
+            dispatch = { it() }, changed = {}, requiresTransferredPair = true)
+        repeat(3) { runtime.resume(); runtime.retry(); runtime.pause() }
+        assertEquals(0, creates)
+        assertNull(runtime.service)
+        val epoch = requireNotNull(runtime.reserveTransferredEpoch())
+        assertNull(runtime.reserveTransferredEpoch())
+        runtime.cancelTransferredEpoch(epoch + 1)
+        assertNull(runtime.reserveTransferredEpoch())
+        runtime.cancelTransferredEpoch(epoch)
+        assertTrue(requireNotNull(runtime.reserveTransferredEpoch()) > epoch)
+        runtime.destroy()
+        assertNull(runtime.reserveTransferredEpoch())
+    }
+
+    @Test fun transferredAdoptionRequiresReservedEpochAndReadyServiceAndDoesNotRecreateIt() = Fixture().use { f ->
+        val receiver = CameraUnknownRuntime<Void>(create = { error("Independent OPEN") },
+            dispatch = { it() }, changed = {}, requiresTransferredPair = true)
+        val epoch = requireNotNull(receiver.reserveTransferredEpoch())
+        val service = f.create(epoch)
+        assertFalse(receiver.adoptTransferred(epoch, service))
+        service.start().get(3, TimeUnit.SECONDS)
+        assertFalse(receiver.adoptTransferred(epoch + 1, service))
+        assertTrue(receiver.adoptTransferred(epoch, service))
+        assertFalse(receiver.adoptTransferred(epoch, service))
+        assertFalse(receiver.accepts(epoch))
+        receiver.resume()
+        receiver.retry()
+        assertSame(service, receiver.service)
+        assertTrue(receiver.accepts(epoch))
+        assertSame(service.releasedFuture(), receiver.retainedReleaseReceipts().single())
+        receiver.pause()
+        receiver.resume()
+        assertSame(service, receiver.service)
+        receiver.destroy()
+        service.releasedFuture().get(3, TimeUnit.SECONDS)
+        Unit
+    }
+
+    @Test fun cancelledOrDestroyedTargetCannotAdoptLateReadyService() = Fixture().use { f ->
+        val receiver = CameraUnknownRuntime<Void>(create = { error("Independent OPEN") },
+            dispatch = { it() }, changed = {}, requiresTransferredPair = true)
+        val epoch = requireNotNull(receiver.reserveTransferredEpoch())
+        val service = f.create(epoch)
+        service.start().get(3, TimeUnit.SECONDS)
+        receiver.cancelTransferredEpoch(epoch)
+        assertFalse(receiver.adoptTransferred(epoch, service))
+        val newer = requireNotNull(receiver.reserveTransferredEpoch())
+        receiver.destroy()
+        assertFalse(receiver.adoptTransferred(newer, service))
+        assertNull(receiver.service)
+    }
+
     @Test fun foreignCohortBusyWaitsForAvailabilityWithoutConfusingItWithOwnedNativeRelease() {
         val available = CompletableFuture<VisionReleaseReceipt>()
         Fixture(busyFirstLoad = VisionCohortBusyException(available)).use { f ->
@@ -326,7 +430,7 @@ class CameraUnknownRuntimeTest {
             return service.submitArgb(2, 1, IntArray(2), token, null)
         }
 
-        private fun create(epoch: Long): FastSamRuntimeService<Void> {
+        fun create(epoch: Long): FastSamRuntimeService<Void> {
             val first = services.isEmpty()
             val options = FastSamRuntimeOptions(FastSamRuntimeOptions.Backend.GPU, 1, true,
                 System.nanoTime() + TimeUnit.SECONDS.toNanos(10), 5_000L, false)

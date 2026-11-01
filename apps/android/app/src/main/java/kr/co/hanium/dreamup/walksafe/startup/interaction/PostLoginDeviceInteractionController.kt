@@ -146,8 +146,8 @@ internal class PostLoginDeviceInteractionController(
                 if (facts.cameraPermission()) "재점검 필요" else "권한 허용 후 재점검 필요"
             !postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.OBSTACLE_DETECTION) ->
                 "제한"
-            !facts.detectorLoadAttempted() -> "통과 · 보행 시작 시 모델 재확인"
-            facts.detectorAvailable() -> "통과"
+            !facts.detectorLoadAttempted() -> "모델 준비 확인 대기"
+            facts.detectorAvailable() -> "두 모델 준비 확인(내장 이미지)"
             else -> "제한"
         }
     }
@@ -163,7 +163,7 @@ internal class PostLoginDeviceInteractionController(
                 PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE,
             ) -> "제한(거리 제한 모드)"
             facts.metricDepth == PostLoginMetricDepthState.SUPPORTED ->
-                "지원"
+                "API 지원 확인"
             facts.metricDepth == PostLoginMetricDepthState.PENDING ->
                 "지원 확인 대기"
             else -> null

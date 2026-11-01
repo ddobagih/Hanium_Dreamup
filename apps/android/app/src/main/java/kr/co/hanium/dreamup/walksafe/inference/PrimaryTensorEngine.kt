@@ -10,15 +10,25 @@ internal interface PrimaryTensorEngine : Closeable {
     val runtime: AndroidDetectorRuntime
     fun invoke(input: ByteBuffer, output: ByteBuffer, width: Int, height: Int,
         purpose: VisionPurpose): PrimaryTensorResult
+    fun invoke(input: ByteBuffer, output: ByteBuffer, width: Int, height: Int,
+        purpose: VisionPurpose, absoluteDeadlineMs: Long): PrimaryTensorResult = invoke(input, output, width, height, purpose)
 }
 
 internal data class PrimaryTensorResult(val runtime: AndroidDetectorRuntime,
     val inferenceMs: Long, val outputReadMs: Long)
 
+internal class DetectorAttachmentInactive : IllegalStateException("primary transferred consumer is not adopted")
+
 /** The receipt exists before OPEN and survives an OPEN failure without a returned engine. */
 internal interface PrimaryTensorEngineFactory : Closeable {
     val actualReleasedFuture: CompletionStage<Unit>
     val requiresOwnerThread: Boolean get() = false
+    fun canAdmit(): Boolean = true
+    fun inputBuffer(modelSize: Int): ByteBuffer = ByteBuffer.allocateDirect(modelSize * modelSize * 3 * Float.SIZE_BYTES)
+        .order(java.nio.ByteOrder.nativeOrder())
+    fun outputBuffer(modelKey: String, bytes: Int): ByteBuffer = ByteBuffer.allocateDirect(bytes).order(java.nio.ByteOrder.nativeOrder())
+    fun detachForTransfer(): PrimaryTransferredDetector = throw UnsupportedOperationException("primary factory cannot transfer")
+    fun activateTransferred(): Unit = throw UnsupportedOperationException("primary factory is not a transferred attachment")
     fun open(model: ModelRuntimeConfig, delegate: String, recorder: DetectorLoadTimingRecorder,
         modelKey: String): PrimaryTensorEngine
 }

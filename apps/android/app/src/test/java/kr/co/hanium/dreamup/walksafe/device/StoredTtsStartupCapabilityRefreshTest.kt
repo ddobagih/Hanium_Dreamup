@@ -9,8 +9,9 @@ import kr.co.hanium.dreamup.walksafe.session.*
 import kr.co.hanium.dreamup.walksafe.session.readiness.StartupCapabilityReadinessEvidence
 import kr.co.hanium.dreamup.walksafe.startup.capability.*
 
-/** Actual Controller + AndroidPostLoginDeviceProbes + result store/resolver.
- * Stable verified actor and native probe-result callback are controlled leaves.
+/** Actual Controller + AndroidPostLoginDeviceProbes + resolver.
+ * Stable verified actor, SavedResults/current-runtime readiness and native probe callback are controlled leaves.
+ * This regression suite does not prove persistence or native qualification; authority/store suites own those contracts.
  * Actual Coordinator/evidence/lifecycle and PrewalkGuidanceProgress are also connected.
  * Main adapter/native TTS and prewalk continuation itself are NOT executed; observer port records them.
  */
@@ -76,7 +77,24 @@ class StoredTtsStartupCapabilityRefreshTest {
         var actor=PostLoginDeviceCheckActorFacts(true,"actor",1,"actor",true,true,false,false)
         fun input()=WalkSafeStartupCapabilityInput(true,true,true,true,true,true,tts,true,true,"profile")
         fun binding()=PostLoginDeviceCheckResultBinding("actor","installation","maker","model","device",36,"fingerprint","app",1,"1","source","policy",null,null,"registry","sha",null,null,emptySet(),true,true,tts,true)
-        val store=AndroidDeviceCheckResultStore(FakeSharedPreferences())
+        // Preserve this suite's historical FULL fixture while TTS capability is rechecked separately.
+        // No legacy preference record is allowed to open a production gate by this test port.
+        val store=object:PostLoginDeviceCheckSavedResults {
+            val historical=PersistedPostLoginDeviceCheckResult(PostLoginDeviceCheckState.FULL,emptySet(),false,true,
+                PostLoginMetricDepthState.SUPPORTED)
+            override fun candidatePresent()=actor.actorId=="actor"
+            override fun restore(binding:PostLoginDeviceCheckResultBinding)=historical.takeIf {
+                binding==this@Fixture.binding() && actor.actorId=="actor" && actor.sessionVerified && actor.sessionUsable
+            }
+            override fun runtimeReady(binding:PostLoginDeviceCheckBinding)=binding.actorId==actor.actorId &&
+                binding.sessionGeneration==actor.sessionGeneration && actor.sessionVerified && actor.sessionUsable &&
+                !actor.storageBlocked && !actor.deletionRecoveryOnly
+            override fun acceptsPublishedSnapshot(snapshot:PostLoginDeviceCheckSnapshot)=snapshot.state==historical.state &&
+                snapshot.disabledFeatures==historical.disabledFeatures && snapshot.bindingOrNull?.let(::runtimeReady)==true
+            override fun save(snapshot:PostLoginDeviceCheckSnapshot,binding:PostLoginDeviceCheckResultBinding,
+                cameraDependentChecksDeferred:Boolean,metricDepthState:PostLoginMetricDepthState):Boolean=
+                error("Unexpected persistence in TTS/readiness-only controlled fixture")
+        }
         var now=1000L
         val lifecycle=WalkSessionLifecycle({"review-walk"},{now},{now}).apply { handle(WalkSessionEvent.EnteredForeground) }
         val evidence=StartupCapabilityReadinessEvidence({WalkSafeStartupCapabilityResolver.resolve(input())},{"review-v1"},{now})
@@ -158,11 +176,9 @@ class StoredTtsStartupCapabilityRefreshTest {
             "scheduleCalibration","afterRestoredResult","noteCancellation" -> Unit
             else -> error("unexpected effects: $name")
         }}
-        val controller=PostLoginDeviceCheckController(facts,AndroidPostLoginDeviceCheckSavedResults {store},probes,
+        val controller=PostLoginDeviceCheckController(facts,store,probes,
             proxy<PostLoginDeviceCheckPermissionPort>(),effects,proxy<PostLoginDeviceCheckScheduler>(),PostLoginDeviceCheckController.Config())
         fun begin() {
-            assertTrue(store.save(PostLoginDeviceCheckSnapshot(PostLoginDeviceCheckState.FULL,"actor",1,1), binding(),
-                metricDepthState=PostLoginMetricDepthState.SUPPORTED))
             controller.bindSession("actor",1)
             assertTrue(controller.passesFeatureGate())
             assertTrue(probes.storedBindingValidationPending)

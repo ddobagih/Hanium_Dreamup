@@ -269,7 +269,7 @@ internal class DeviceCheckPresenter(
                 )
             }
             val cameraPending = if (facts.cameraPipelineActive) {
-                "카메라·모델 실행 중"
+                "두 모델 샘플 처리 중"
             } else {
                 "검사 대기"
             }
@@ -293,18 +293,19 @@ internal class DeviceCheckPresenter(
                 if (facts.cameraPermission) "재점검 필요" else "권한 허용 후 재점검 필요"
             } else when (observation.metricDepth) {
                 PostLoginMetricDepthState.PENDING -> "지원 확인 중"
-                PostLoginMetricDepthState.SUPPORTED -> "지원"
-                PostLoginMetricDepthState.AVAILABLE -> "실측 확인"
+                PostLoginMetricDepthState.SUPPORTED -> "API 지원 확인"
+                PostLoginMetricDepthState.AVAILABLE -> "실시간 거리 관측"
                 PostLoginMetricDepthState.EXPLICITLY_UNSUPPORTED -> "제한(거리 제한 모드)"
                 PostLoginMetricDepthState.UNKNOWN -> "확인 불가(AR 서비스·권한 확인)"
-                PostLoginMetricDepthState.TIMED_OUT -> "제한(측정 시간 초과)"
+                PostLoginMetricDepthState.TIMED_OUT -> "제한(지원 확인 시간 초과)"
             }
             return listOf(
-                "ARCore Depth\t$distanceText",
-                "카메라\t$cameraText",
-                "위치\t$locationText",
-                "한국어 음성\t${label(observation.koreanTextToSpeech, "확인 중")}",
-                "호출어\t$microphoneText",
+                "거리 API 지원\t$distanceText",
+                "객체 인식(내장 이미지)\t$cameraText",
+                "GPS·위치 서비스\t$locationText",
+                "현재 위치 수신\t${label(observation.locationFix, "수신 대기", "수신 미확인")}",
+                "한국어 음성 합성\t${label(observation.koreanTextToSpeech, "확인 중")}",
+                "기기 내 호출어 인식\t$microphoneText",
                 "기기 상태\t${facts.resourceWaitNotice ?: label(observation.deviceResources, "상태 확인 중", "배터리·저장공간·발열 확인 필요")}",
             ).joinToString(separator = "\n")
         }
@@ -360,25 +361,27 @@ internal class DeviceCheckPresenter(
                 "RELEASE_TIMED_OUT" ->
                     "카메라 점검을 끝냈지만 카메라 자원이 닫히지 않았습니다. 앱을 다시 시작한 뒤 점검하세요."
                 "TIMED_OUT" ->
-                    "카메라와 기기 내 탐지 모델 점검 시간이 초과되었습니다. 잠시 후 다시 시도하세요."
+                    "내장 이미지의 두 모델 실행 점검 시간이 초과되었습니다. 잠시 후 다시 시도하세요."
                 else ->
-                    "카메라 영상과 기기 내 탐지 모델을 함께 실행할 수 없습니다. 다시 점검하세요."
+                    "내장 이미지로 두 인식 모델의 실행을 확인하지 못했습니다. 다시 점검하세요."
             }
             PostLoginDeviceCheckFailure.KOREAN_TTS_UNAVAILABLE ->
                 requireNotNull(facts.koreanSpeechDetail)
             PostLoginDeviceCheckFailure.WAKE_PHRASE_UNAVAILABLE ->
                 "기기 내 음성 모델이 ‘길라잡이’를 인식하지 못했습니다. 조용한 곳에서 다시 점검하세요."
             PostLoginDeviceCheckFailure.HAPTIC_UNAVAILABLE ->
-                "시험 진동을 확인하지 못했습니다. 진동 설정과 기기 상태를 확인하세요."
+                "진동 기능을 사용할 수 없습니다. 진동 설정과 기기 상태를 확인하세요."
             PostLoginDeviceCheckFailure.DEPTH_UNKNOWN ->
                 "거리 기능 상태를 확정하지 못했습니다. 잠시 후 다시 점검하세요."
             PostLoginDeviceCheckFailure.DEPTH_TIMEOUT ->
-                "거리 측정 점검 시간이 초과되었습니다. 전경에서 다시 점검하세요."
+                "거리 API 지원 확인 시간이 초과되었습니다. 앱 화면으로 돌아와 다시 점검하세요."
             PostLoginDeviceCheckFailure.CHECK_TIMEOUT ->
                 facts.resourceWaitNotice?.let { "기기 점검 시간이 초과되었습니다. $it" }
                     ?: "기기 점검을 완료하지 못했습니다. 화면의 대기 중 항목을 확인하고 다시 점검하세요."
             PostLoginDeviceCheckFailure.RESULT_SAVE_FAILED ->
                 "기기 점검 결과를 저장하지 못했습니다. 저장공간을 확인하고 다시 점검하세요."
+            PostLoginDeviceCheckFailure.RESULT_SAVE_UNCONFIRMED ->
+                "저장 결과를 확인 중입니다. 확인이 끝나기 전에는 점검 결과를 적용하지 않습니다."
             PostLoginDeviceCheckFailure.ONBOARDING_TRANSITION_REJECTED ->
                 "기기 점검의 다음 단계로 진행하지 못했습니다. 현재 화면과 로그인 상태를 확인한 뒤 다시 점검하세요."
             PostLoginDeviceCheckFailure.SESSION_CHANGED,
@@ -437,13 +440,14 @@ internal class DeviceCheckPresenter(
                 append(when (check.state) {
                     PostLoginDeviceCheckState.NOT_RUN -> "시작 전"
                     PostLoginDeviceCheckState.REQUESTING_PERMISSIONS -> "권한 확인 중"
-                    PostLoginDeviceCheckState.RUNNING -> "전경 점검 중"
+                    PostLoginDeviceCheckState.RUNNING -> "검사 중(최대 5분 · 이후 저장 확인)"
+                    PostLoginDeviceCheckState.SAVING -> "점검 결과 저장 확인 중"
                     PostLoginDeviceCheckState.FULL -> if (check.hasCurrentRestrictions) {
-                        "기기 사양 통과·현재 제한(${check.disabledFeaturesText})"
+                        "필수 점검 완료·현재 제한(${check.disabledFeaturesText})"
                     } else {
-                        "모든 기능 통과"
+                        "필수 점검 완료"
                     }
-                    PostLoginDeviceCheckState.LIMITED -> "제한 모드 통과(${check.disabledFeaturesText})"
+                    PostLoginDeviceCheckState.LIMITED -> "제한 모드 점검 완료(${check.disabledFeaturesText})"
                     PostLoginDeviceCheckState.FAIL -> check.failureMessage
                 })
                 append("\n")
@@ -472,6 +476,7 @@ internal class DeviceCheckPresenter(
                         PostLoginDeviceCheckState.NOT_RUN -> "권한과 기기 기능 점검 시작"
                         PostLoginDeviceCheckState.REQUESTING_PERMISSIONS -> "권한 확인 중"
                         PostLoginDeviceCheckState.RUNNING -> "기기 기능 점검 중"
+                        PostLoginDeviceCheckState.SAVING -> "점검 결과 저장 확인 중"
                         PostLoginDeviceCheckState.FULL -> "기기 점검 완료"
                         PostLoginDeviceCheckState.LIMITED -> "제한 기능을 적용하고 점검 완료"
                         PostLoginDeviceCheckState.FAIL -> "기기 점검 다시 시도"
@@ -481,6 +486,7 @@ internal class DeviceCheckPresenter(
                     confirmation.walkState != WalkSessionState.ACTIVE && check.state !in setOf(
                         PostLoginDeviceCheckState.REQUESTING_PERMISSIONS,
                         PostLoginDeviceCheckState.RUNNING,
+                        PostLoginDeviceCheckState.SAVING,
                     ),
                 visible = showDeviceCheckAction,
             )

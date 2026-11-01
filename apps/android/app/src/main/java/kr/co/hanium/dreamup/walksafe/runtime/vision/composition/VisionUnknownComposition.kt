@@ -13,6 +13,7 @@ internal interface VisionUnknownPreparationInteraction {
     fun mayRefreshReadiness(): Boolean
     fun refreshReadiness()
     fun speakPreparationCompleted()
+    fun requirePairPreparation(reason: String) {}
 }
 
 /** The two actual mutually referring Lazy holders, with SDK and policy queries deferred to their original phase. */
@@ -60,6 +61,7 @@ internal class VisionUnknownComposition<S : Any>(
 
     private fun onServiceEvent(event: UnknownRuntimeServiceEvent) {
         when (event) {
+            is UnknownRuntimeServiceEvent.PairPreparationRequired -> interaction.requirePairPreparation(event.reason)
             UnknownRuntimeServiceEvent.PreparationFinished -> calibration().preparationFinished()
             UnknownRuntimeServiceEvent.CalibrationWillStart -> interaction.cancelHomeWakeListening()
             is UnknownRuntimeServiceEvent.CalibrationClosed -> {

@@ -16,23 +16,23 @@ class CameraRuntimePreparationContractTest {
     }
 
     @Test fun devicePreparationRunsOffUiAndKeepsTheLoadingStatePending() {
-        assertTrue(body(main, "private fun loadDetectorForCurrentProcess()").contains("primaryDetectorLifecycleController.loadForCurrentProcess()"))
-        val load = body(primary, "fun loadForCurrentProcess(allowComparison: Boolean = false,")
-        assertTrue(load.indexOf("val loadTask = Runnable loadTask@{") < load.indexOf("platform.select("))
-        assertTrue(load.indexOf("platform.select(") < load.indexOf("detector.tuningLane.execute(loadTask)"))
-        assertTrue(load.contains("detector.nativeLane.execute retire@{"))
-        assertTrue(load.contains("retireLoadedForReloadOnNativeLane("))
-        assertTrue(load.contains("allowComparison = allowComparison"))
-        assertTrue(body(main, "private fun loadDetectorForPostLoginDeviceCheck()").contains(
-            "primaryDetectorLifecycleController.loadForCurrentProcess(allowComparison = true)"))
-        assertTrue(body(main, "private fun loadDetectorForCurrentProcess()").contains(
-            "primaryDetectorLifecycleController.loadForCurrentProcess()"))
-        assertTrue(load.contains("loadInFlight = true"))
-        assertTrue(load.contains("loadInFlight = false"))
-        assertTrue(main.contains("!primaryDetectorLifecycleController.metadata().loadAttempted || primaryDetectorLifecycleController.metadata().loadInFlight -> PostLoginDeviceCheckSignal.PENDING"))
-        assertTrue(load.contains("scheduleVerification(instance,"))
-        assertTrue(load.contains("requestGeneration != loadRequestGeneration"))
-        assertTrue(load.contains("load.detector?.let(::closeRetiredLoad)"))
+        val load = body(main, "private fun loadDetectorForCurrentProcess()")
+        assertTrue(load.contains("maybePrepareHistoricalRuntime()"))
+        assertFalse(load.contains("loadForCurrentProcess("))
+        val initial = body(main, "private fun loadDetectorForPostLoginDeviceCheck()")
+        assertFalse(initial.contains("allowComparison"))
+        val prepare = body(main, "private fun prepareMainRuntimePair(")
+        assertTrue(prepare.indexOf("reservePreparedPair(current)") < prepare.indexOf("tuningLane.execute"))
+        assertTrue(prepare.indexOf("tuningLane.execute") < prepare.indexOf("AndroidJointRuntimeLoader.preparePair("))
+        assertTrue(prepare.contains("retainCreatedLoad(primarySlot, it)"))
+        assertTrue(prepare.contains("registerPreparedPair(auxiliarySlot, it)"))
+        assertTrue(prepare.contains("finishPreparedCreation(primarySlot, it)"))
+        assertTrue(prepare.contains("finishPreparedNotStarted(primarySlot)"))
+        assertTrue(prepare.contains("adoptPreparedLoad("))
+        assertTrue(prepare.contains("adoptPreparedPair(auxiliarySlot, pair.auxiliary, pair.choice)"))
+        assertTrue(main.contains("override val requiresJointRuntimeCheck = true"))
+        val support = body(main, "override fun prepareVoiceModelAndDetector()")
+        assertFalse(support.contains("loadDetectorForPostLoginDeviceCheck()"))
     }
 
     @Test fun homeDoesNotReplaceTheSavedChoiceWithUnconditionalGpu() {
@@ -41,17 +41,18 @@ class CameraRuntimePreparationContractTest {
         assertTrue(preparation.contains("nativeUiPage == NativeUiPage.GUIDANCE || isWalkSessionRuntimeActive()"))
     }
 
-    @Test fun cameraIsCacheOnlyAndStartsAuxiliaryAfterPrimaryWarmup() {
+    @Test fun cameraAdoptsThePreparedPairWithoutOpeningModelsOrStartingAnotherBenchmark() {
         val prepare = body(camera, "private fun prepareCameraDetector()")
-        assertTrue(prepare.contains("AndroidJointRuntimeLoader.restore("))
-        assertTrue(prepare.contains("resumeUnknownAfterPrimaryLiveAttempt()"))
-        assertTrue(prepare.contains("if (detector == null)"))
+        assertFalse(prepare.contains("AndroidJointRuntimeLoader.restore("))
+        assertFalse(prepare.contains("createWithStatus("))
         assertFalse(prepare.contains("AndroidFixedFixtureRuntimeSelector"))
+        assertTrue(prepare.contains("transfers.adopt("))
+        assertTrue(prepare.contains("reservation::retainPrimary"))
+        assertTrue(prepare.contains("reservation::retainAuxiliary"))
+        assertTrue(prepare.contains("unknownRuntime.rollbackTransferred("))
+        assertTrue(camera.contains("requiresTransferredPair = true"))
         val resume = body(camera, "private fun resumeUnknownAfterPrimaryLiveAttempt()")
         assertTrue(resume.indexOf("auxiliaryStartup.mayStart(generation, busy.get())") < resume.indexOf("unknownRuntime.resume()"))
-        assertTrue(resume.contains("unknownRuntime.retry()"))
-        assertTrue(body(camera, "override fun onResume()").contains("resumeUnknownAfterPrimaryLiveAttempt()"))
-        assertTrue(camera.contains("auxiliaryStartup.complete(epoch)"))
     }
 
     @Test fun cameraSetupCannotPublishAfterPauseOrDestroy() {
@@ -61,7 +62,7 @@ class CameraRuntimePreparationContractTest {
         assertTrue(start.contains("foreground && !isDestroyed && !isFinishing"))
         assertTrue(start.contains("releasePreparedCamera("))
         assertTrue(body(camera, "override fun onPause()").contains("generation++"))
-        assertTrue(body(camera, "override fun onPause()").contains("unknownRuntime.pauseAndRelease()"))
+        assertTrue(body(camera, "override fun onPause()").contains("unknownRuntime.pause()"))
         val destroy = body(camera, "override fun onDestroy()")
         assertTrue(destroy.contains("if (!startingCamera && (!closingCamera || cameraRelease.failure != null)) cameraWorker.shutdown()"))
         val release = body(camera, "private fun queueCameraRelease(")
@@ -70,27 +71,22 @@ class CameraRuntimePreparationContractTest {
         assertTrue(start.indexOf("if (cameraRelease.failure != null)") in 0 until start.indexOf("cameraWorker.execute"))
     }
 
-    @Test fun cameraEntryReleasesTheMainOwnerBeforeTheTestActivityAllocates() {
+    @Test fun normalCameraEntryTransfersTheTwoExistingModelsAndTheirImmutableOwnerScopes() {
         val open = body(main, "private fun openLiveCameraScreen()")
-        assertTrue(open.contains("if (!shouldShowNativeHome() || !isActivityForeground) return"))
-        assertTrue(open.contains("if (!BuildConfig.DEBUG) return"))
-        assertTrue(open.contains("cancelDeviceRuntimeCalibration(\"live_camera_requested\")"))
-        assertTrue(open.indexOf("primaryDetectorLifecycleController.cancelPendingLoadAfterDrain") < open.indexOf("startActivity("))
-        assertTrue(open.contains("startActivity("))
-        assertTrue(open.indexOf("releaseForCompositeCheck(current)") < open.indexOf("startActivity("))
-        assertTrue(open.contains("releaseBeforePrimaryCalibration()"))
+        assertFalse(open.contains("createWithStatus("))
+        assertFalse(open.contains("AndroidJointRuntimeLoader.restore("))
         assertFalse(open.contains("loadDetectorForCurrentProcess()"))
-        assertFalse(open.contains("detectorLoadInFlight"))
-        assertFalse(main.contains("cameraTestLaunchPending"))
+        assertTrue(open.contains("BuildConfig.DEBUG"))
+        assertTrue(open.contains("claimForTransfer()"))
+        assertTrue(open.contains("detachForTransferAfterDrain()"))
+        assertTrue(open.contains("detachPreparedPairForTransfer(runtime.pair.auxiliary)"))
+        assertTrue(open.indexOf("transfers.prepare(") < open.indexOf("startActivityForResult("))
         val create = body(camera, "override fun onCreate(")
-        assertFalse("Opening a camera must not run a new performance benchmark",
-            create.contains("AndroidFixedFixtureRuntimeSelector.load("))
-        val prepare = body(camera, "private fun prepareCameraDetector()")
-        assertTrue(prepare.indexOf("worker.execute") < prepare.indexOf("AndroidJointRuntimeLoader.restore("))
-        assertTrue(prepare.contains("AndroidJointRuntimeLoader.restore("))
-        assertFalse(prepare.contains("choice.scope"))
-        assertFalse(prepare.contains("choice.cameraMode"))
-        assertTrue(body(camera, "private fun startCamera()").contains("prepareCameraDetector()"))
+        assertTrue(create.contains("VisionRuntimeContext(applicationContext, ticket.targetOwner)"))
+        assertFalse(create.contains("AndroidFixedFixtureRuntimeSelector"))
+        val returned = body(camera, "override fun finish()")
+        assertTrue(returned.contains("transfers.prepare("))
+        assertFalse(returned.contains("createWithStatus("))
     }
 
     @Test fun recheckDuringLoadingCannotResetAttemptAndLeaveSuccessPending() {
@@ -112,13 +108,14 @@ class CameraRuntimePreparationContractTest {
         assertFalse(settings.contains("onCameraPerformanceCheck"))
         val apply = body(main, "private fun finishDeviceCompositeApplicationIfReady()")
         assertTrue(apply.contains("RunningDetectorVerificationState.VERIFIED"))
-        assertTrue(apply.contains("DeviceCheckJointRuntimeChoice"))
+        assertTrue(apply.contains("runtime.pair.proof.isCurrent()"))
+        assertTrue(apply.contains("acceptPrepared"))
     }
 
     @Test fun samplePerformanceCheckerAndWorkerHaveNoCameraOrArCoreDependency() {
         val directory = File("src/main/java/kr/co/hanium/dreamup/walksafe/inference/composite")
-        val source = listOf("AndroidJointRuntimeCheck.kt", "FixtureRuntimeWorker.kt", "FixtureRuntimeService.kt",
-            "FixtureRuntimeProtocol.kt", "RemoteFixtureRuntime.kt").joinToString("\n") { File(directory, it).readText() }
+        val source = listOf("AndroidJointRuntimeCheck.kt", "JointRuntimeSampleHost.kt", "JointRuntimeReferenceSet.kt",
+            "JointRuntimeFinalPairPreparation.kt", "JointRuntimeCheckedSelection.kt").joinToString("\n") { File(directory, it).readText() }
         listOf("AndroidRuntimeCalibrationSession", "com.google.ar.core", "android.media.Image",
             "android.hardware.camera2", "androidx.camera", "ACTION_IMAGE_CAPTURE").forEach { forbidden ->
             assertFalse("Sample-image performance check must not use $forbidden", source.contains(forbidden))
@@ -141,26 +138,98 @@ class CameraRuntimePreparationContractTest {
         assertFalse(failure.contains("deviceCompositeAttempt = null"))
     }
 
-    @Test fun explicitChoiceIsAppliedAndVerifiedBeforeTheOnlyDurableSavePath() {
+    @Test fun actualPairIsPreparedBeforeTheControllerAloneCommitsTheBundle() {
         val start = body(main, "private fun startDeviceCompositeCameraCheck(")
-        assertTrue(start.contains("choiceOverride = choice"))
+        val candidate = body(main, "private fun receiveCompositeSelection(")
+        assertTrue(candidate.contains("claimForFinal("))
+        assertTrue(candidate.contains("prepareMainRuntimePair("))
+        val prepared = body(main, "private fun prepareMainRuntimePair(")
+        assertTrue(prepared.contains("JointRuntimeFinalPairPreparation.prepare("))
+        assertFalse(start.contains("choiceOverride"))
         assertFalse(start.contains(".save("))
         val applied = body(main, "private fun finishDeviceCompositeApplicationIfReady()")
-        assertTrue(applied.indexOf("RunningDetectorVerificationState.VERIFIED") < applied.indexOf("persistVerified("))
-        assertTrue(applied.contains("retireIfCurrent(it)"))
-        val cleanup = body(main, "private fun requestDeviceCompositeNativeCleanup(")
-        assertTrue(cleanup.indexOf("cancelPendingLoadAfterDrain") < cleanup.indexOf("releaseForCompositeCheck(authority)"))
-        assertTrue(cleanup.contains("primaryDetectorOwner.closedFuture()"))
+        assertTrue(applied.indexOf("RunningDetectorVerificationState.VERIFIED") < applied.indexOf("acceptPrepared"))
+        assertFalse(applied.contains("persistVerified("))
+        assertFalse(applied.contains(".save("))
+        assertTrue(main.contains("savedResults = authorityDeviceCheckResults"))
+        assertTrue(main.contains("postLoginDeviceCheckResultStore = AndroidDeviceCheckResultStore(deviceCheckAuthority)"))
+        val cleanup = body(main, "private fun retireMainPairPreparation(")
+        assertTrue(cleanup.contains("workerFinished.whenComplete"))
+        assertTrue(cleanup.contains("primarySlot.actualReleasedFuture"))
+        assertTrue(cleanup.contains("actualReleased"))
         assertTrue(start.contains("CameraRuntimeHandoff.begin()"))
     }
 
-    @Test fun samplePerformanceWorkerIsPrivateAndSeparateFromMainAndVoice() {
+    @Test fun auxiliaryFailureRetiresTheWholeOperationalPairWithoutWaitingForAnotherPrimaryFrame() {
+        val interaction = body(main, "override fun requirePairPreparation(reason: String)")
+        assertTrue(interaction.contains("if (reason == \"auxiliary_runtime_failed\") retireOperationalRuntime(reason)"))
+        assertTrue(interaction.indexOf("retireOperationalRuntime(reason)") < interaction.indexOf("if (!isActivityForeground)"))
+        val retire = body(main, "private fun retireOperationalRuntime(")
+        assertTrue(retire.indexOf("deviceCheckAuthority.retireChoice(") < retire.indexOf("client.requestExit("))
+        assertTrue(retire.contains("quiesceForRuntimeError(captured)"))
+        assertTrue(retire.contains("reportRuntimeLost(runtime.binding)"))
+        assertFalse(retire.contains("closeDetectorAsync()"))
+    }
+
+    @Test fun everyPreCreationReceiverRejectionClosesTheClaimedReferenceAndFixtureSet() {
+        val prepare = body(main, "private fun prepareMainRuntimePair(")
+        val rejection = prepare.substringAfter("fun rejectPreparation(").substringBefore("val transferredRuntime")
+        assertTrue(rejection.indexOf("measured?.close()") < rejection.indexOf("onFailed(reason)"))
+        listOf("primary_pair_receiver_unavailable", "auxiliary_pair_receiver_unavailable",
+            "transferred_cohort_missing", "primary_return_reservation_rejected", "auxiliary_return_reservation_rejected")
+            .forEach { reason -> assertTrue(prepare.contains("rejectPreparation(\"$reason\")")) }
+    }
+
+    @Test fun historicalResultsRequireFreshActualPairAndFrozenOwnerContext() {
+        val historical = body(main, "private fun maybePrepareHistoricalRuntime()")
+        assertTrue(historical.contains("authorityDeviceCheckResults.historical()"))
+        assertTrue(historical.contains("attemptGeneration.coerceAtLeast(1L)"))
+        assertTrue(historical.indexOf("prepareMainRuntimePair(") < historical.indexOf("restoreBoundResultIfPossible()"))
+        assertTrue(historical.contains("bundleRef === read.bundleRef"))
+        val lease = body(main, "private fun prepareDeviceRuntimeLease(")
+        assertTrue(lease.contains("registerRuntimeOwner(binding,"))
+        assertTrue(lease.contains("VisionRuntimeContext(applicationContext, owner)"))
+        assertTrue(lease.contains("retirementSnapshot(it)"))
+        assertTrue(lease.contains("oldRegistryReleased"))
+        assertTrue(historical.contains("deviceAuthorityBindingCurrent(binding) && mainRuntimeSource === source"))
+    }
+
+    @Test fun physicalCompletionKeepsOnlyWeakActivityDispatchAndDestroyedUiCallbacksAreDiscarded() {
+        val observer = body(main, "private fun observeRuntimeCompletion(")
+        assertTrue(observer.contains("java.lang.ref.WeakReference(this)"))
+        assertTrue(observer.contains("activity.get()?.runtimeUiCompletions?.remove(serial)"))
+        assertTrue(observer.contains("onOwnerGone(error)"))
+        val destroy = body(main, "override fun onDestroy()")
+        assertTrue(destroy.indexOf("runtimeUiCompletionsClosed = true") < destroy.indexOf("beginDestroyedVisionRetirement()"))
+        assertTrue(destroy.contains("runtimeUiCompletions.clear()"))
+    }
+
+    @Test fun explicitRecheckCanSettleOldStorageBeforeAnyNewAttemptAndAllocationWaitsForTheCapturedAck() {
+        val cleanup = body(main, "private fun recheckPendingDeviceRuntimeCleanup()")
+        assertTrue(cleanup.contains("RemoteMetricSupportProbe.recheckPendingRelease()"))
+        assertTrue(cleanup.contains("RemoteVisionClient.recheckPendingRelease()"))
+        assertFalse(cleanup.contains("forMainProcess("))
+        listOf("private fun startPostLoginDeviceCheckFromPrimaryAction()",
+            "private fun handlePostLoginDeviceCheckPrimaryAction()",
+            "private fun beginPostLoginDeviceCheckFromUserAction(").forEach { signature ->
+            val entry = body(main, signature)
+            assertTrue(entry.indexOf("recheckPendingDeviceRuntimeCleanup()") in 0 until entry.indexOf("postLoginDeviceCheckController."))
+        }
+        val lease = body(main, "private fun prepareDeviceRuntimeLease(")
+        assertTrue(lease.contains("captured.actualReleased.toCompletableFuture()"))
+        assertTrue(lease.contains("captured.allocationAvailable.toCompletableFuture()"))
+    }
+
+    @Test fun samplePerformanceUsesTheProductionPrivateRuntimeRatherThanAFixtureChild() {
+        val check = File("src/main/java/kr/co/hanium/dreamup/walksafe/inference/composite/AndroidJointRuntimeCheck.kt").readText()
+        assertFalse(check.contains("RemoteFixtureRuntime"))
+        assertFalse(check.contains("createWithStatusLocal"))
+        assertTrue(check.contains("JointRuntimeSampleHost.create("))
         val manifest = File("src/main/AndroidManifest.xml").readText()
-        val service = Regex("<service[^>]*FixtureRuntimeService[\\s\\S]*?/>").find(manifest)?.value
-        assertNotNull("Dedicated fixture Service must be declared", service)
+        val service = Regex("<service[^>]*VisionRuntimeService[\\s\\S]*?/>").find(manifest)?.value
+        assertNotNull("Production native models require a private Service", service)
         assertTrue(service!!.contains("android:exported=\"false\""))
-        assertTrue(service.contains("android:process=\":fixture_runtime\""))
-        assertFalse(service.contains(":vosk_decoder"))
+        assertTrue(service.contains("android:process=\":vision_runtime\""))
     }
 
 }

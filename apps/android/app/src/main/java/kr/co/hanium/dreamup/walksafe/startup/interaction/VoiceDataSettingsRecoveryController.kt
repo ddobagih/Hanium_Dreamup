@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.startup.interaction
 
 import java.util.Locale
+import java.lang.ref.WeakReference
 import kr.co.hanium.dreamup.walksafe.device.*
 import kr.co.hanium.dreamup.walksafe.device.postlogin.PostLoginLocationFixTerminalFailure
 import kr.co.hanium.dreamup.walksafe.session.*
@@ -16,6 +17,7 @@ internal class VoiceDataSettingsRecoveryController(
 ) {
     private var recheckPending = false
     private var recheckInFlight = false
+    private var recoveryGeneration = 0L
 
     /** A restored device check can leave a closed/unstarted probe PENDING. Start the actual
      * synthesis check for this Home request; actuator readiness never supplies its result.
@@ -85,6 +87,7 @@ internal class VoiceDataSettingsRecoveryController(
         )
 
     fun openVoiceDataInstallSettings() {
+        ++recoveryGeneration
         val guidance = offlineKoreanSpeechGuidance()
         val opened = settings.openVoiceCandidates(
             guidance.settingsAction == OfflineKoreanSpeechSettingsAction.CHOOSE_PREFERRED_ENGINE,
@@ -148,7 +151,20 @@ internal class VoiceDataSettingsRecoveryController(
             return
         }
 
-        if (!effects.recoverPassedGate()) {
+        val generation = ++recoveryGeneration
+        val binding = facts.snapshot.bindingOrNull
+        val owner = WeakReference(this)
+        effects.status("음성 기능 복구 저장 확인 중", "한국어 음성 재점검 결과를 저장하고 있습니다.")
+        if (!effects.recoverPassedGate { committed -> owner.get()?.let { current ->
+                if (generation == current.recoveryGeneration && current.facts.snapshot.bindingOrNull == binding)
+                    current.finishRecovery(committed)
+            } }) {
+            effects.status("음성 기능 복구 저장 실패", "한국어 음성 데이터는 확인했지만 점검 결과를 저장하지 못했습니다. 다시 시도하세요.")
+        }
+    }
+
+    private fun finishRecovery(committed: Boolean) {
+        if (!committed) {
             effects.status("음성 기능 복구 저장 실패", "한국어 음성 데이터는 확인했지만 점검 결과를 저장하지 못했습니다. 다시 시도하세요.")
             return
         }
@@ -157,5 +173,6 @@ internal class VoiceDataSettingsRecoveryController(
             "한국어 음성 재점검 완료",
             "설치된 한국어 음성으로 실제 안내 생성을 다시 확인했습니다. 기기 점검 결과를 확인한 뒤 보행을 시작하거나 재개하세요.",
         )
+        effects.refresh()
     }
 }

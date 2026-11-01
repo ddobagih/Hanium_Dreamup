@@ -4,6 +4,8 @@ import android.content.Context
 import android.os.Build
 import android.os.SystemClock
 import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.*
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckAuthority
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckOwnerRef
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.CancellationException
@@ -22,32 +24,37 @@ internal class RemoteFastSamEngine internal constructor(
     private val physical: CompletableFuture<Void>,
     private val nowMs: () -> Long = SystemClock::elapsedRealtime,
     private val validateTransfer: () -> Unit = {},
+    private val buffers: ParentDirectBufferArena.Lease = acquireBuffers(),
 ) : FastSamEngine {
     private val owner = Thread.currentThread().id
     private val closed = AtomicBoolean()
     private var info = decodeObserved(options, handle, handle.runtimeJson)
-    private var input: ByteBuffer? = null
-    private val outputs = arrayOf(ByteBuffer.allocateDirect(FastSamModelContract.DETECTION_FLOATS * 4).order(ByteOrder.LITTLE_ENDIAN),
-        ByteBuffer.allocateDirect(FastSamModelContract.PROTOTYPE_FLOATS * 4).order(ByteOrder.LITTLE_ENDIAN))
+    private val outputs = buffers.outputViews()
 
     override fun runtime(): FastSamRuntimeInfo = info
     override fun invoke(ownedArgb: IntArray, width: Int, height: Int): FastSamEngine.Output =
-        invokeOwned(ownedArgb, width, height, VisionPurpose.LIVE, deadline(nowMs(), options.maximumResultAgeMs))
+        invokeOwned(ownedArgb, width, height, VisionPurpose.LIVE, deadline(nowMs(), VisionRuntimeProtocol.operationBudget(VisionPurpose.LIVE)))
     override fun invoke(ownedArgb: IntArray, width: Int, height: Int, token: FastSamFrameToken): FastSamEngine.Output =
         invokeToken(ownedArgb, width, height, token)
+    override fun invoke(ownedArgb: IntArray, width: Int, height: Int, token: FastSamFrameToken,
+        request: FastSamExecutionRequest): FastSamEngine.Output {
+        require(token.width == width && token.height == height &&
+            (token.source == FastSamFrameToken.Source.LIVE_CAMERA) == (request.purpose == VisionPurpose.LIVE))
+        return invokeOwned(ownedArgb, width, height, request.purpose, request.absoluteDeadlineElapsedNs / 1_000_000L)
+    }
 
     internal fun invokeOwned(ownedArgb: IntArray, width: Int, height: Int, purpose: VisionPurpose,
         deadlineMs: Long): FastSamEngine.Output {
         checkOwner(); check(!closed.get()) { "FastSAM remote engine closed" }
         require(width in 1..2048 && height in 1..2048 && ownedArgb.size == Math.multiplyExact(width, height))
+        val now = nowMs()
+        if (deadlineMs <= now) throw FastSamExecutionRequest.Expired()
+        val executionDeadline = VisionRuntimeProtocol.deadline(deadlineMs, now, VisionRuntimeProtocol.operationBudget(purpose))
         val bytes = Math.multiplyExact(ownedArgb.size, 4)
-        val buffer = input?.takeIf { it.capacity() >= bytes } ?: ByteBuffer.allocateDirect(bytes)
-            .order(ByteOrder.LITTLE_ENDIAN).also { input = it }
-        buffer.clear(); buffer.limit(bytes)
-        val wire = buffer.slice().order(ByteOrder.LITTLE_ENDIAN)
+        val wire = buffers.inputView(bytes)
         wire.asIntBuffer().put(ownedArgb)
         outputs.forEach(ByteBuffer::clear)
-        val result = invokeRemote(handle, wire, outputs, width, height, purpose, deadlineMs)
+        val result = invokeRemote(handle, wire, outputs, width, height, purpose, executionDeadline)
         val observed = decodeObserved(options, handle, result.runtimeJson)
         check(observed.modelOwnerProcessId == info.modelOwnerProcessId && observed.modelOwnerThreadId == info.modelOwnerThreadId) {
             "FastSAM native identity changed"
@@ -68,15 +75,8 @@ internal class RemoteFastSamEngine internal constructor(
 
     internal fun invokeToken(ownedArgb: IntArray, width: Int, height: Int, token: FastSamFrameToken): FastSamEngine.Output {
         require(token.width == width && token.height == height)
-        val purpose = when {
-            token.source == FastSamFrameToken.Source.LIVE_CAMERA -> VisionPurpose.LIVE
-            options.calibrationFixtureDeadlineElapsedNs > 0 -> VisionPurpose.REFERENCE
-            else -> VisionPurpose.BENCHMARK
-        }
-        val limit = if (token.source == FastSamFrameToken.Source.LIVE_CAMERA)
-            deadline(token.capturedElapsedNs / 1_000_000L, options.maximumResultAgeMs)
-        else if (options.calibrationFixtureDeadlineElapsedNs > 0) options.calibrationFixtureDeadlineElapsedNs / 1_000_000L
-        else deadline(nowMs(), VisionRuntimeProtocol.operationBudget(purpose))
+        val purpose = if (token.source == FastSamFrameToken.Source.LIVE_CAMERA) VisionPurpose.LIVE else VisionPurpose.BENCHMARK
+        val limit = deadline(nowMs(), VisionRuntimeProtocol.operationBudget(purpose))
         return invokeOwned(ownedArgb, width, height, purpose, limit)
     }
 
@@ -95,7 +95,7 @@ internal class RemoteFastSamEngine internal constructor(
             // A semantic error cannot poison the recoverable physical receipt. Late child death
             // completes it independently, after the service has drained its CPU consumer.
             throw error
-        } finally { input = null }
+        } finally { buffers.releaseAfterHostDrain() }
     }
 
     override fun detachForTransfer(): FastSamTransferredModel {
@@ -103,18 +103,30 @@ internal class RemoteFastSamEngine internal constructor(
         check(!closed.get()) { "FastSAM proxy already retired" }
         validateTransfer()
         check(closed.compareAndSet(false, true)) { "FastSAM proxy already retired" }
-        input = null
+        buffers.releaseAfterHostDrain()
         return FastSamTransferredModel(lease, handle, options)
     }
 
     private fun checkOwner() { check(Thread.currentThread().id == owner) { "FastSAM parent proxy owner changed" } }
 
     companion object {
+        private const val MAXIMUM_WIRE_BYTES = 2048 * 2048 * Int.SIZE_BYTES
+        internal fun acquireBuffers(): ParentDirectBufferArena.Lease = ParentDirectBufferArena.process().acquire(
+            "fastsam-parent-argb-2048", MAXIMUM_WIRE_BYTES,
+            intArrayOf(FastSamModelContract.DETECTION_FLOATS * Float.SIZE_BYTES,
+                FastSamModelContract.PROTOTYPE_FLOATS * Float.SIZE_BYTES))
         @JvmStatic @JvmOverloads fun factory(context: Context, options: FastSamRuntimeOptions,
-            ownerId: String = "foreground"): FastSamEngine.Factory = RemoteFactory(context.applicationContext, options, ownerId)
+            ownerId: String = VisionRuntimeContext.ownerId(context)): FastSamEngine.Factory {
+            val owner = VisionRuntimeContext.ownerRef(context)
+            require(owner.ownerId == ownerId) { "FastSAM request owner differs" }
+            return RemoteFactory(context.applicationContext, options, owner, VisionRuntimeContext.diagnosticAuthority(context))
+        }
         @JvmStatic fun attachedFactory(context: Context, options: FastSamRuntimeOptions,
-            lease: VisionCohortLease, handle: VisionModelHandle): FastSamEngine.Factory =
-            RemoteFactory(context.applicationContext, options, lease.ownerId, lease, handle)
+            lease: VisionCohortLease, handle: VisionModelHandle): FastSamEngine.Factory {
+            val owner = VisionRuntimeContext.ownerRef(context)
+            require(owner.ownerId == lease.ownerId) { "FastSAM attachment owner differs" }
+            return RemoteFactory(context.applicationContext, options, owner, VisionRuntimeContext.diagnosticAuthority(context), lease, handle)
+        }
         internal fun deadline(now: Long, budget: Long) = if (now > Long.MAX_VALUE - budget) Long.MAX_VALUE else now + budget
 
         internal fun decodeObserved(options: FastSamRuntimeOptions, handle: VisionModelHandle, json: String): FastSamRuntimeInfo {
@@ -140,7 +152,8 @@ internal class RemoteFastSamEngine internal constructor(
     }
 
     private class RemoteFactory(private val context: Context, private val options: FastSamRuntimeOptions,
-        private val ownerId: String, private val attachedLease: VisionCohortLease? = null,
+        private val owner: DeviceCheckOwnerRef, private val diagnostics: DeviceCheckAuthority?,
+        private val attachedLease: VisionCohortLease? = null,
         private val attachedHandle: VisionModelHandle? = null) : FastSamEngine.Factory {
         private val actual = CompletableFuture<Void>()
         private val cancelled = AtomicBoolean()
@@ -150,12 +163,20 @@ internal class RemoteFastSamEngine internal constructor(
         @Volatile private var attachmentActivated = attachedHandle == null
         private val observedCohort = AtomicBoolean()
         private val observedModel = AtomicBoolean()
+        @Volatile private var ownerValidated = false
         override fun actualReleasedFuture(): CompletableFuture<Void> = actual
         override fun supportsTransfer() = true
+        override fun reportNativeOutputFault(failure: FastSamModelContract.NativeOutputException) {
+            val captured = lease ?: return
+            if (!ownerValidated) return
+            requireNotNull(client).reportNativeFault(owner, captured, VisionNativeFaultReason.valueOf(failure.reason.name))
+        }
         override fun validateTransferredAttachment() {
             val owned = requireNotNull(attachedLease) { "FastSAM factory has no transferred model" }
             val captured = requireNotNull(attachedHandle)
             val remote = client ?: RemoteVisionClient.forMainProcess(context).also { client = it }
+            remote.validateOwner(owner, owned)
+            ownerValidated = true
             remote.validateAttach(owned, captured)
             decodeObserved(options, captured, captured.runtimeJson)
             observeCohort(remote, owned)
@@ -164,6 +185,7 @@ internal class RemoteFastSamEngine internal constructor(
         override fun activateTransferred() {
             val owned = requireNotNull(attachedLease)
             val captured = requireNotNull(attachedHandle)
+            requireNotNull(client).validateOwner(owner, owned)
             requireNotNull(client).validateAdopted(owned, captured)
             attachmentActivated = true
         }
@@ -172,43 +194,52 @@ internal class RemoteFastSamEngine internal constructor(
             val remote = client ?: return false
             val owned = lease ?: return false
             val captured = model ?: return false
-            return runCatching { remote.validateAdopted(owned, captured) }.isSuccess
+            return runCatching { remote.validateOwner(owner, owned); remote.validateAdopted(owned, captured) }.isSuccess
         }
         override fun cancelPendingLoad() {
             cancelled.set(true)
             val captured = lease ?: return
-            client?.requestExit(captured, "fastsam_load_cancelled")
+            if (ownerValidated) client?.requestExit(captured, "fastsam_load_cancelled")
         }
         override fun create(): FastSamEngine {
+            var buffers: ParentDirectBufferArena.Lease? = null
+            var handedToEngine = false
             try {
                 require(Build.VERSION.SDK_INT >= 31) { "vision_android_api_unsupported" }
                 if (cancelled.get()) throw CancellationException("FastSAM creation retired")
                 if (attachedHandle != null) {
                     validateTransferredAttachment()
                     if (cancelled.get()) throw CancellationException("FastSAM attachment retired")
-                    return proxy(requireNotNull(client), requireNotNull(attachedLease), attachedHandle)
+                    buffers = acquireBuffers()
+                    return proxy(requireNotNull(client), requireNotNull(attachedLease), attachedHandle, buffers).also { handedToEngine = true }
                 }
                 val spec = FastSamNativeBridge.spec(options).also(FastSamNativeBridge::validateSpec)
                 val remote = RemoteVisionClient.forMainProcess(context.applicationContext).also { client = it }
-                val owned = remote.acquire(ownerId, options.loadDeadlineElapsedNs / 1_000_000L).also { lease = it }
+                val deadline = options.loadDeadlineElapsedNs / 1_000_000L
+                val owned = (diagnostics?.let { remote.acquireForDiagnostics(owner, deadline, it) }
+                    ?: remote.acquire(owner, deadline)).also { lease = it; ownerValidated = true }
                 observeCohort(remote, owned)
                 if (cancelled.get()) { remote.requestExit(owned, "fastsam_load_cancelled"); throw CancellationException("FastSAM creation retired") }
+                // The nonnative lease preserves typed foreign-owner Busy. Buffers are still
+                // admitted/charged before OPEN can grant any new native allocation.
+                buffers = acquireBuffers()
                 val opened = remote.open(owned, spec, options.loadDeadlineElapsedNs / 1_000_000L).also { model = it }
                 observeModel(remote, owned, opened)
                 if (cancelled.get()) { remote.requestExit(owned, "fastsam_load_cancelled"); throw CancellationException("FastSAM creation retired") }
-                return proxy(remote, owned, opened)
+                return proxy(remote, owned, opened, buffers).also { handedToEngine = true }
             } catch (error: Throwable) {
                 val owned = lease
-                if (owned != null) client?.requestExit(owned, "fastsam_open_failed")
+                if (owned != null && ownerValidated) client?.requestExit(owned, "fastsam_open_failed")
                 else if (error is VisionRuntimeException && error.releaseReceipt != null) observe(error.releaseReceipt)
                 else actual.complete(null) // No lease/OPEN admission was ever acquired.
                 throw error
-            }
+            } finally { if (!handedToEngine) buffers?.releaseAfterHostDrain() }
         }
-        private fun proxy(remote: RemoteVisionClient, owned: VisionCohortLease, model: VisionModelHandle) =
+        private fun proxy(remote: RemoteVisionClient, owned: VisionCohortLease, model: VisionModelHandle,
+            buffers: ParentDirectBufferArena.Lease) =
             RemoteFastSamEngine(options, owned, model, remote::invoke, remote::close,
                 { reason -> remote.requestExit(owned, reason) }, actual,
-                validateTransfer = { remote.validateAttach(owned, model) })
+                validateTransfer = { remote.validateAttach(owned, model) }, buffers = buffers)
         private fun observeCohort(remote: RemoteVisionClient, owned: VisionCohortLease) {
             if (observedCohort.compareAndSet(false, true)) observe(remote.actualReleasedFuture(owned.cohortId))
         }

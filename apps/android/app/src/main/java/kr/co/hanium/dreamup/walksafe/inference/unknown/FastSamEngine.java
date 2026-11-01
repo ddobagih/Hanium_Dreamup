@@ -12,10 +12,16 @@ interface FastSamEngine extends AutoCloseable {
         default void validateTransferredAttachment(){throw new UnsupportedOperationException("Not a transferred factory");}
         default void activateTransferred(){throw new UnsupportedOperationException("Not a transferred factory");}
         default boolean canAdmit(){return true;}
+        /** Exact owned native output faults only; host/geometry/cancellation failures never call it. */
+        default void reportNativeOutputFault(FastSamModelContract.NativeOutputException failure){}
     }
     FastSamRuntimeInfo runtime();
     Output invoke(int[] ownedArgb,int width,int height);
     default Output invoke(int[] ownedArgb,int width,int height,FastSamFrameToken token){return invoke(ownedArgb,width,height);}
+    /** The service freezes this purpose/deadline with the accepted job, never from a fixture TTL. */
+    default Output invoke(int[] ownedArgb,int width,int height,FastSamFrameToken token,FastSamExecutionRequest request){
+        return invoke(ownedArgb,width,height,token);
+    }
     default FastSamTransferredModel detachForTransfer(){throw new UnsupportedOperationException("FastSAM engine cannot transfer");}
     @Override void close();
     final class Output {

@@ -73,6 +73,7 @@ internal data class UnknownCaptureDepthAuthority(
 
 internal data class UnknownCaptureExecutionObservation(
     val thermalThrottled: Boolean?,
+    val auxiliaryAdmissionAllowed: Boolean = true,
 )
 
 /** The caller reuses its actual source gates and existing lock order, not supplied success facts. */

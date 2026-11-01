@@ -1,6 +1,8 @@
 package kr.co.hanium.dreamup.walksafe.device
 
 import kr.co.hanium.dreamup.walksafe.session.WalkSessionReadinessStatus
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionStage
 
 /** Copied identity facts. No session/Activity object crosses this boundary. */
 internal data class PostLoginDeviceCheckActorFacts(
@@ -45,14 +47,39 @@ internal interface PostLoginDeviceCheckFactsReader {
 }
 
 internal interface PostLoginDeviceCheckSavedResults {
+    fun bindSession(actorId: String?, sessionGeneration: Long?) = Unit
+    fun beginAttemptAsync(binding: PostLoginDeviceCheckBinding, resultBinding: PostLoginDeviceCheckResultBinding,
+        startedAtMs: Long, deadlineMs: Long): CompletionStage<DeviceCheckAuthorityOutcome<Unit>> =
+        CompletableFuture.completedFuture(DeviceCheckAuthorityOutcome.Committed(Unit, 0L, "in-memory-begin"))
+    fun attemptCancelled(binding: PostLoginDeviceCheckBinding, reason: String) = Unit
+    fun mayBeginAttempt(): Boolean = true
     fun candidatePresent(): Boolean
     fun restore(binding: PostLoginDeviceCheckResultBinding): PersistedPostLoginDeviceCheckResult?
+    /** Retain an already displayed measurement during consumer handoff; never opens a feature gate. */
+    fun retainedResult(binding: PostLoginDeviceCheckResultBinding): PersistedPostLoginDeviceCheckResult? = restore(binding)
     fun save(
         snapshot: PostLoginDeviceCheckSnapshot,
         binding: PostLoginDeviceCheckResultBinding,
         cameraDependentChecksDeferred: Boolean,
         metricDepthState: PostLoginMetricDepthState,
     ): Boolean
+    /** Android implementations must override this with a worker-owned durable transaction. */
+    fun saveAsync(snapshot: PostLoginDeviceCheckSnapshot, binding: PostLoginDeviceCheckResultBinding,
+        cameraDependentChecksDeferred: Boolean, metricDepthState: PostLoginMetricDepthState,
+        acceptedAtMs: Long): CompletionStage<DeviceCheckAuthorityOutcome<Unit>> =
+        CompletableFuture.completedFuture(if (save(snapshot, binding, cameraDependentChecksDeferred, metricDepthState))
+            DeviceCheckAuthorityOutcome.Committed(Unit, 0L, "in-memory-adapter")
+        else DeviceCheckAuthorityOutcome.NotPublished("save_rejected"))
+    /** Metadata-only. A historical result cannot supply the current native pair's proof. */
+    fun runtimeReady(binding: PostLoginDeviceCheckBinding): Boolean = true
+    fun acceptsPublishedSnapshot(snapshot: PostLoginDeviceCheckSnapshot): Boolean = true
+    /** A timed-out write continues settling; the adapter fences restore/new writes immediately. */
+    fun publicationUnconfirmed(binding: PostLoginDeviceCheckBinding) = Unit
+    fun updateAsync(expected: PostLoginDeviceCheckSnapshot, snapshot: PostLoginDeviceCheckSnapshot, binding: PostLoginDeviceCheckResultBinding,
+        cameraDependentChecksDeferred: Boolean, metricDepthState: PostLoginMetricDepthState):
+        CompletionStage<DeviceCheckAuthorityOutcome<Unit>> = saveAsync(snapshot, binding,
+            cameraDependentChecksDeferred, metricDepthState, 0L)
+    fun didPublish(snapshot: PostLoginDeviceCheckSnapshot) = Unit
 }
 
 /** Adapts the existing durable store without changing its validation or persistence format. */
@@ -90,6 +117,7 @@ internal data class PostLoginDeviceCheckProbeSignals(
 )
 
 internal interface PostLoginDeviceCheckProbeSuite {
+    val requiresJointRuntimeCheck: Boolean get() = false
     val signals: PostLoginDeviceCheckProbeSignals
     val metricPreflightStarted: Boolean
     val capabilityProbeStarted: Boolean
@@ -97,6 +125,7 @@ internal interface PostLoginDeviceCheckProbeSuite {
     fun resetForAttempt(binding: PostLoginDeviceCheckBinding)
     fun restartCapabilityAndResources(binding: PostLoginDeviceCheckBinding, onChanged: () -> Unit)
     fun prepareVoiceModelAndDetector()
+    fun prepareRuntimeLease(binding: PostLoginDeviceCheckBinding, onReady: (Boolean) -> Unit) { onReady(true) }
     fun startAutomaticProbes(binding: PostLoginDeviceCheckBinding)
     fun startCamera(binding: PostLoginDeviceCheckBinding)
     fun startMetricPreflight(binding: PostLoginDeviceCheckBinding)

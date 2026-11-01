@@ -99,6 +99,10 @@ internal interface VoiceSettingsEffects {
     fun status(title: String, detail: String)
     fun speak(message: String)
     fun recoverPassedGate(): Boolean
+    fun recoverPassedGate(onCompleted: (Boolean) -> Unit): Boolean {
+        onCompleted(recoverPassedGate())
+        return true
+    }
 }
 internal enum class StartupSettingsTarget { APPLICATION, LOCATION, DEVELOPMENT }
 internal interface StartupSettingsNative<I> {

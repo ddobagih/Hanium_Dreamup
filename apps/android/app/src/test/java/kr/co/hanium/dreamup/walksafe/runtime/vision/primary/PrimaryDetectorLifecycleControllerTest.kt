@@ -19,6 +19,8 @@ import kr.co.hanium.dreamup.walksafe.inference.tracking.*
 import kr.co.hanium.dreamup.walksafe.runtime.vision.frame.*
 import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionCohortBusyException
 import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionReleaseReceipt
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionCohortLease
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRetirementSnapshot
 import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
 import org.junit.Assert.*
 import org.junit.Test
@@ -271,11 +273,15 @@ class PrimaryDetectorLifecycleControllerTest {
         f.currentCalls = 0; f.revokeAfterFirstCurrent = true; f.lifecycle.runtimeFailure(IllegalStateException(), 0, f.epoch)
         assertEquals(0, f.supervisor.consecutiveFailures); assertEquals(0, f.ui.pending)
     }
-    @Test fun nativeRuntimeCloseFailurePreservesActualPointerGenerationAndOldMetadataAndDoesNotQueueOutputs() {
+    @Test fun nativeRuntimeCloseFailureKeepsTheRetiredGenerationUnavailableAndDoesNotAuthorizeOrdinaryReload() {
         val f = Fixture(); val failure = IllegalStateException("native"); val native = f.nativeDetector(failure); f.install(native)
         assertSame(failure, runCatching { f.lifecycle.disableAfterFailure(IllegalStateException(), 0, f.epoch) }.exceptionOrNull())
-        assertSame(native, f.execution.projection().detector); assertEquals(0, f.execution.projection().frameGeneration)
-        assertEquals("detector=load_pending_after_camera_gate", f.lifecycle.metadata().statusText); assertEquals(0, f.ui.pending)
+        assertTrue(f.execution.projection().detector is NoopAndroidFrameDetector)
+        assertEquals(1, f.execution.projection().frameGeneration); assertTrue(f.execution.projection().closing)
+        assertFalse(f.execution.projection().available); assertEquals("runtime_failed_unavailable", f.lifecycle.metadata().loadReason)
+        assertEquals(0, f.ui.pending)
+        f.events.clear(); f.lifecycle.loadForCurrentProcess()
+        assertTrue(f.events.isEmpty()); assertEquals(0, f.tuning.pending)
     }
     @Test fun safetyHandledFailureKeepsFrameClearingAndStopsSourcesInOriginalOrderWithoutDuplicateSafetyOutput() {
         val f = Fixture(); f.install(f.nativeDetector()); f.safetyHandled = true
@@ -798,6 +804,156 @@ class PrimaryDetectorLifecycleControllerTest {
         assertEquals("loaded", f.lifecycle.metadata().loadReason)
     }
 
+    @Test fun reservedPairCannotReleaseBeforeCreationAckAndItsActualLateNativeReceipt() {
+        val f = Fixture(); val physical = CompletableFuture<Unit>()
+        val slot = requireNotNull(f.lifecycle.reservePreparedPair { !f.destroyed })
+        assertTrue(f.lifecycle.metadata().loadInFlight)
+        f.destroyed = true; f.lifecycle.closeAsync(); f.tuning.next(); f.native.next()
+        assertFalse(f.execution.closedFuture().isDone)
+        val load = AndroidDetectorLoadResult(f.instance, true, true, "unified_walksafe", false, "prepared", actualReleasedFuture = physical)
+        assertFalse(f.lifecycle.retainCreatedLoad(slot, load))
+        f.lifecycle.finishPreparedCreation(slot)
+        assertFalse(slot.actualReleasedFuture.toCompletableFuture().isDone)
+        assertFalse(f.execution.closedFuture().isDone)
+        assertNull(f.lifecycle.metadata().loadReason)
+        physical.complete(Unit)
+        assertEquals(Unit, slot.actualReleasedFuture.toCompletableFuture().getNow(null))
+        assertEquals(Unit, f.execution.closedFuture().getNow(null))
+        val retained = PrimaryDetectorExecutionOwner::class.java.getDeclaredField("detectorReleaseProofs").apply { isAccessible = true }
+            .get(f.execution) as Map<*, *>
+        assertTrue(retained.isEmpty())
+    }
+
+    @Test fun runtimeRecoveryNeverStartsOrdinaryRestoreAndOnlyAnExplicitPairReservationConsumesIt() {
+        val f = Fixture(); val model = CompletableFuture<Unit>(); val actual = CompletableFuture<VisionReleaseReceipt>()
+        val snapshot = VisionRetirementSnapshot(VisionCohortLease("d".repeat(64), "main", 1L), actual)
+        val instance = f.nativeDetector()
+        f.install(instance); f.execution.retainPhysicalRelease(model, instance)
+        val drained = f.lifecycle.quiesceForRuntimeError(snapshot)
+        f.tuning.next(); f.native.next()
+        assertEquals(Unit, drained.toCompletableFuture().getNow(null))
+        assertTrue(f.events.contains("native-close"))
+        f.lifecycle.loadForCurrentProcess()
+        assertEquals(0, f.tuning.pending)
+        assertFalse(f.lifecycle.resumeQuiescedForRecheck { true })
+        model.complete(Unit); actual.complete(VisionReleaseReceipt(snapshot.lease.cohortId, 234))
+        assertFalse(f.lifecycle.resumeQuiescedForRecheck { false })
+        assertTrue(f.lifecycle.resumeQuiescedForRecheck { true })
+        f.lifecycle.loadForCurrentProcess()
+        assertEquals(0, f.tuning.pending)
+        assertTrue(f.execution.projection().closing)
+        val reserved = requireNotNull(f.lifecycle.reservePreparedPair { true })
+        assertFalse(f.execution.projection().closing)
+        assertTrue(f.lifecycle.metadata().loadInFlight)
+        assertEquals(0, f.events.count { it.startsWith("select:") || it == "prepare-measured" })
+        f.lifecycle.finishPreparedNotStarted(reserved)
+        f.lifecycle.rollbackPreparedLoad(reserved)
+    }
+
+    @Test fun anAuxiliaryFirstCohortDeathNeedsNoFurtherPrimaryInvocationAndOnlyExplicitRecheckCanReserveAgain() {
+        val f = Fixture(); val actual = CompletableFuture<VisionReleaseReceipt>()
+        val snapshot = VisionRetirementSnapshot(VisionCohortLease("9".repeat(64), "main", 1L), actual)
+        val primaryReceipt = actual.thenApply { Unit }
+        val retired = DetectorCohortRetired(IllegalStateException("auxiliary native owner failed first"), primaryReceipt)
+        val instance = f.nativeDetector(retired)
+        f.install(instance); f.execution.retainPhysicalRelease(primaryReceipt, instance)
+        actual.complete(VisionReleaseReceipt(snapshot.lease.cohortId, 234))
+        assertFalse(f.events.contains("native-close"))
+        val drained = f.lifecycle.quiesceForRuntimeError(snapshot)
+        f.tuning.next(); f.native.next()
+        assertEquals(Unit, drained.toCompletableFuture().getNow(null))
+        assertEquals(1, f.events.count { it == "native-close" })
+        assertFalse(f.events.contains("sample"))
+        assertTrue(f.execution.projection().detector is NoopAndroidFrameDetector)
+        f.events.clear(); f.lifecycle.loadForCurrentProcess()
+        assertEquals(0, f.tuning.pending); assertFalse(f.lifecycle.resumeQuiescedForRecheck { false })
+        assertTrue(f.lifecycle.resumeQuiescedForRecheck { true })
+        f.lifecycle.loadForCurrentProcess(); assertEquals(0, f.tuning.pending)
+        assertTrue(f.execution.projection().closing)
+        val slot = requireNotNull(f.lifecycle.reservePreparedPair { true })
+        assertFalse(f.execution.projection().closing)
+        assertFalse(f.events.any { it.startsWith("select:") || it == "prepare-measured" || it == "sample" })
+        f.lifecycle.finishPreparedNotStarted(slot); f.lifecycle.rollbackPreparedLoad(slot)
+    }
+
+    @Test fun aBusyPreparedCreationDoesNotJoinTheOtherOwnersAvailabilityReceipt() {
+        val f = Fixture(); val availability = CompletableFuture<VisionReleaseReceipt>()
+        val slot = requireNotNull(f.lifecycle.reservePreparedPair { true })
+        f.lifecycle.rollbackPreparedLoad(slot)
+        f.lifecycle.finishPreparedCreation(slot, VisionCohortBusyException(availability))
+        f.lifecycle.closeAsync(); f.tuning.next(); f.native.next()
+        assertEquals(Unit, f.execution.closedFuture().getNow(null))
+        assertFalse(availability.isDone)
+    }
+
+    @Test fun explicitPreflightNotStartedAckCanReleaseOnlyAfterTheHostBarrier() {
+        val f = Fixture(); val slot = requireNotNull(f.lifecycle.reservePreparedPair { true })
+        f.lifecycle.finishPreparedNotStarted(slot)
+        assertEquals(Unit, slot.actualReleasedFuture.toCompletableFuture().getNow(null))
+        f.lifecycle.rollbackPreparedLoad(slot)
+        f.lifecycle.closeAsync()
+        assertFalse(f.execution.closedFuture().isDone)
+        f.tuning.next(); f.native.next()
+        assertEquals(Unit, f.execution.closedFuture().getNow(null))
+    }
+
+    @Test fun anUnclassifiedStartedCreationErrorRemainsUnconfirmedUnlikePreflightRejection() {
+        val f = Fixture(); val slot = requireNotNull(f.lifecycle.reservePreparedPair { true })
+        val failure = IllegalArgumentException("started native create returned no receipt")
+        f.lifecycle.finishPreparedCreation(slot, failure)
+        assertFalse(slot.actualReleasedFuture.toCompletableFuture().isDone)
+        f.lifecycle.closeAsync(); f.tuning.next(); f.native.next()
+        assertTrue(f.execution.closedFuture().isCompletedExceptionally)
+        assertSame(failure, runCatching { f.execution.closedFuture().join() }.exceptionOrNull()!!.cause)
+    }
+
+    @Test fun aReturnedModelCannotBeAcknowledgedAsPreflightNotStarted() {
+        val f = Fixture(); val physical = CompletableFuture<Unit>()
+        val slot = requireNotNull(f.lifecycle.reservePreparedPair { true })
+        f.lifecycle.retainCreatedLoad(slot, AndroidDetectorLoadResult(f.instance, true, true,
+            "unified_walksafe", false, "prepared", actualReleasedFuture = physical))
+        assertTrue(runCatching { f.lifecycle.finishPreparedNotStarted(slot) }.isFailure)
+        assertFalse(slot.actualReleasedFuture.toCompletableFuture().isDone)
+        f.lifecycle.finishPreparedCreation(slot)
+        assertFalse(slot.actualReleasedFuture.toCompletableFuture().isDone)
+        physical.complete(Unit)
+        assertEquals(Unit, slot.actualReleasedFuture.toCompletableFuture().getNow(null))
+    }
+
+    @Test fun preparedAdoptionUsesTheExactFacadeAndStillRequiresActualVerification() {
+        val f = Fixture(); val physical = CompletableFuture<Unit>()
+        f.enablePreparedAdmission(physical)
+        val slot = requireNotNull(f.lifecycle.reservePreparedPair { f.authorized })
+        val load = AndroidDetectorLoadResult(f.instance, true, true, "unified_walksafe", false, "prepared", actualReleasedFuture = physical)
+        assertTrue(f.lifecycle.retainCreatedLoad(slot, load))
+        f.lifecycle.finishPreparedCreation(slot)
+        val adopted = mutableListOf<Boolean>()
+        f.lifecycle.adoptPreparedLoad(slot, load, JointRuntimeTestFixtures.choice()) { adopted += it }
+        assertSame(f.original, f.execution.projection().detector)
+        f.native.next(); assertSame(f.instance, f.execution.projection().detector)
+        assertFalse(f.execution.projection().available)
+        f.ui.next(); assertEquals(listOf(true), adopted)
+        assertEquals(RunningDetectorVerificationState.PENDING, f.lifecycle.verificationState(f.instance))
+        assertFalse(f.lifecycle.verifiedForOutput())
+        assertEquals(0, f.events.count { it.startsWith("select:") || it == "prepare-measured" })
+        f.native.next(); f.ui.next()
+        assertTrue(f.lifecycle.verifiedForOutput())
+    }
+
+    @Test fun obsoletePreparedRollbackCannotCloseANewerAdoptedOwner() {
+        val f = Fixture(); val physical = CompletableFuture<Unit>()
+        val oldSlot = requireNotNull(f.lifecycle.reservePreparedPair { true })
+        val old = AndroidDetectorLoadResult(f.instance, true, true, "unified_walksafe", false, "prepared", actualReleasedFuture = physical)
+        f.lifecycle.retainCreatedLoad(oldSlot, old); f.lifecycle.finishPreparedCreation(oldSlot)
+        f.lifecycle.rollbackPreparedLoad(oldSlot); f.native.next()
+        val newer = f.nativeDetector()
+        f.install(newer)
+        f.lifecycle.rollbackPreparedLoad(oldSlot)
+        assertSame(newer, f.execution.projection().detector)
+        assertEquals(listOf(f.instance), f.closed)
+        assertEquals(0, f.native.pending)
+    }
+
     private class Lane : AbstractExecutorService() {
         val tasks = ArrayDeque<Runnable>(); var reject = false; var closed = false
         val pending get() = tasks.size
@@ -912,6 +1068,16 @@ class PrimaryDetectorLifecycleControllerTest {
         fun completeLoad() {
             lifecycle.loadForCurrentProcess(); tuning.next(); native.next(); ui.next(); native.next(); ui.next()
             assertTrue(lifecycle.verifiedForOutput())
+        }
+        fun enablePreparedAdmission(physical: CompletableFuture<Unit>) {
+            TfliteAndroidFrameDetector::class.java.getDeclaredField("runtimeLock").apply { isAccessible = true }.set(instance, Any())
+            TfliteAndroidFrameDetector::class.java.getDeclaredField("tensorFactory").apply { isAccessible = true }.set(instance,
+                object : PrimaryTensorEngineFactory {
+                    override val actualReleasedFuture = physical
+                    override fun open(model: ModelRuntimeConfig, delegate: String, recorder: DetectorLoadTimingRecorder,
+                        modelKey: String): PrimaryTensorEngine = error("Receiver adoption must not call a factory")
+                    override fun close() = Unit
+                })
         }
         fun install(value: AndroidFrameDetector) {
             PrimaryDetectorExecutionOwner::class.java.getDeclaredField("detector").apply { isAccessible = true }.set(execution, value)

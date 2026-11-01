@@ -6,6 +6,7 @@ import java.util.concurrent.CompletionStage
 /** Java consumers and native handles have different lifetimes. This registry retains only IDs
  * and receipts; an Activity, listener, frame or model wrapper must never be stored here. */
 internal class VisionConsumerRegistry {
+    companion object { val process = VisionConsumerRegistry() }
     data class Owner(val id: String, val authority: String) {
         init { require(id.isNotBlank() && authority.isNotBlank()) }
     }

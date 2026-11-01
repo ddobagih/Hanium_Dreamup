@@ -40,6 +40,7 @@ data class InferencePacingSnapshot(
     val observedLoadPressure: Double = 0.0,
     val loadRecoverySamples: Int = 0,
     val workHeadroomMultiplier: Double = 1.0,
+    val auxiliaryHoldActive: Boolean = false,
 )
 
 /**
@@ -107,6 +108,8 @@ class AdaptiveInferencePacingPolicy(
     private val lastComponentObservationAtMs = LongArray(4) { -1L }
     private var observedLoadPressure = 0.0
     private var loadRecoverySamples = 0
+    private var auxiliaryHoldActive = false
+    private var auxiliaryRecoverySamples = 0
     /** Earliest start an early re-detection request may use: MINIMUM_INTERVAL_MS after the last start and the measured cooldown. */
     private var earliestEarlyStartAtElapsedRealtimeMs = 0L
 
@@ -164,6 +167,8 @@ class AdaptiveInferencePacingPolicy(
             loadRecoverySamples = 0
             componentRecoverySamples.fill(0)
             reason = InferencePacingReason.INVALID_TIMING
+            auxiliaryHoldActive = true
+            auxiliaryRecoverySamples = 0
             // An unmeasured completion leaves no cooldown evidence, so it cannot earn an early start.
             earliestEarlyStartAtElapsedRealtimeMs = nextEligibleAtElapsedRealtimeMs
             return false
@@ -182,6 +187,18 @@ class AdaptiveInferencePacingPolicy(
         overFreshnessBudget = !freshSample
         if (!freshSample) staleSamples += 1L
         updateLoadPressure(loadObservation, completedAtElapsedRealtimeMs, allowRecovery = freshSample)
+        // Give the primary/depth/UI path room to recover. A transient fast frame alone cannot
+        // reopen auxiliary admission after stale work or a component using twice its budget.
+        if (!freshSample || thermalHoldActive || observedLoadPressure >= 1.0) {
+            auxiliaryHoldActive = true
+            auxiliaryRecoverySamples = 0
+        } else if (auxiliaryHoldActive) {
+            auxiliaryRecoverySamples++
+            if (auxiliaryRecoverySamples >= RECOVERY_SAMPLE_COUNT) {
+                auxiliaryHoldActive = false
+                auxiliaryRecoverySamples = 0
+            }
+        }
 
         val measuredWorkMs = max(
             checkNotNull(smoothedEndToEndMs),
@@ -278,6 +295,8 @@ class AdaptiveInferencePacingPolicy(
         componentRecoverySamples.fill(0)
         lastComponentObservationAtMs.fill(-1L)
         observedLoadPressure = 0.0
+        auxiliaryHoldActive = thermalHoldActive
+        auxiliaryRecoverySamples = 0
         loadRecoverySamples = 0
         reason = if (thermalHoldActive) InferencePacingReason.THERMAL_BACKOFF else InferencePacingReason.INITIAL
     }
@@ -303,6 +322,7 @@ class AdaptiveInferencePacingPolicy(
         observedLoadPressure = observedLoadPressure,
         loadRecoverySamples = loadRecoverySamples,
         workHeadroomMultiplier = workHeadroomMultiplier(),
+        auxiliaryHoldActive = auxiliaryHoldActive,
     )
 
     private fun updateLoadPressure(observation: InferenceLoadObservation?, completedAtMs: Long, allowRecovery: Boolean) {

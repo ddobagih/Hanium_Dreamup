@@ -4,6 +4,7 @@ enum class PostLoginDeviceCheckState {
     NOT_RUN,
     REQUESTING_PERMISSIONS,
     RUNNING,
+    SAVING,
     FULL,
     LIMITED,
     FAIL,
@@ -51,6 +52,7 @@ enum class PostLoginDeviceCheckFailure {
     DEPTH_TIMEOUT,
     CHECK_TIMEOUT,
     RESULT_SAVE_FAILED,
+    RESULT_SAVE_UNCONFIRMED,
     ONBOARDING_TRANSITION_REJECTED,
     SESSION_CHANGED,
 }
@@ -142,6 +144,7 @@ object PostLoginDeviceCheckPolicy {
         if (
             snapshot.state == PostLoginDeviceCheckState.REQUESTING_PERMISSIONS ||
             snapshot.state == PostLoginDeviceCheckState.RUNNING ||
+            snapshot.state == PostLoginDeviceCheckState.SAVING ||
             snapshot.state == PostLoginDeviceCheckState.FULL ||
             snapshot.state == PostLoginDeviceCheckState.LIMITED
         ) return snapshot

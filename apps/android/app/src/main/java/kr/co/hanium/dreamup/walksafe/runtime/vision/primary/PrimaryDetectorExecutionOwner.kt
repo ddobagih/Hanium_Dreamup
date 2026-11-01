@@ -14,11 +14,18 @@ import kr.co.hanium.dreamup.walksafe.inference.AndroidDetectionResult
 import kr.co.hanium.dreamup.walksafe.inference.AndroidFrameDetector
 import kr.co.hanium.dreamup.walksafe.inference.DetectorStallWatchdog
 import kr.co.hanium.dreamup.walksafe.inference.DetectorCohortRetired
+import kr.co.hanium.dreamup.walksafe.inference.DetectorNativeCleanupFailure
 import kr.co.hanium.dreamup.walksafe.inference.InferenceLoadObservation
 import kr.co.hanium.dreamup.walksafe.inference.InferencePacingTicket
 import kr.co.hanium.dreamup.walksafe.inference.NativeDetectorFlight
 import kr.co.hanium.dreamup.walksafe.inference.NoopAndroidFrameDetector
 import kr.co.hanium.dreamup.walksafe.inference.OwnedYuvFrame
+import kr.co.hanium.dreamup.walksafe.inference.PrimaryTransferredDetector
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionTransferResult
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRole
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRetirementSnapshot
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionReleaseProof
+import java.util.concurrent.CancellationException
 import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
 import kr.co.hanium.dreamup.walksafe.session.WalkSessionState
 
@@ -73,10 +80,21 @@ internal class PrimaryDetectorExecutionOwner(
     private val releaseProofs = mutableListOf<CompletionStage<Unit>>()
     private val detectorReleaseProofs = java.util.IdentityHashMap<AndroidFrameDetector, CompletionStage<Unit>>()
     private val shutdownRelease = CompletableFuture<Unit>()
+    private val shutdownHostDrain = CompletableFuture<Unit>()
+    private var transferDrain: CompletableFuture<PrimaryTransferredDetector>? = null
+    private var transferDraining = false
+    private var transferredIdle = false
+    private var transferredResumeAuthorized = false
+    private class RuntimeQuiesce(val captured: VisionRetirementSnapshot) {
+        val hostDrain = CompletableFuture<Unit>()
+    }
+    private var runtimeQuiesce: RuntimeQuiesce? = null
+    private var runtimeRecheckAuthorized = false
     @Volatile private var available = false
     private val workInFlight = AtomicBoolean(false)
     private val pacing = AdaptiveInferencePacingPolicy(sourceAgeMs)
-    private val watchdog = DetectorStallWatchdog(sourceAgeMs, elapsedRealtimeMs)
+    @Volatile private var watchdog = DetectorStallWatchdog(sourceAgeMs, elapsedRealtimeMs)
+    private val flightWatchdogs = java.util.WeakHashMap<DetectorStallWatchdog.Flight, DetectorStallWatchdog>()
 
     /** General facts preserve the original separate volatile/plain reads and acquire no new frame lock. */
     fun projection(): PrimaryDetectorObservation =
@@ -90,16 +108,213 @@ internal class PrimaryDetectorExecutionOwner(
 
     /** No timer/unbind/rejected callback is a release receipt; this future follows both lanes. */
     fun closedFuture(): CompletableFuture<Unit> = shutdownRelease
+    /** Actual Activity teardown only; an idle transfer leaves these queues available for return. */
+    fun hostDrainedFuture(): CompletableFuture<Unit> = shutdownHostDrain
+
+    /** Host-only acknowledgement. Native ownership intentionally remains in [closedFuture]. */
+    fun detachAfterCalibrationDrains(detach: (AndroidFrameDetector) -> PrimaryTransferredDetector):
+        CompletableFuture<PrimaryTransferredDetector> {
+        val drained = synchronized(stateLock) {
+            transferDrain?.let { if (transferDraining || transferredIdle) return it }
+            check(!shutdownStarted && !closing && available && detector !is NoopAndroidFrameDetector &&
+                detectorReleaseProofs[detector] != null) {
+                "primary transfer requires an available, unretired owner"
+            }
+            transferDraining = true
+            transferredResumeAuthorized = false
+            frameGeneration += 1
+            fenceForClose()
+            available = false
+            pacing.reset()
+            CompletableFuture<PrimaryTransferredDetector>().also { transferDrain = it }
+        }
+        val detachTask = Runnable {
+            val owned = synchronized(stateLock) { detector }
+            val ownedProof = synchronized(stateLock) { detectorReleaseProofs[owned] }
+            val stillCurrent = synchronized(stateLock) { !shutdownStarted && transferDraining && transferDrain === drained }
+            if (!stillCurrent) {
+                drained.completeExceptionally(CancellationException("primary transfer was retired by host teardown"))
+                return@Runnable
+            }
+            try {
+                val token = detach(owned)
+                synchronized(stateLock) {
+                    if (detector === owned) detector = NoopAndroidFrameDetector()
+                    if (detectorReleaseProofs[owned] === ownedProof) detectorReleaseProofs.remove(owned)
+                    transferDraining = false
+                    transferredIdle = !shutdownStarted
+                }
+                // Physical receipts stay in releaseProofs. Dropping an already drained remote
+                // facade does not assert that its native model was freed or close another owner.
+                drained.complete(token)
+            } catch (error: Throwable) {
+                recordDetectorReleaseFailure(owned, error)
+                synchronized(stateLock) { transferDraining = false }
+                drained.completeExceptionally(error)
+            }
+        }
+        try {
+            tuningExecutor.execute {
+                try { detectorExecutor.execute(detachTask) }
+                catch (error: RejectedExecutionException) {
+                    recordReleaseFailure(error)
+                    synchronized(stateLock) { transferDraining = false }
+                    drained.completeExceptionally(error)
+                }
+            }
+        } catch (error: RejectedExecutionException) {
+            recordReleaseFailure(error)
+            synchronized(stateLock) { transferDraining = false }
+            drained.completeExceptionally(error)
+        }
+        return drained
+    }
+
+    /** The guard must validate the current global-registry claim and exact client target lease. */
+    fun resumeTransferredHost(receipt: VisionTransferResult, currentGuard: () -> Boolean): Boolean {
+        if (!currentGuard()) return false
+        val pending = synchronized(stateLock) {
+            if (shutdownStarted || !transferredIdle || !closing || detector !is NoopAndroidFrameDetector ||
+                releaseFailure != null || unprovenReleaseFailure != null) return false
+            val drained = transferDrain ?: return false
+            val previous = drained.getNow(null) ?: return false
+            val primary = receipt.handles.filter { it.role == VisionRole.PRIMARY }
+            if (receipt.lease.cohortId != previous.oldLease.cohortId || receipt.lease.ownerId != previous.oldLease.ownerId ||
+                receipt.lease.ownerEpoch <= previous.oldLease.ownerEpoch || primary.size != previous.oldHandles.size ||
+                primary.map { it.modelInstanceId }.toSet() != previous.oldHandles.map { it.modelInstanceId }.toSet() ||
+                primary.any { it.cohortId != receipt.lease.cohortId || it.ownerEpoch != receipt.lease.ownerEpoch }) return false
+            drained
+        }
+        if (!currentGuard()) return false
+        return synchronized(stateLock) {
+            if (shutdownStarted || !transferredIdle || transferDrain !== pending || detector !is NoopAndroidFrameDetector) false
+            else { transferredResumeAuthorized = true; true }
+        }
+    }
+
+    /** Consume only inside the lifecycle's explicit prepared-reservation transaction. */
+    fun consumeTransferredResumeAuthorization(): Boolean = synchronized(stateLock) {
+        if (shutdownStarted || !transferredIdle || !transferredResumeAuthorized || detector !is NoopAndroidFrameDetector) return@synchronized false
+        transferredResumeAuthorized = false
+        transferredIdle = false
+        closing = false
+        transferDrain = null
+        frameGeneration += 1
+        loadGeneration += 1L
+        pacing.reset()
+        true
+    }
+
+    /** Runtime failure stops host admission, but leaves the captured lanes available for an explicit recheck. */
+    fun quiesceForRuntimeError(captured: VisionRetirementSnapshot): CompletionStage<Unit> {
+        val quiesce = synchronized(stateLock) {
+            runtimeQuiesce?.let {
+                check(it.captured.lease === captured.lease && it.captured.actualReleased === captured.actualReleased) {
+                    "Runtime quiescence belongs to a different captured cohort"
+                }
+                return it.hostDrain
+            }
+            check(!shutdownStarted) { "A destroyed host cannot be quiesced for reuse" }
+            transferDraining = false
+            transferredIdle = false
+            transferredResumeAuthorized = false
+            runtimeRecheckAuthorized = false
+            frameGeneration += 1
+            fenceForClose()
+            available = false
+            pacing.reset()
+            RuntimeQuiesce(captured).also { runtimeQuiesce = it }
+        }
+        val task = Runnable {
+            val owned = synchronized(stateLock) { detector }
+            try { (owned as? Closeable)?.close() }
+            catch (error: Throwable) {
+                val known = synchronized(stateLock) { detectorReleaseProofs[owned] } ?: physicalRelease(error)
+                recordReleaseFailure(error, known)
+                if (known == null) synchronized(stateLock) { if (reloadReleasePending == null) reloadReleasePending = owned }
+            }
+            synchronized(stateLock) { if (detector === owned) detector = NoopAndroidFrameDetector(); available = false }
+            forgetReleasedDetector(owned)
+            quiesce.hostDrain.complete(Unit)
+        }
+        try {
+            tuningExecutor.execute {
+                try { detectorExecutor.execute(task) }
+                catch (error: RejectedExecutionException) { recordReleaseFailure(error); quiesce.hostDrain.completeExceptionally(error) }
+            }
+        } catch (error: RejectedExecutionException) { recordReleaseFailure(error); quiesce.hostDrain.completeExceptionally(error) }
+        return quiesce.hostDrain
+    }
+
+    /** Guard: a fresh AuthorityAttempt, explicit user recheck, and all auxiliary host drains. */
+    fun resumeQuiescedForRecheck(currentGuard: () -> Boolean): Boolean {
+        if (!currentGuard()) return false
+        val captured = synchronized(stateLock) {
+            val quiet = runtimeQuiesce ?: return false
+            if (shutdownStarted || !closing || detector !is NoopAndroidFrameDetector || unprovenReleaseFailure != null ||
+                !positive(quiet.hostDrain) || !releaseProofs.all(::positive)) return false
+            val actual = quiet.captured.actualReleased.toCompletableFuture()
+            if (!positive(actual)) return false
+            val receipt = actual.getNow(null) ?: return false
+            if (receipt.cohortId != quiet.captured.lease.cohortId ||
+                !(receipt.releaseProof == VisionReleaseProof.CHILD_DEATH && receipt.childPid > 0 ||
+                    receipt.releaseProof == VisionReleaseProof.NO_NATIVE_START && receipt.childPid == 0)) return false
+            quiet
+        }
+        if (!currentGuard()) return false
+        return synchronized(stateLock) {
+            if (shutdownStarted || runtimeQuiesce !== captured || unprovenReleaseFailure != null) false
+            else { runtimeRecheckAuthorized = true; true }
+        }
+    }
+
+    /** Recovery is consumed only by an explicit pair reservation, never ordinary profile restore. */
+    fun consumeQuiescedRecheckAuthorization(): Boolean = synchronized(stateLock) {
+        val quiet = runtimeQuiesce ?: return@synchronized false
+        if (shutdownStarted || !runtimeRecheckAuthorized || !closing || detector !is NoopAndroidFrameDetector ||
+            unprovenReleaseFailure != null || !positive(quiet.hostDrain) || !releaseProofs.all(::positive)) return@synchronized false
+        runtimeRecheckAuthorized = false
+        runtimeQuiesce = null
+        releaseFailure = null
+        reloadReleasePending = null
+        detectorReleaseProofs.entries.removeAll { positive(it.value) }
+        releaseProofs.removeAll(::positive)
+        watchdog = DetectorStallWatchdog(sourceAgeMs, elapsedRealtimeMs)
+        closing = false
+        frameGeneration += 1
+        loadGeneration += 1L
+        pacing.reset()
+        true
+    }
+
+    private fun positive(proof: CompletionStage<*>): Boolean = proof.toCompletableFuture().let {
+        it.isDone && !it.isCompletedExceptionally && !it.isCancelled
+    }
+
+    private fun physicalRelease(error: Throwable): CompletionStage<Unit>? {
+        val visited = java.util.Collections.newSetFromMap(java.util.IdentityHashMap<Throwable, Boolean>())
+        var cause: Throwable? = error
+        while (cause != null && visited.add(cause)) {
+            (cause as? DetectorCohortRetired)?.actualReleasedFuture?.let { return it }
+            (cause as? DetectorNativeCleanupFailure)?.actualReleasedFuture?.let { return it }
+            cause = cause.cause
+        }
+        return null
+    }
 
     /** Retained before adoption: even a failed OPEN without a detector can still own child resources. */
-    fun retainPhysicalRelease(proof: CompletionStage<Unit>?, instance: AndroidFrameDetector? = null) = synchronized(stateLock) {
-        if (proof == null) return@synchronized
-        if (releaseProofs.none { it === proof }) releaseProofs += proof
-        if (instance != null) detectorReleaseProofs[instance] = proof
+    fun retainPhysicalRelease(proof: CompletionStage<Unit>?, instance: AndroidFrameDetector? = null) {
+        if (proof == null) return
+        synchronized(stateLock) {
+            if (releaseProofs.none { it === proof }) releaseProofs += proof
+            if (instance != null) detectorReleaseProofs[instance] = proof
+        }
+        // A producer may close a rejected, never-adopted facade directly, outside this owner.
+        instance?.let(::forgetReleasedDetector)
     }
 
     fun recordReleaseFailure(error: Throwable,
-        proof: CompletionStage<Unit>? = (error as? DetectorCohortRetired)?.actualReleasedFuture,
+        proof: CompletionStage<Unit>? = physicalRelease(error),
     ) = synchronized(stateLock) {
         if (releaseFailure == null) releaseFailure = error
         else if (releaseFailure !== error) releaseFailure?.addSuppressed(error)
@@ -111,7 +326,22 @@ internal class PrimaryDetectorExecutionOwner(
 
     fun recordDetectorReleaseFailure(instance: AndroidFrameDetector, error: Throwable) =
         recordReleaseFailure(error, synchronized(stateLock) { detectorReleaseProofs[instance] }
-            ?: (error as? DetectorCohortRetired)?.actualReleasedFuture)
+            ?: physicalRelease(error))
+
+    /** After a host close/detach attempt, keep unknown resources but forget confirmed old facades. */
+    fun forgetReleasedDetector(instance: AndroidFrameDetector) {
+        val proof = synchronized(stateLock) { detectorReleaseProofs[instance] } ?: return
+        val weakOwner = WeakReference(this)
+        val weakDetector = WeakReference(instance)
+        proof.whenComplete { _, error ->
+            if (error == null) weakOwner.get()?.let { owner -> weakDetector.get()?.let { released ->
+                synchronized(owner.stateLock) {
+                    if (owner.detector !== released && owner.detectorReleaseProofs[released] === proof)
+                        owner.detectorReleaseProofs.remove(released)
+                }
+            } }
+        }
+    }
 
     fun beginLoad(): PrimaryDetectorLoadClaim = synchronized(stateLock) { PrimaryDetectorLoadClaim(loadGeneration) }
 
@@ -141,6 +371,7 @@ internal class PrimaryDetectorExecutionOwner(
                 }
             }
         } catch (error: Throwable) { recordDetectorReleaseFailure(release.first, error); throw error }
+        finally { forgetReleasedDetector(release.first) }
         return synchronized(stateLock) {
             reloadReleasePending = null
             if (loadGeneration != release.second.generation) return@synchronized null
@@ -212,36 +443,43 @@ internal class PrimaryDetectorExecutionOwner(
     }
 
     fun beginNativeFlight(epoch: WalkRuntimeEpoch, generation: Int): NativeDetectorFlight? {
-        val ticket = watchdog.begin(epoch) ?: run {
+        val owned = synchronized(stateLock) { if (closing || shutdownStarted) return null; watchdog }
+        val ticket = owned.begin(epoch) ?: run {
             rejectBlockedWork()
             return null
         }
+        synchronized(stateLock) { flightWatchdogs[ticket] = owned }
         val stopClaim = AtomicBoolean(false)
         val timeout = Runnable {
-            if (watchdog.expire(ticket) && stopClaim.compareAndSet(false, true)) onNativeStall(epoch, generation)
+            if (owned === watchdog && owned.expire(ticket) && stopClaim.compareAndSet(false, true)) onNativeStall(epoch, generation)
         }
         val delay = (ticket.deadlineElapsedRealtimeMs - elapsedRealtimeMs()).coerceAtLeast(0L)
         if (!nativeScheduler.postDelayed(timeout, delay)) {
-            watchdog.complete(ticket)
+            owned.complete(ticket)
+            synchronized(stateLock) { flightWatchdogs.remove(ticket) }
             return null
         }
         return NativeDetectorFlight(ticket, timeout, epoch, generation, stopClaim)
     }
 
     fun completeNativeFlight(flight: NativeDetectorFlight) {
-        val completed = watchdog.complete(flight.ticket)
         nativeScheduler.remove(flight.timeout)
-        if (!completed) requestNativeStall(flight)
+        val owned = synchronized(stateLock) { flightWatchdogs[flight.ticket] } ?: return
+        val completed = owned.complete(flight.ticket)
+        if (owned === watchdog && !completed) requestNativeStall(flight)
     }
 
     fun requestNativeStall(flight: NativeDetectorFlight) {
-        if (watchdog.blocksNewWork() && flight.stopClaim.compareAndSet(false, true)) {
-            dispatchOnMain { onNativeStall(flight.walkEpoch, flight.detectorGeneration) }
+        val owned = synchronized(stateLock) { flightWatchdogs[flight.ticket] } ?: return
+        if (owned === watchdog && owned.blocksNewWork() && flight.stopClaim.compareAndSet(false, true)) {
+            dispatchOnMain { if (owned === watchdog) onNativeStall(flight.walkEpoch, flight.detectorGeneration) }
         }
     }
 
-    fun publishNativeIfCurrent(flight: NativeDetectorFlight, publish: () -> Unit): Boolean =
-        watchdog.publishIfCurrent(flight.ticket, publish)
+    fun publishNativeIfCurrent(flight: NativeDetectorFlight, publish: () -> Unit): Boolean = synchronized(stateLock) {
+        val owned = flightWatchdogs[flight.ticket] ?: return@synchronized false
+        owned === watchdog && owned.publishIfCurrent(flight.ticket, publish)
+    }
 
     fun nativeWorkBlocked(): Boolean = watchdog.blocksNewWork()
     fun rejectBlockedNativeWork(epoch: WalkRuntimeEpoch?, state: WalkSessionState?, stop: (WalkRuntimeEpoch) -> Unit): Boolean =
@@ -285,17 +523,37 @@ internal class PrimaryDetectorExecutionOwner(
     }
 
     fun disableFailedIfCurrent(isCurrent: () -> Boolean, resetVisualState: () -> Unit,
-        afterUnavailable: () -> Unit): Int? = synchronized(stateLock) {
-        if (!isCurrent()) return@synchronized null
-        try { (detector as? Closeable)?.close() }
-        catch (error: Throwable) { recordDetectorReleaseFailure(detector, error); throw error }
-        detector = NoopAndroidFrameDetector()
-        frameGeneration += 1
-        resetVisualState()
-        pacing.reset()
-        available = false
-        afterUnavailable()
-        frameGeneration
+        afterUnavailable: () -> Unit): Int? {
+        var metadataFailure: Throwable? = null
+        val retired = synchronized(stateLock) {
+            if (!isCurrent() || closing || shutdownStarted) return null
+            val owned = detector
+            detector = NoopAndroidFrameDetector()
+            available = false
+            closing = true
+            frameGeneration += 1
+            loadGeneration += 1L
+            reloadReleasePending = owned
+            pacing.reset()
+            try { resetVisualState(); afterUnavailable() } catch (error: Throwable) { metadataFailure = error }
+            owned to frameGeneration
+        }
+        // This method is already called on the native lane. Never wait for remote CLOSE
+        // while holding the frame/UI metadata lock, and never publish a second generation.
+        var closeFailure: Throwable? = null
+        try { (retired.first as? Closeable)?.close() }
+        catch (error: Throwable) { closeFailure = error; recordDetectorReleaseFailure(retired.first, error) }
+        finally {
+            val proof = synchronized(stateLock) { detectorReleaseProofs[retired.first] }
+                ?: closeFailure?.let(::physicalRelease)
+            synchronized(stateLock) {
+                if (reloadReleasePending === retired.first && (closeFailure == null || proof != null)) reloadReleasePending = null
+            }
+            forgetReleasedDetector(retired.first)
+        }
+        closeFailure?.let { failure -> metadataFailure?.takeIf { it !== failure }?.let(failure::addSuppressed); throw failure }
+        metadataFailure?.let { throw it }
+        return retired.second
     }
 
     /** Used only on the native lane after a stored measured profile still owns its old baseline. */
@@ -334,35 +592,8 @@ internal class PrimaryDetectorExecutionOwner(
             } catch (error: Throwable) {
                 recordDetectorReleaseFailure(owned, error)
             }
-            // This task actually ran after both lane barriers. Physical receipts arriving before
-            // it cannot acknowledge consumers which may still be holding their input/output.
-            val (failure, proofs) = synchronized(stateLock) {
-                available = false
-                if (reloadReleasePending != null && releaseFailure == null)
-                    recordReleaseFailure(IllegalStateException("Previous detector release remains unconfirmed"))
-                unprovenReleaseFailure to releaseProofs.toList()
-            }
-            if (failure != null) shutdownRelease.completeExceptionally(failure)
-            else {
-                val joined = proofs.map { proof ->
-                    CompletableFuture<Unit>().also { joinedProof -> proof.whenComplete { _, error ->
-                        if (error == null) joinedProof.complete(Unit) else joinedProof.completeExceptionally(error)
-                    } }
-                }
-                val shutdownFuture = shutdownRelease
-                val weakOwner = WeakReference(this@PrimaryDetectorExecutionOwner)
-                val weakOwned = WeakReference(owned)
-                CompletableFuture.allOf(*joined.toTypedArray()).whenComplete { _, error ->
-                    if (error != null) shutdownFuture.completeExceptionally(error)
-                    else {
-                        weakOwner.get()?.let { owner -> synchronized(owner.stateLock) {
-                            if (owner.detector === weakOwned.get()) owner.detector = NoopAndroidFrameDetector()
-                            owner.reloadReleasePending = null
-                        } }
-                        shutdownFuture.complete(Unit)
-                    }
-                }
-            }
+            finishPhysicalReleaseAfterBarrier(owned)
+            shutdownHostDrain.complete(Unit)
         }
         try {
             tuningExecutor.execute {
@@ -370,11 +601,49 @@ internal class PrimaryDetectorExecutionOwner(
                 catch (error: RejectedExecutionException) {
                     recordReleaseFailure(error)
                     shutdownRelease.completeExceptionally(error)
+                    shutdownHostDrain.completeExceptionally(error)
                 } finally { detectorExecutor.shutdown() }
             }
         } catch (error: RejectedExecutionException) {
             recordReleaseFailure(error)
             shutdownRelease.completeExceptionally(error)
+            shutdownHostDrain.completeExceptionally(error)
         } finally { tuningExecutor.shutdown() }
+    }
+
+    /** Called only by a task which really ran after both host lane barriers. */
+    private fun finishPhysicalReleaseAfterBarrier(owned: AndroidFrameDetector) {
+        forgetReleasedDetector(owned)
+        val (failure, proofs) = synchronized(stateLock) {
+            available = false
+            if (reloadReleasePending != null && releaseFailure == null)
+                recordReleaseFailure(IllegalStateException("Previous detector release remains unconfirmed"))
+            unprovenReleaseFailure to releaseProofs.toList()
+        }
+        if (failure != null) shutdownRelease.completeExceptionally(failure)
+        else {
+            val ownedProof = synchronized(stateLock) { detectorReleaseProofs[owned] }
+            val joined = proofs.map { proof ->
+                CompletableFuture<Unit>().also { joinedProof -> proof.whenComplete { _, error ->
+                    if (error == null) joinedProof.complete(Unit) else joinedProof.completeExceptionally(error)
+                } }
+            }
+            val shutdownFuture = shutdownRelease
+            val weakOwner = WeakReference(this@PrimaryDetectorExecutionOwner)
+            val weakOwned = WeakReference(owned)
+            CompletableFuture.allOf(*joined.toTypedArray()).whenComplete { _, error ->
+                if (error != null) shutdownFuture.completeExceptionally(error)
+                else {
+                    weakOwner.get()?.let { owner -> synchronized(owner.stateLock) {
+                        val released = weakOwned.get()
+                        if (owner.detector === released) owner.detector = NoopAndroidFrameDetector()
+                        if (released != null && owner.detectorReleaseProofs[released] === ownedProof)
+                            owner.detectorReleaseProofs.remove(released)
+                        owner.reloadReleasePending = null
+                    } }
+                    shutdownFuture.complete(Unit)
+                }
+            }
+        }
     }
 }

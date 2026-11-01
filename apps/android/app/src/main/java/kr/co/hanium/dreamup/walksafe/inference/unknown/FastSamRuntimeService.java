@@ -16,6 +16,8 @@ import kr.co.hanium.dreamup.walksafe.inference.unknown.segmentation.FastSamDecod
 import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionCohortLease;
 import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionModelHandle;
 import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRuntimeContext;
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionPurpose;
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRuntimeProtocol;
 
 /** Independent FastSAM768 service. It never borrows the primary detector's owner or closes an Image.
  * One latest pending snapshot plus one whole inference/decode/consumer flight bounds memory/work.
@@ -51,6 +53,7 @@ public final class FastSamRuntimeService<T> implements AutoCloseable {
     private final PhysicalReleaseState physicalRelease=new PhysicalReleaseState();
     private final CompletableFuture<Void> released=physicalRelease.released;
     private final CompletableFuture<FastSamTransferredModel> transferred=new CompletableFuture<>();
+    private CompletableFuture<Void> consumerIdle=CompletableFuture.completedFuture(null);
     private final Thread modelOwner,cpuPostOwner,loadWatchdog;
     private final FastSamYuvCopy.YuvScratch copyScratch=new FastSamYuvCopy.YuvScratch();
     private enum TerminalMode { FINAL_CLOSE, TRANSFER_DRAIN }
@@ -70,8 +73,8 @@ public final class FastSamRuntimeService<T> implements AutoCloseable {
     }
     private static FastSamEngine.Factory engineFactory(Context context,FastSamRuntimeOptions options) {
         String owner=VisionRuntimeContext.ownerId(Objects.requireNonNull(context,"context"));
-        Context app=context.getApplicationContext();
-        return RemoteFastSamEngine.factory(app,options,owner);
+        // The factory captures the immutable owner ref before normalizing its stored Context.
+        return RemoteFastSamEngine.factory(context,options,owner);
     }
     /** Transitional fixture owner only. A fixture child must never spawn a production grandchild. */
     public static <T> FastSamRuntimeService<T> createLocalForFixture(Context context,long sessionEpoch,
@@ -157,7 +160,12 @@ public final class FastSamRuntimeService<T> implements AutoCloseable {
 
     /** Synchronous, stride-aware copy while the caller still owns an open Image. */
     public Admission submit(Image image,FastSamFrameToken token,T frozenAttachment) {
+        return submit(image,token,frozenAttachment,defaultRequest(token));
+    }
+    public Admission submit(Image image,FastSamFrameToken token,T frozenAttachment,FastSamExecutionRequest request) {
         Objects.requireNonNull(image,"image");Objects.requireNonNull(token,"token");
+        validateDimensions(token);
+        validateRequest(token,request);
         if(token.source!=FastSamFrameToken.Source.LIVE_CAMERA || image.getFormat()!=ImageFormat.YUV_420_888
                 || image.getWidth()!=token.width || image.getHeight()!=token.height
                 || image.getTimestamp()!=token.cpuImageTimestampNs)
@@ -165,7 +173,7 @@ public final class FastSamRuntimeService<T> implements AutoCloseable {
         Rect crop=image.getCropRect();
         if(crop==null || crop.left!=0 || crop.top!=0 || crop.right!=token.width || crop.bottom!=token.height)
             throw new IllegalArgumentException("FastSAM requires the same full CPU-image geometry as its depth token");
-        Admission gate=beginCopy(token);if(gate!=null)return gate;
+        Admission gate=beginCopy(token,request);if(gate!=null)return gate;
         long copyStarted=clock.getAsLong();
         try {
             Image.Plane[] p=image.getPlanes();if(p.length!=3)throw new IllegalArgumentException("YUV420 needs three planes");
@@ -173,46 +181,72 @@ public final class FastSamRuntimeService<T> implements AutoCloseable {
                 p[0].getBuffer(),p[0].getRowStride(),p[0].getPixelStride(),
                 p[1].getBuffer(),p[1].getRowStride(),p[1].getPixelStride(),
                 p[2].getBuffer(),p[2].getRowStride(),p[2].getPixelStride(),copyScratch);
-            return publish(new FrozenInput<>(token,frozenAttachment,argb,(clock.getAsLong()-copyStarted)/1e6));
-        } finally { synchronized(lock){copying=false;lock.notifyAll();} }
+            return publish(new FrozenInput<>(token,request,frozenAttachment,argb,(clock.getAsLong()-copyStarted)/1e6));
+        } finally { synchronized(lock){copying=false;lock.notifyAll();} signalConsumerIdle(); }
     }
 
     /** Fixture/owned RGB entry. Clone completes before return; later caller mutation is harmless. */
     public Admission submitArgb(int width,int height,int[] argb,FastSamFrameToken token,T frozenAttachment) {
+        Objects.requireNonNull(token,"token");
+        // Compatibility admission still rejects an already-old capture. Explicit static requests
+        // carry their own whole-job deadline; neither path guesses REFERENCE from an options TTL.
+        if(!token.isFreshAt(clock.getAsLong(),options.maximumResultAgeMs))return Admission.STALE;
+        return submitArgb(width,height,argb,token,frozenAttachment,defaultRequest(token));
+    }
+    public Admission submitArgb(int width,int height,int[] argb,FastSamFrameToken token,T frozenAttachment,
+            FastSamExecutionRequest request) {
         Objects.requireNonNull(argb,"argb");Objects.requireNonNull(token,"token");
+        validateDimensions(token);
+        validateRequest(token,request);
         if(width!=token.width || height!=token.height || argb.length!=Math.multiplyExact(width,height))
             throw new IllegalArgumentException("ARGB does not match frozen FastSAM token");
-        Admission gate=beginCopy(token);if(gate!=null)return gate;
+        Admission gate=beginCopy(token,request);if(gate!=null)return gate;
         long copyStarted=clock.getAsLong();
-        try{return publish(new FrozenInput<>(token,frozenAttachment,argb.clone(),(clock.getAsLong()-copyStarted)/1e6));}
-        finally{synchronized(lock){copying=false;lock.notifyAll();}}
+        try{return publish(new FrozenInput<>(token,request,frozenAttachment,argb.clone(),(clock.getAsLong()-copyStarted)/1e6));}
+        finally{synchronized(lock){copying=false;lock.notifyAll();}signalConsumerIdle();}
     }
-    private Admission beginCopy(FastSamFrameToken token) {
+    private FastSamExecutionRequest defaultRequest(FastSamFrameToken token) {
+        Objects.requireNonNull(token,"token");
+        VisionPurpose purpose=token.source==FastSamFrameToken.Source.LIVE_CAMERA?VisionPurpose.LIVE:VisionPurpose.BENCHMARK;
+        long budget=TimeUnit.MILLISECONDS.toNanos(VisionRuntimeProtocol.INSTANCE.operationBudget(purpose));
+        long now=clock.getAsLong();
+        return new FastSamExecutionRequest(purpose,now>Long.MAX_VALUE-budget?Long.MAX_VALUE:now+budget,false);
+    }
+    private static void validateRequest(FastSamFrameToken token,FastSamExecutionRequest request) {
+        Objects.requireNonNull(request,"request");
+        if((token.source==FastSamFrameToken.Source.LIVE_CAMERA)!=(request.purpose==VisionPurpose.LIVE))
+            throw new IllegalArgumentException("Execution purpose does not match the captured source");
+    }
+    private static void validateDimensions(FastSamFrameToken token) {
+        if(token.width>2048 || token.height>2048)
+            throw new IllegalArgumentException("FastSAM parent input exceeds the 2048-pixel wire contract");
+    }
+    private Admission beginCopy(FastSamFrameToken token,FastSamExecutionRequest request) {
         synchronized(lock) {
-            Admission gate=gate(token);
+            Admission gate=gate(token,request);
             if(gate!=null){rejected++;return gate;}
             if(copying){rejected++;return Admission.COPY_BUSY;}
+            if(consumerIdle.isDone())consumerIdle=new CompletableFuture<>();
             copying=true;return null;
         }
     }
-    private Admission gate(FastSamFrameToken token) {
+    private Admission gate(FastSamFrameToken token,FastSamExecutionRequest request) {
         if(stopping)return Admission.CLOSED;
         if(!activated || !ready.isDone() || ready.isCompletedExceptionally() || !factory.canAdmit())return Admission.NOT_READY;
         if(token.sessionEpoch!=sessionEpoch)return Admission.WRONG_EPOCH;
-        if(!isFresh(token))return Admission.STALE;
+        if(!isFresh(token,request))return Admission.STALE;
         if(token.frameId<=lastFrameId || (token.source==FastSamFrameToken.Source.LIVE_CAMERA
                 && token.cpuImageTimestampNs<=lastCpuTimestampNs))return Admission.OUT_OF_ORDER;
         return null;
     }
-    private boolean isFresh(FastSamFrameToken token) {
+    private boolean isFresh(FastSamFrameToken token,FastSamExecutionRequest request) {
         long now=clock.getAsLong();
-        if(token.source==FastSamFrameToken.Source.CALIBRATION_FIXTURE && options.calibrationFixtureDeadlineElapsedNs>0)
-            return now>=token.capturedElapsedNs && now<options.calibrationFixtureDeadlineElapsedNs;
-        return token.isFreshAt(now,options.maximumResultAgeMs);
+        return now>=token.capturedElapsedNs && now<request.absoluteDeadlineElapsedNs &&
+            (token.source!=FastSamFrameToken.Source.LIVE_CAMERA || token.isFreshAt(now,options.maximumResultAgeMs));
     }
     private Admission publish(FrozenInput<T> input) {
         synchronized(lock) {
-            Admission gate=gate(input.token);if(gate!=null){rejected++;return gate;}
+            Admission gate=gate(input.token,input.request);if(gate!=null){rejected++;return gate;}
             boolean replace=pending!=null;if(replace)replaced++;
             pending=input;lastFrameId=input.token.frameId;
             if(input.token.source==FastSamFrameToken.Source.LIVE_CAMERA)lastCpuTimestampNs=input.token.cpuImageTimestampNs;
@@ -239,12 +273,17 @@ public final class FastSamRuntimeService<T> implements AutoCloseable {
                 }
                 boolean transferred=false;
                 try {
-                    if(!isFresh(input.token)) {
+                    if(!isFresh(input.token,input.request)) {
                         synchronized(lock){stale++;}
                         listener.onDiscard(input.token,"stale_before_inference");continue;
                     }
                     long invokeStarted=clock.getAsLong();
-                    FastSamEngine.Output output=engine.invoke(input.ownedArgb,input.token.width,input.token.height,input.token);
+                    FastSamEngine.Output output;
+                    try { output=engine.invoke(input.ownedArgb,input.token.width,input.token.height,input.token,input.request); }
+                    catch(FastSamExecutionRequest.Expired expired) {
+                        synchronized(lock){stale++;}
+                        listener.onDiscard(input.token,"execution_deadline_before_dispatch");continue;
+                    }
                     synchronized(lock) {
                         // Admission reserved this flight. Stop cannot close native state ahead of its post drain.
                         if(cpuPostTerminated)throw new IllegalStateException("FastSAM CPU post worker terminated");
@@ -252,7 +291,7 @@ public final class FastSamRuntimeService<T> implements AutoCloseable {
                         pendingPost=new PostJob<>(input,output,engine.runtime(),invokeStarted,clock.getAsLong());
                         transferred=true;lock.notifyAll();
                     }
-                } finally {if(!transferred)synchronized(lock){inflight=false;lock.notifyAll();}}
+                } finally {if(!transferred){synchronized(lock){inflight=false;lock.notifyAll();}signalConsumerIdle();}}
             }
         } catch(Throwable error){if(error instanceof TfliteFastSamEngine.NativeReleaseFailure)releaseFailure=error;fail(error);}
         finally {
@@ -262,6 +301,7 @@ public final class FastSamRuntimeService<T> implements AutoCloseable {
                 while(inflight || copying)try{lock.wait();}catch(InterruptedException error){interrupted=true;recordFailure(error);}
             }
             while(cpuPostOwner.isAlive())try{cpuPostOwner.join();}catch(InterruptedException error){interrupted=true;recordFailure(error);}
+            signalConsumerIdle();
             FastSamTransferredModel transferToken=null;
             TerminalMode mode;Throwable beforeTransfer;synchronized(lock){mode=terminalMode;beforeTransfer=failure;}
             if(mode==TerminalMode.TRANSFER_DRAIN) {
@@ -305,18 +345,17 @@ public final class FastSamRuntimeService<T> implements AutoCloseable {
                         continue;
                     }
                     long postStarted=clock.getAsLong();
-                    DecodeResult decoded=decoder.decode(job.output.ownedTensors[0],job.output.ownedTensors[1],
-                        job.input.token.width,job.input.token.height);
+                    DecodeResult decoded=decodeNativeOutput(decoder,job);
                     long finished=clock.getAsLong();
                     FastSamResult<T> result=new FastSamResult<>(job.input.token,job.input.attachment,decoded,job.runtime,
                         finished,Thread.currentThread().getId(),job.input.copyMs,
                         (job.invokeStarted-job.input.token.capturedElapsedNs)/1e6,
                         job.output.preprocessingMs,job.output.inferenceMs,job.output.outputReadMs,
                         (postStarted-job.handedOffNs)/1e6,
-                        options.captureRawOutputs && job.input.token.source==FastSamFrameToken.Source.CALIBRATION_FIXTURE
+                        options.captureRawOutputs && job.input.request.captureRawOutputs
                             ?new FastSamResult.RawOutputs(job.output.ownedTensors):null);
                     boolean deliver;synchronized(lock){completed++;deliver=!stopping;}
-                    if(deliver && isFresh(job.input.token)) {
+                    if(deliver && isFresh(job.input.token,job.input.request)) {
                         listener.onResult(result); // Frozen depth/named-result processing is inside this flight.
                         synchronized(lock){cpuPostCompleted++;}
                     } else {
@@ -327,7 +366,7 @@ public final class FastSamRuntimeService<T> implements AutoCloseable {
                     // Publish failure/stop before releasing the lease: the model owner must not
                     // reserve a successor for a CPU worker that is about to terminate.
                     fail(error);return;
-                } finally {synchronized(lock){inflight=false;lock.notifyAll();}}
+                } finally {synchronized(lock){inflight=false;lock.notifyAll();}signalConsumerIdle();}
             }
         } catch(Throwable error){fail(error);}
         finally {
@@ -336,6 +375,7 @@ public final class FastSamRuntimeService<T> implements AutoCloseable {
                 if(pendingPost!=null){pendingPost=null;inflight=false;}
                 lock.notifyAll();
             }
+            signalConsumerIdle();
         }
     }
 
@@ -347,6 +387,18 @@ public final class FastSamRuntimeService<T> implements AutoCloseable {
         } catch(TimeoutException error){fail(error);}
         catch(ExecutionException ignored){/* The producing thread already reports its actual failure. */}
         catch(InterruptedException error){Thread.currentThread().interrupt();fail(error);}
+    }
+
+    private DecodeResult decodeNativeOutput(FastSamDecoder decoder,PostJob<T> job){
+        try{
+            if(job.output==null)throw new FastSamModelContract.NativeOutputException(
+                FastSamModelContract.NativeOutputFailureReason.INVALID_NATIVE_OUTPUT,"Native FastSAM output is missing");
+            FastSamModelContract.validateRawOutputShape(job.output.ownedTensors);
+            return decoder.decode(job.output.ownedTensors[0],job.output.ownedTensors[1],job.input.token.width,job.input.token.height);
+        }catch(FastSamModelContract.NativeOutputException failure){
+            try{factory.reportNativeOutputFault(failure);}catch(Throwable report){if(report!=failure)failure.addSuppressed(report);}
+            throw failure;
+        }
     }
 
     /** Stops admission immediately and requests control cancellation of a pending remote load.
@@ -363,6 +415,7 @@ public final class FastSamRuntimeService<T> implements AutoCloseable {
             if(unstarted && !transferredConsumer){physicalRelease.local(null);closed.complete(null);}
             if(unstarted && transferredConsumer)cancelLoad=true;
         }
+        signalConsumerIdle();
         if(cancelLoad)cancelPendingLoad();
         if(unstarted && transferredConsumer){
             followPhysicalRelease(null);
@@ -375,6 +428,11 @@ public final class FastSamRuntimeService<T> implements AutoCloseable {
     /** Independent of inference/load success: only completes after all owned native/copy/post work
      * is released. Failure here means the next tuning candidate must not assume its slot is free. */
     public CompletableFuture<Void> releasedFuture(){return released;}
+    /** An idle boundary for already-admitted copy/invoke/decode/listener work. This does not close
+     * admission, release a native model, prove successful inference, or acknowledge cohort death. */
+    public CompletableFuture<Void> consumerIdleFuture(){synchronized(lock){return consumerIdle;}}
+    /** Reads actual prepared metadata only; never calls start, OPEN or native inference. */
+    public FastSamRuntimeInfo runtimeIfReady(){synchronized(lock){return isReady()?ready.getNow(null):null;}}
     public long getSessionEpoch(){return sessionEpoch;}
     /** Keep the warmed model. Inflight results retain their old token/attachment; the consumer's
      * walk/AR/geometry fence must reject them after pause or session replacement. */
@@ -397,8 +455,19 @@ public final class FastSamRuntimeService<T> implements AutoCloseable {
         boolean cancelLoad;
         synchronized(lock){cancelLoad=started && !ready.isDone();if(terminalMode==null)terminalMode=TerminalMode.FINAL_CLOSE;stopping=true;dropPending();lock.notifyAll();}
         ready.completeExceptionally(error);
+        signalConsumerIdle();
         if(cancelLoad)cancelPendingLoad();
         if(first)try{listener.onError(error);}catch(Throwable callbackError){recordFailure(callbackError);}
+    }
+    private void signalConsumerIdle(){
+        CompletableFuture<Void> completed;
+        synchronized(lock){
+            if(copying || inflight || pending!=null || pendingPost!=null || consumerIdle.isDone())return;
+            completed=consumerIdle;
+            // A new copy must get a new boundary even if a completion callback reenters submit.
+            consumerIdle=CompletableFuture.completedFuture(null);
+        }
+        completed.complete(null);
     }
     private void cancelPendingLoad(){try{factory.cancelPendingLoad();}catch(Throwable error){recordFailure(error);}}
     private void followPhysicalRelease(Throwable localFailure){
@@ -415,8 +484,10 @@ public final class FastSamRuntimeService<T> implements AutoCloseable {
         void follow(CompletableFuture<Void> actual){actual.whenComplete((ignored,error)->local(error));}
     }
     private static final class FrozenInput<T> {
-        final FastSamFrameToken token;final T attachment;final int[] ownedArgb;final double copyMs;
-        FrozenInput(FastSamFrameToken token,T attachment,int[] argb,double copyMs){this.token=token;this.attachment=attachment;ownedArgb=argb;this.copyMs=copyMs;}
+        final FastSamFrameToken token;final FastSamExecutionRequest request;final T attachment;final int[] ownedArgb;final double copyMs;
+        FrozenInput(FastSamFrameToken token,FastSamExecutionRequest request,T attachment,int[] argb,double copyMs){
+            this.token=token;this.request=request;this.attachment=attachment;ownedArgb=argb;this.copyMs=copyMs;
+        }
     }
     private static final class PostJob<T> {
         final FrozenInput<T> input;final FastSamEngine.Output output;final FastSamRuntimeInfo runtime;
