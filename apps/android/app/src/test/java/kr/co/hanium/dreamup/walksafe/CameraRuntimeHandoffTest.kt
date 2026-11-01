@@ -5,6 +5,52 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CameraRuntimeHandoffTest {
+    @Test fun anotherActivitiesCleanupCannotBeSkippedOrReleaseAnExistingCameraClaim() {
+        for (cameraFirst in listOf(false, true)) {
+            val registry = CameraRuntimeHandoff.Registry()
+            val camera = requireNotNull(registry.begin())
+            val retiringMain = registry.joinRetirement()
+            val cameraRelease = CompletableFuture<Unit>()
+            val mainRelease = CompletableFuture<Unit>()
+            val pending = requireNotNull(registry.pendingRelease())
+            camera.completeAfter(listOf(cameraRelease))
+            retiringMain.completeAfter(listOf(mainRelease))
+            if (cameraFirst) cameraRelease.complete(Unit) else mainRelease.complete(Unit)
+            assertFalse(pending.isDone)
+            assertNull(registry.begin())
+            if (cameraFirst) mainRelease.complete(Unit) else cameraRelease.complete(Unit)
+            assertEquals(Unit, pending.join())
+            assertNotNull(registry.begin())
+        }
+    }
+
+    @Test fun aLateRetirementParticipantCannotAcknowledgeTheNextCameraBudget() {
+        val registry = CameraRuntimeHandoff.Registry()
+        val camera = requireNotNull(registry.begin())
+        val retiringMain = registry.joinRetirement()
+        retiringMain.complete()
+        assertNull(registry.begin())
+        camera.complete()
+        val next = requireNotNull(registry.begin())
+        val pending = registry.pendingRelease()
+        retiringMain.complete()
+        retiringMain.fail(IllegalStateException("late cleanup"))
+        assertSame(pending, registry.pendingRelease())
+        assertFalse(requireNotNull(pending).isDone)
+        next.complete()
+    }
+
+    @Test fun cleanupCanClaimAnEmptySlotButKeepsTheExistingPhysicalFailureFence() {
+        val registry = CameraRuntimeHandoff.Registry()
+        val retiring = registry.joinRetirement()
+        assertNull(registry.begin())
+        retiring.fail(IllegalStateException("unproven physical close"))
+        val laterCleanup = registry.joinRetirement()
+        laterCleanup.complete()
+        assertTrue(requireNotNull(registry.pendingRelease()).isCompletedExceptionally)
+        assertNull(registry.begin())
+    }
+
     @Test fun anotherOwnerWaitsForCameraPrimaryAndAuxiliaryReleaseAcknowledgements() {
         val registry = CameraRuntimeHandoff.Registry()
         val claim = requireNotNull(registry.begin())

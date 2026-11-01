@@ -113,7 +113,7 @@ internal class FixtureRuntimeWorker(private val context: Context, private val ca
     private fun openPrimary(value: RuntimeCandidate) {
         checkBudget(); check(primary == null)
         primaryRuntime = value
-        val loaded = TfliteAndroidFrameDetector.createWithStatus(context,
+        val loaded = TfliteAndroidFrameDetector.createWithStatusLocal(context,
             config.copy(fallbackModelKey = null, customTactile = null, cocoGeneral = null),
             ModelRuntimeOptions(value.backend.delegate, value.numThreads, fallbackToCpu = false,
                 gpuPrecisionLossAllowed = false, gpuSerializationCacheEnabled = true), YuvPreprocessingStrategy.FUSED_YUV_TO_TENSOR)
@@ -161,7 +161,7 @@ internal class FixtureRuntimeWorker(private val context: Context, private val ca
         val options = FastSamRuntimeOptions(FastSamRuntimeOptions.Backend.valueOf(value.backend.name), value.numThreads,
             false, deadlineMs * 1_000_000L, 800L, true, false, true,
             (deadlineMs - FixtureRuntimeProtocol.DEATH_ACK_MS) * 1_000_000L)
-        val service = FastSamRuntimeService(context, epoch, options, object : FastSamRuntimeService.Listener<Attachment> {
+        val service = FastSamRuntimeService.createLocalForFixture(context, epoch, options, object : FastSamRuntimeService.Listener<Attachment> {
             override fun onResult(result: FastSamResult<Attachment>) {
                 try {
                     requireFast(result.runtime)

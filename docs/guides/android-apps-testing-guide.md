@@ -68,6 +68,13 @@ adb install -r "$VISUAL_TEST_WORKSPACE/apps/android/app/build/outputs/apk/visual
 - `CameraCompositionCalibrationDeviceTest`의 명시적 입력은 `allowFixtureCompositionCalibration=true`입니다. 내장 이미지 측정·worker 종료·실제 유효 기록 저장을 시험하며 HOME·카메라를 열거나 계정·동의·교육을 만들어내지 않습니다. 이번 작업에서는 사용자 지시에 따라 이 실기기 시험을 실행하지 않습니다.
 - `CameraHomeReopenDiagnosticDeviceTest`는 실제 카메라 진입을 따로 확인하는 기존 진단입니다. `restoredHome`과 `directCamera`를 구분하며 샘플 성능 검사의 일부로 자동 실행하지 않습니다.
 
+## 모델 프로세스 격리 회귀
+
+- `VisionRuntimeFaultAndroidTest`는 `visionRemoteFaultTests=true`로 명시한 debug 시험입니다. 전용 에뮬레이터에서 실제 Service/Binder/SharedMemory를 이용해 정지·늦은 명령·소유권 이전·응답 유실·실제 종료를 확인합니다. native 모델을 흉내 낸 정지 주입이며 GPU 드라이버 복구나 처리 성능을 증명하지 않습니다.
+- `MetricSupportIsolationFaultDeviceTest`의 debug 입력은 `allowMetricSupportIsolationFaults=true`입니다. 생성·지원 조회·close 정지와 취소를 주입하며, 실제 ARCore 지원 성공·거리 측정·카메라 촬영을 시험하지 않습니다.
+- `VisionProductionModelsAndroidTest`는 `visionProductionModelTests=true`로 실제 번들 CPU 모델 두 개를 운영 adapter로 실행합니다. 고유 owner context, 같은 자식 PID, 서로 다른 두 native owner, 두 이미지에서 유지되는 모델 식별자와 raw 반환을 확인합니다. 기기별 GPU 성능·장시간 카메라·보행의 증거와 구분합니다.
+- 위 격리 회귀의 실행 대상은 별도 에뮬레이터 serial을 명시합니다. 앱/AndroidTest APK 빌드와 설치만 성공한 상태를 해당 회귀 실행 성공으로 표시하지 않습니다.
+
 ## 관리자 앱
 
 `adminapp`은 applicationId `kr.co.hanium.dreamup.walksafe.admin`의 별도 앱입니다. [관리자 빌드 설정](../../apps/android/adminapp/build.gradle.kts)은 비밀번호·TOTP 인증과 보안 제어 화면을 사용하며, 신고 검토·수동 기관 전달 기록 같은 운영 워크플로는 기본적으로 잠급니다.

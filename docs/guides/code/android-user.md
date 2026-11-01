@@ -55,7 +55,11 @@ adb install -r apps/android/app/build/outputs/apk/debug/app-debug.apk
 - `FixtureRuntimeConnectionLease`는 START 전송 허가 이전의 실패와 실제 모델 작업의 종료 미확인을 구분합니다. 전자는 큐에 남은 START 허가를 취소하고 실패한 연결도 정리합니다. 후자는 실제 작업 프로세스의 종료 확인을 요구합니다. 연결 실패 자체를 후보의 성능 실패로 해석하지 않습니다.
 - 활성 점검은 기존 `CameraRuntimeHandoff`의 프로세스 범위 자원 인계에 참여합니다. 취소 시 적용된 모델의 실제 close와 저장 정리를 함께 기다리며, 화면 재생성 시 이전 작업과 새 모델 준비가 겹치지 않게 합니다. 기본 모델 소유자의 `closedFuture`는 생성 작업과 뒤늦은 채택·종료 작업까지 배출한 뒤 완료됩니다.
 - 실패 결과 통지와 물리적 해제 확인은 별개입니다. 시간 초과나 정리 실패는 즉시 실패 결과를 통지하되, 실제 종료가 불확실하면 재할당을 막습니다. 늦은 해제 확인은 원래 시도의 자원만 풀며 실패를 성공으로 바꾸지 않습니다. 최종 결과 전달 전에는 임시 모델 퇴역을 지원 불가로 오인해 LIMITED로 통과시키지 않습니다.
-- 시험 worker와 달리 실제 적용 모델은 기존 앱 프로세스의 소유자에서 실행됩니다. GPU 드라이버 내부 작업을 일반 취소나 타이머로 강제 중단할 수 있다고 보장하지 않습니다. 이 경우 실패 안내와 자원 차단을 유지하며 실제 정리 확인 또는 앱의 완전한 재시작이 필요합니다.
+- 실제 기본 모델과 FastSAM의 native 생성·추론·종료는 비공개 `:vision_runtime`의 두 owner 스레드에서 수행합니다. 부모의 `PrimaryTensorEngine`/`RemoteFastSamEngine`은 전처리·파서·CPU mask decode·listener를 기존 경로에 유지하고, 큰 입출력은 크기를 검증한 shared region으로 전달합니다. API31 미만은 native 준비 전에 지원 조건에서 거절합니다.
+- `runtime/vision/remote/RemoteVisionClient`는 기능 결과, 모델별 실제 close 확인, cohort 전체의 실제 사망·부모 mapping 회수를 구분합니다. OPEN 전송 권한을 주기 전 원자적으로 취소한 경우만 `NO_NATIVE_START`로 증명하며, 권한을 준 뒤에는 실제 child death가 필요합니다. 한 모델의 hard timeout은 두 모델을 같은 cohort로 퇴역시킵니다. 살아남은 옛 handle과 새 CPU handle을 섞는 부분 fallback은 허용하지 않습니다.
+- `VisionRuntimeContext`는 Activity를 붙잡지 않고 고유 owner ID를 worker factory에 전달합니다. 다른 owner의 자원 점유는 `Busy` 가용성 신호이며 새 factory의 미회수 native 증거가 아닙니다. 이 신호로 검증된 선택값을 무효화하지 않습니다.
+- `VisionOwnerRetirement`는 primary의 작업 배출 뒤 늦게 생성된 auxiliary receipt까지 모으고, owner별 snapshot을 한 번 캡처해 해당 lease만 EXIT합니다. `CameraRuntimeHandoff.joinRetirement`는 다른 화면의 기존 claim이 있어도 퇴역 참여자를 누락하지 않으며 모든 참여자의 실제 회수가 확인되어야 다음 할당을 허용합니다. 프로세스 종료 신호만으로 GPU/커널 전체가 회복된다고 보장하지 않습니다.
+- 지원 조회는 `:metric_support`에서 Session 생성 → AUTOMATIC 지원 API → close만 수행합니다. resume·카메라 프레임은 사용하지 않으며 설치 요청 UI와 권한은 Main이 담당합니다. API false·명시적 호환 불가와 설치/권한/정지/회수 미확인 오류를 구분하고, 오류를 미지원 성공으로 바꾸지 않습니다.
 
 ## 변경 시 확인
 

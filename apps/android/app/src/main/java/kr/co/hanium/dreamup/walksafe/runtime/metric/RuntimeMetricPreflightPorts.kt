@@ -29,6 +29,9 @@ internal interface RuntimeMetricLossLifecycle {
 }
 internal fun interface RuntimeMetricDepthSupportProbe {
     fun automaticDepthSupported(): Boolean
+    /** Production implementations are asynchronous and never allocate ARCore in the caller. */
+    fun query(onResult: (Result<Boolean>) -> Unit) { onResult(runCatching(::automaticDepthSupported)) }
+    fun cancel() {}
 }
 /** Synchronous SDK observation only. Implementations must not retain the borrowed frame. */
 internal fun interface RuntimeMetricPreflightFrameEvidence<F> {

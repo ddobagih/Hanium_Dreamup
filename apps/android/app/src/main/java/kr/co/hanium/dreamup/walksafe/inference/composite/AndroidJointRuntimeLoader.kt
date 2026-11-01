@@ -4,6 +4,10 @@ import android.content.Context
 import android.os.Looper
 import kr.co.hanium.dreamup.walksafe.inference.*
 import java.util.concurrent.CancellationException
+import java.util.concurrent.CompletionStage
+import java.util.IdentityHashMap
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRuntimeException
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRuntimeFailures
 
 /** Both HOME and the walking primary owner restore the same complete device-check choice. */
 object AndroidJointRuntimeLoader {
@@ -24,7 +28,8 @@ object AndroidJointRuntimeLoader {
         } catch (error: Throwable) {
             // Only restoration of this captured durable record may retire it. A memory-only trial
             // must never invalidate an unrelated previously applied choice.
-            if (error !is CancellationException && isCurrent()) store.invalidateIfMatches(choice)
+            if (error !is CancellationException && VisionRuntimeFailures.busy(error) == null && isCurrent())
+                store.invalidateIfMatches(choice)
             throw error
         }
     }
@@ -96,22 +101,48 @@ object AndroidJointRuntimeLoader {
 
 /** A failed native cleanup blocks every subsequent parent-process model allocation. */
 internal class JointRuntimeReleaseFence {
-    @Volatile private var failure: Throwable? = null
-    private var retainedDetector: TfliteAndroidFrameDetector? = null
+    private class Pending(val error: Throwable, val detector: TfliteAndroidFrameDetector?)
+    private class ReceiptCause(cause: Throwable, val receipt: CompletionStage<*>?) :
+        RuntimeException("Native retirement is awaiting its physical receipt", cause)
+    private val pending = IdentityHashMap<Throwable, Pending>()
 
-    fun ensureConfirmed() {
-        failure?.let { throw DetectorNativeCleanupFailure(it) }
+    @Synchronized fun ensureConfirmed() {
+        pending.values.firstOrNull()?.let { throw DetectorNativeCleanupFailure(it.error) }
     }
 
     fun requireCleanResult(load: AndroidDetectorLoadResult) {
-        if (load.reason != "DetectorNativeCleanupFailure") return
-        val error = DetectorNativeCleanupFailure(IllegalStateException("Native cleanup reported as a failed load result"))
-        retain(error, load.detector)
+        if (load.reason !in setOf("DetectorNativeCleanupFailure", "DetectorCohortRetired")) return
+        // The same exception crosses prepare's catch and can be retained again after a fast ACK.
+        // Keep its proof in the exception rather than only in an already-removed map entry.
+        val error = DetectorNativeCleanupFailure(ReceiptCause(
+            IllegalStateException("Native retirement reported as a failed load result"), load.actualReleasedFuture))
+        retain(error, load.detector, load.actualReleasedFuture)
         throw error
     }
 
-    @Synchronized fun retain(error: Throwable, detector: TfliteAndroidFrameDetector? = null) {
-        if (failure == null) failure = error
-        if (retainedDetector == null) retainedDetector = detector
+    fun retain(error: Throwable, detector: TfliteAndroidFrameDetector? = null,
+        physicalRelease: CompletionStage<*>? = physicalReceipt(error)) {
+        val retained = synchronized(this) {
+            pending.getOrPut(error) { Pending(error, detector) }
+        }
+        // Operation failure is never release evidence. A late successful physical receipt may
+        // release this exact failure; it cannot release another unknown/local native owner.
+        physicalRelease?.whenComplete { _, releaseError ->
+            if (releaseError == null) synchronized(this) {
+                if (pending[error] === retained) pending.remove(error)
+            }
+        }
+    }
+
+    private fun physicalReceipt(error: Throwable): CompletionStage<*>? {
+        val visited = java.util.Collections.newSetFromMap(IdentityHashMap<Throwable, Boolean>())
+        var cause: Throwable? = error
+        while (cause != null && visited.add(cause)) {
+            (cause as? ReceiptCause)?.receipt?.let { return it }
+            (cause as? DetectorCohortRetired)?.actualReleasedFuture?.let { return it }
+            (cause as? VisionRuntimeException)?.releaseReceipt?.let { return it }
+            cause = cause.cause
+        }
+        return null
     }
 }

@@ -89,6 +89,7 @@ class RuntimeMetricPreflightCoordinatorTest {
         listOf(true, false).forEach { supported ->
             val f = Fixture(); f.prepare(); f.supported = supported
             f.coordinator.continueRuntimeMetricPreflightStart(ArCoreApk.Availability.SUPPORTED_INSTALLED, 1, 7)
+            f.drainUi()
             assertTrue(f.events.indexOf("create") < f.events.indexOf("probe"))
             assertTrue(f.events.indexOf("probe") < f.events.indexOf("close"))
             assertTrue(f.events.indexOf("close") < f.events.indexOf("complete-refresh:$supported"))
@@ -99,19 +100,22 @@ class RuntimeMetricPreflightCoordinatorTest {
         listOf("probe", "close").forEach { stage ->
             val f = Fixture(); f.prepare(); f.failures[stage] = IllegalStateException(stage)
             f.coordinator.continueRuntimeMetricPreflightStart(ArCoreApk.Availability.SUPPORTED_INSTALLED, 1, 7)
+            f.drainUi()
             assertEquals(1, f.events.count { it == "close" })
             assertTrue(f.events.contains("complete-refresh:null"))
             assertTrue(f.diagnostics.single().contains("reason=IllegalStateException"))
             assertNull(f.native.observe().session)
         }
     }
-    @Test fun unsupportedDeviceExceptionRemainsUnsupportedWhileCreateFailureHasNoClose() {
+    @Test fun sdkExceptionIsUnknownWhileOnlyAnActualFalseMeansUnsupported() {
         val f = Fixture(); f.prepare(); f.failures["probe"] = UnavailableDeviceNotCompatibleException()
         f.coordinator.continueRuntimeMetricPreflightStart(ArCoreApk.Availability.SUPPORTED_INSTALLED, 1, 7)
-        assertTrue(f.events.contains("close")); assertTrue(f.events.contains("complete-refresh:false"))
-        assertTrue(f.diagnostics.single().contains("ARCORE_DEVICE_NOT_COMPATIBLE"))
+        f.drainUi()
+        assertTrue(f.events.contains("close")); assertTrue(f.events.contains("complete-refresh:null"))
+        assertTrue(f.diagnostics.single().contains("UnavailableDeviceNotCompatibleException"))
         val failed = Fixture(); failed.prepare(); failed.failures["create"] = IllegalStateException("create")
         failed.coordinator.continueRuntimeMetricPreflightStart(ArCoreApk.Availability.SUPPORTED_INSTALLED, 1, 7)
+        failed.drainUi()
         assertFalse(failed.events.contains("close")); assertTrue(failed.events.contains("complete-refresh:null"))
     }
     @Test fun pendingAvailabilityUiRechecksOriginalGenerationBeforeSupportProbe() {
@@ -126,8 +130,8 @@ class RuntimeMetricPreflightCoordinatorTest {
         val f = Fixture(); f.prepare(); f.availability = ArCoreApk.Availability.UNKNOWN_CHECKING
         f.coordinator.startRuntimeMetricPreflight(1, 7)
         requireNotNull(f.availabilityCallback)(ArCoreApk.Availability.SUPPORTED_INSTALLED)
-        f.ui.removeAt(0).invoke(); requireNotNull(f.availabilityCallback)(ArCoreApk.Availability.SUPPORTED_INSTALLED)
-        f.ui.removeAt(0).invoke()
+        f.drainUi(); requireNotNull(f.availabilityCallback)(ArCoreApk.Availability.SUPPORTED_INSTALLED)
+        f.drainUi()
         assertEquals(1, f.events.count { it == "probe" }); assertEquals(2L, f.metric.preflightGeneration)
     }
     @Test fun lossRejectsForeignPurposeGenerationOrStartupWithoutSdkQuery() {
@@ -184,6 +188,7 @@ class RuntimeMetricPreflightCoordinatorTest {
         f.failures["probe"] = IllegalArgumentException("probe")
         f.failures["close"] = IllegalStateException("close")
         f.coordinator.continueRuntimeMetricPreflightStart(ArCoreApk.Availability.SUPPORTED_INSTALLED, 1, 7)
+        f.drainUi()
         assertTrue(f.diagnostics.single().contains("reason=IllegalStateException"))
         assertTrue(f.events.contains("complete-refresh:null"))
         assertEquals(1, f.events.count { it == "close" })
@@ -199,6 +204,52 @@ class RuntimeMetricPreflightCoordinatorTest {
         assertFalse(f.metric.outputAllowed); assertSame(f.session, f.native.observe().session)
     }
 
+    @Test fun asynchronousSupportUsesUiPublicationAndConsumesDuplicateCallbacksOnce() {
+        val f = Fixture(); f.prepare(); f.deferSupport = true
+        f.coordinator.continueRuntimeMetricPreflightStart(ArCoreApk.Availability.SUPPORTED_INSTALLED, 1, 7)
+        val callback = requireNotNull(f.supportCallback)
+        assertFalse(f.events.contains("create")); assertTrue(f.ui.isEmpty())
+        callback(Result.success(true))
+        assertFalse(f.events.any { it.startsWith("complete-refresh:") })
+        f.drainUi()
+        callback(Result.success(false)); f.drainUi()
+        assertEquals(listOf("complete-refresh:true"), f.events.filter { it.startsWith("complete-refresh:") })
+    }
+    @Test fun cancellationRejectsAlreadyQueuedSuccessAndOldCompletionCannotFinishRetry() {
+        val f = Fixture(); f.prepare(); f.deferSupport = true
+        f.coordinator.continueRuntimeMetricPreflightStart(ArCoreApk.Availability.SUPPORTED_INSTALLED, 1, 7)
+        val old = requireNotNull(f.supportCallback)
+        old(Result.success(true))
+        f.coordinator.cancelSupportCheck(); f.drainUi()
+        assertFalse(f.events.any { it.startsWith("complete-refresh:") })
+        f.metric.invalidateEvidence(); f.prepare()
+        val nextGeneration = f.metric.preflightGeneration
+        f.coordinator.continueRuntimeMetricPreflightStart(ArCoreApk.Availability.SUPPORTED_INSTALLED, nextGeneration, 7)
+        val next = requireNotNull(f.supportCallback)
+        old(Result.success(true)); next(Result.success(false)); f.drainUi()
+        assertEquals(listOf("complete-refresh:false"), f.events.filter { it.startsWith("complete-refresh:") })
+        assertTrue(f.supportCancellations >= 2)
+    }
+    @Test fun supportCompletionRechecksActorAndPermissionOnUi() {
+        for (retireActor in listOf(false, true)) {
+            val f = Fixture(); f.prepare(); f.deferSupport = true
+            f.coordinator.continueRuntimeMetricPreflightStart(ArCoreApk.Availability.SUPPORTED_INSTALLED, 1, 7)
+            requireNotNull(f.supportCallback)(Result.success(true))
+            if (retireActor) f.bindingLive = false else f.permission = false
+            f.drainUi()
+            assertEquals(if (retireActor) emptyList<String>() else listOf("complete-refresh:null"),
+                f.events.filter { it.startsWith("complete-refresh:") })
+        }
+    }
+    @Test fun remoteReleaseFailureAndQueryExceptionNeverClaimUnsupported() {
+        val f = Fixture(); f.prepare(); f.deferSupport = true
+        f.coordinator.continueRuntimeMetricPreflightStart(ArCoreApk.Availability.SUPPORTED_INSTALLED, 1, 7)
+        requireNotNull(f.supportCallback)(Result.failure(MetricSupportProbeException(MetricSupportFailure.RELEASE_UNCONFIRMED)))
+        f.drainUi()
+        assertTrue(f.events.contains("complete-refresh:null"))
+        assertTrue(f.diagnostics.single().contains("RELEASE_UNCONFIRMED"))
+    }
+
     private enum class Purpose { NONE, PREFLIGHT, RUNTIME }
     private class Fixture(active: Boolean = false, debug: Boolean = false) {
         val lock = Any(); val session = Any(); val provider = Any(); val binding = PostLoginDeviceCheckBinding("actor", 1, 1)
@@ -208,6 +259,9 @@ class RuntimeMetricPreflightCoordinatorTest {
         var availability = ArCoreApk.Availability.SUPPORTED_INSTALLED
         var now = 1_000L; var clockReads = 0; var permission = true; var supported = true; var metricAllowed = true; var foreground = true
         var bindingLive = true; var frameFailure: RuntimeException? = null
+        var deferSupport = false
+        var supportCallback: ((Result<Boolean>) -> Unit)? = null
+        var supportCancellations = 0
         var frameReads = 0; var seenFrame: String? = null; var seenCameraStamp: Long? = null
         var onTexture: (Boolean) -> Unit = {}; var evaluatorAtTexture: RuntimeMetricPreflightSession? = null
         val depth = DepthFrameSnapshot(1_000_000_000L, null, null, null)
@@ -274,7 +328,14 @@ class RuntimeMetricPreflightCoordinatorTest {
             override fun resumeBeforePublish(session: Any): Boolean { assertSame(this@Fixture.session, session); event("native-resume"); return true }
         }
         val coordinator = RuntimeMetricPreflightCoordinator(lock, { metric }, { native }, platform,
-            RuntimeMetricSupportProbe(platform) { assertSame(session, it); event("probe"); supported },
+            object : RuntimeMetricDepthSupportProbe {
+                private val synchronous = RuntimeMetricSupportProbe(platform) { assertSame(session, it); event("probe"); supported }
+                override fun automaticDepthSupported() = synchronous.automaticDepthSupported()
+                override fun query(onResult: (Result<Boolean>) -> Unit) {
+                    if (deferSupport) supportCallback = onResult else super.query(onResult)
+                }
+                override fun cancel() { supportCancellations++ }
+            },
             RuntimeMetricPreflightFrameEvidence<String> { frame, snapshot, at, generation, stamp ->
                 assertSame(depth, snapshot); assertFalse(Thread.holdsLock(lock)); frameReads++; frameFailure?.let { throw it }; seenFrame = frame; seenCameraStamp = stamp
                 RuntimeMetricFrameEvidence(generation, 1_000_000_000L, at, true, true, 20)
@@ -299,6 +360,7 @@ class RuntimeMetricPreflightCoordinatorTest {
             }, Purpose.PREFLIGHT, Purpose.RUNTIME, { clockReads++; event("clock"); now }, debug,
             { message -> event("diagnostic"); diagnostics += message })
         fun prepare() { metric.beginStoredDepthRefresh(binding); events.clear(); diagnostics.clear() }
+        fun drainUi() { while (ui.isNotEmpty()) ui.removeAt(0).invoke() }
     }
     companion object {
         private inline fun <reified T> proxy(noinline handle: (String, Array<out Any?>?) -> Any?): T =

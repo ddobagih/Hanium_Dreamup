@@ -10,8 +10,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.Closeable
 import java.io.File
+import java.util.concurrent.CompletableFuture
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionCohortBusyException
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionReleaseReceipt
 
 class DelegateFallbackRuntimeTest {
+    @Test fun anUnacquiredBusyCohortNeverStartsDelegateFallback() {
+        val busy = VisionCohortBusyException(CompletableFuture<VisionReleaseReceipt>())
+        val created = mutableListOf<String>()
+        assertSame(busy, runCatching {
+            DelegateFallbackRuntime<Closeable>(ModelRuntimeOptions("gpu", fallbackToCpu = true)) {
+                created += it
+                throw busy
+            }
+        }.exceptionOrNull())
+        assertEquals(listOf("gpu"), created)
+    }
+
     @Test
     fun gpuSuccessReportsAttachedDelegateWithoutCpuFallback() {
         val created = mutableListOf<String>()

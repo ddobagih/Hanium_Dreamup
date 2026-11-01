@@ -59,6 +59,16 @@
             android:process=":fixture_runtime" />
 
         <service
+            android:name=".runtime.vision.remote.VisionRuntimeService"
+            android:exported="false"
+            android:process=":vision_runtime" />
+
+        <service
+            android:name=".runtime.metric.MetricSupportService"
+            android:exported="false"
+            android:process=":metric_support" />
+
+        <service
             android:name=".report.ReportQueueCleanupJobService"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />

@@ -15,9 +15,66 @@ import kr.co.hanium.dreamup.walksafe.inference.unknown.tuning.*
 import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
 import org.junit.Assert.*
 import org.junit.Test
+import java.util.concurrent.CompletableFuture
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionCohortBusyException
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionReleaseReceipt
 
 /** Real FastSam model/post owners; release futures are driven by a controlled test engine. */
 class UnknownRuntimeServiceOwnerTest {
+    @Test fun busyPreservesTheMeasuredChoiceAndRetriesOnlyAfterAvailability() {
+        val f = Fixture()
+        f.requiresJoint = true
+        val measured = jointChoice(JointRuntimeCandidate(RuntimeCandidate(RuntimeBackend.CPU, 1),
+            RuntimeCandidate(RuntimeBackend.CPU, 1)))
+        f.joint = measured
+        val availability = CompletableFuture<VisionReleaseReceipt>()
+        f.native.loadFailure = VisionCohortBusyException(availability)
+        f.start()
+        val rejected = requireNotNull(f.owner.loadingService)
+        assertThrows(java.util.concurrent.ExecutionException::class.java) { rejected.start().get(3, TimeUnit.SECONDS) }
+        rejected.releasedFuture().get(3, TimeUnit.SECONDS)
+        f.awaitQueue(1); f.drain()
+        assertSame(measured, f.joint)
+        assertEquals(0, f.jointInvalidations)
+        assertEquals(1, f.native.creations.get())
+        assertNull(f.owner.currentService)
+        f.native.loadFailure = null
+        availability.complete(VisionReleaseReceipt("previous-cohort", 71))
+        f.awaitQueue(1); f.drain()
+        val ready = requireNotNull(f.owner.loadingService ?: f.owner.currentService)
+        ready.start().get(3, TimeUnit.SECONDS)
+        if (f.owner.currentService !== ready) { f.awaitQueue(1); f.drain() }
+        assertSame(ready, f.owner.currentService)
+        assertEquals(2, f.native.creations.get())
+        assertEquals(0, f.jointInvalidations)
+        f.close(ready)
+    }
+
+    @Test fun staleSourceOrLateBusyAvailabilityCannotStartAnotherService() {
+        for (retireSource in listOf(false, true)) {
+            val f = Fixture()
+            f.requiresJoint = true
+            f.joint = jointChoice(JointRuntimeCandidate(RuntimeCandidate(RuntimeBackend.CPU, 1),
+                RuntimeCandidate(RuntimeBackend.CPU, 1)))
+            val availability = CompletableFuture<VisionReleaseReceipt>()
+            f.native.loadFailure = IllegalStateException("adapter wrapper", VisionCohortBusyException(availability))
+            f.start()
+            val rejected = requireNotNull(f.owner.loadingService)
+            assertThrows(java.util.concurrent.ExecutionException::class.java) { rejected.start().get(3, TimeUnit.SECONDS) }
+            rejected.releasedFuture().get(3, TimeUnit.SECONDS)
+            f.awaitQueue(1); f.drain()
+            if (retireSource) { f.sourceCurrent = false; f.owner.startForWalk(null, { null }, { null }) }
+            else f.nowNs += TimeUnit.SECONDS.toNanos(15L)
+            f.native.loadFailure = null
+            availability.complete(VisionReleaseReceipt("old-cohort", 71))
+            f.drain()
+            assertEquals(1, f.native.creations.get())
+            assertEquals(0, f.jointInvalidations)
+            assertNotNull(f.joint)
+            assertNull(f.owner.currentService)
+        }
+    }
+
     @Test fun walkingRestoresBothTheJointAuxiliaryAndItsCadenceWithoutLegacyProfileMixing() {
         val f = Fixture()
         f.requiresJoint = true
@@ -627,8 +684,9 @@ class UnknownRuntimeServiceOwnerTest {
         private val profileBinding = UnknownRuntimeBinding("a".repeat(64), "b".repeat(64),
             "primary-rgb", "fast-rgb", "primary-decode", "fast-decode", candidate, "schedule",
             "device", "runtime", "environment", "fixture", "c".repeat(64), RuntimeFeatureScope.CAMERA_TRACKING)
-        override fun elapsedRealtimeMs() = 100_000L
-        override fun elapsedRealtimeNanos() = 100_000_000_000L
+        var nowNs = 100_000_000_000L
+        override fun elapsedRealtimeMs() = nowNs / 1_000_000L
+        override fun elapsedRealtimeNanos() = nowNs
         override fun cpuNanos() = 0L
         val owner = UnknownRuntimeServiceOwner(object : UnknownRuntimeProfileRepository {
             override val requiresJointChoice get() = requiresJoint

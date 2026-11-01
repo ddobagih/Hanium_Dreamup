@@ -1,7 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.runtime.metric
 
 import com.google.ar.core.ArCoreApk
-import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException
 import kr.co.hanium.dreamup.walksafe.shouldRecheckArCoreAvailability
 import kr.co.hanium.dreamup.walksafe.depth.DepthAcquisitionFailureReason
 import kr.co.hanium.dreamup.walksafe.depth.DepthFrameSnapshot
@@ -28,6 +27,15 @@ internal class RuntimeMetricPreflightCoordinator<L, Q, S : Any, P : Any, F>(
     private val debug: Boolean,
     private val diagnostic: (String) -> Unit,
 ) {
+    private var supportRequestGeneration = 0L
+    private var pendingSupportAttempt: Pair<Long, Int>? = null
+
+    /** Retires callback authority before asking the remote owner to release its process. */
+    fun cancelSupportCheck() {
+        ++supportRequestGeneration
+        pendingSupportAttempt = null
+        probe.cancel()
+    }
     fun updateOutputGate(frame: F, snapshot: DepthFrameSnapshot, observedAtMs: Long,
         expectedGeneration: Long, expectedEpoch: WalkRuntimeEpoch,
         acquisitionFailure: DepthAcquisitionFailureReason? = null, recognitionCameraTimestampNs: Long? = null,
@@ -73,31 +81,47 @@ internal class RuntimeMetricPreflightCoordinator<L, Q, S : Any, P : Any, F>(
 
     fun continueRuntimeMetricPreflightStart(availability: ArCoreApk.Availability, generation: Long, lifecycleGeneration: Int) {
         if (!metric().isRuntimeMetricPreflightAttemptCurrent(generation, lifecycleGeneration)) return
-        var diagnosticReason = availability.name
-        val depthSupport = when {
+        val immediate = when {
             !admission.cameraPermission() -> {
-                diagnosticReason = "CAMERA_PERMISSION_MISSING"
-                RuntimeMetricDepthSupport.UNKNOWN
+                RuntimeMetricDepthSupport.UNKNOWN to "CAMERA_PERMISSION_MISSING"
             }
-            availability == ArCoreApk.Availability.UNSUPPORTED_DEVICE_NOT_CAPABLE -> RuntimeMetricDepthSupport.UNSUPPORTED
-            availability != ArCoreApk.Availability.SUPPORTED_INSTALLED -> RuntimeMetricDepthSupport.UNKNOWN
-            else -> try {
-                if (probe.automaticDepthSupported()) {
-                    diagnosticReason = "DEPTH_MODE_AUTOMATIC_SUPPORTED"
-                    RuntimeMetricDepthSupport.SUPPORTED
-                } else {
-                    diagnosticReason = "DEPTH_MODE_AUTOMATIC_UNSUPPORTED"
-                    RuntimeMetricDepthSupport.UNSUPPORTED
+            availability == ArCoreApk.Availability.UNSUPPORTED_DEVICE_NOT_CAPABLE ->
+                RuntimeMetricDepthSupport.UNSUPPORTED to availability.name
+            availability != ArCoreApk.Availability.SUPPORTED_INSTALLED ->
+                RuntimeMetricDepthSupport.UNKNOWN to availability.name
+            else -> null
+        }
+        if (immediate != null) {
+            cancelSupportCheck()
+            metric().finishDeviceMetricDepthSupportCheck(generation, lifecycleGeneration, immediate.first, immediate.second)
+            return
+        }
+        val attempt = generation to lifecycleGeneration
+        if (pendingSupportAttempt == attempt) return
+        cancelSupportCheck()
+        val request = ++supportRequestGeneration
+        pendingSupportAttempt = attempt
+        val receive: (Result<Boolean>) -> Unit = { result ->
+            presentation.onUi {
+                if (request == supportRequestGeneration && pendingSupportAttempt == attempt &&
+                    metric().isRuntimeMetricPreflightAttemptCurrent(generation, lifecycleGeneration)) {
+                    // Consume authority before publication; duplicate/reentrant completions are stale.
+                    pendingSupportAttempt = null
+                    ++supportRequestGeneration
+                    val permission = admission.cameraPermission()
+                    if (metric().isRuntimeMetricPreflightAttemptCurrent(generation, lifecycleGeneration)) {
+                        val support = if (!permission || result.isFailure) RuntimeMetricDepthSupport.UNKNOWN
+                            else if (result.getOrNull() == true) RuntimeMetricDepthSupport.SUPPORTED
+                            else RuntimeMetricDepthSupport.UNSUPPORTED
+                        val reason = if (!permission) "CAMERA_PERMISSION_MISSING" else result.fold(
+                            { if (it) "DEPTH_MODE_AUTOMATIC_SUPPORTED" else "DEPTH_MODE_AUTOMATIC_UNSUPPORTED" },
+                            { (it as? MetricSupportProbeException)?.reason?.name ?: it.javaClass.simpleName })
+                        metric().finishDeviceMetricDepthSupportCheck(generation, lifecycleGeneration, support, reason)
+                    }
                 }
-            } catch (_: UnavailableDeviceNotCompatibleException) {
-                diagnosticReason = "ARCORE_DEVICE_NOT_COMPATIBLE"
-                RuntimeMetricDepthSupport.UNSUPPORTED
-            } catch (error: Exception) {
-                diagnosticReason = error.javaClass.simpleName
-                RuntimeMetricDepthSupport.UNKNOWN
             }
         }
-        metric().finishDeviceMetricDepthSupportCheck(generation, lifecycleGeneration, depthSupport, diagnosticReason)
+        try { probe.query(receive) } catch (error: Exception) { receive(Result.failure(error)) }
     }
 
     fun startRuntimeMetricPreflightSession(preflightSession: S, provider: P, generation: Long, lifecycleGeneration: Int) {

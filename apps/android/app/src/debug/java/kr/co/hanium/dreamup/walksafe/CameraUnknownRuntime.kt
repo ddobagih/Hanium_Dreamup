@@ -1,15 +1,18 @@
 package kr.co.hanium.dreamup.walksafe
 
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.CompletableFuture
+import java.lang.ref.WeakReference
 import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamRuntimeService
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRuntimeFailures
 
-/** Main-thread owner. A failed model is replaced only by an explicit, still-active retry. */
+/** Main-thread owner. Model failures require explicit retry; Busy waits only for foreign availability. */
 internal class CameraUnknownRuntime<T>(
     private val create: (Long) -> FastSamRuntimeService<T>,
     private val dispatch: (() -> Unit) -> Unit,
     private val changed: () -> Unit,
 ) {
-    enum class Status { IDLE, LOADING, READY, FAILED, WAITING_RELEASE, RELEASE_FAILED }
+    enum class Status { IDLE, LOADING, READY, FAILED, WAITING_RELEASE, WAITING_AVAILABILITY, RELEASE_FAILED }
 
     @Volatile var service: FastSamRuntimeService<T>? = null
         private set
@@ -20,13 +23,15 @@ internal class CameraUnknownRuntime<T>(
     var backendName: String? = null
         private set
     private var retrySerial = 0L
+    // Futures contain release metadata only. A detached service/listener must not be retained here.
+    private val retainedReleases = mutableListOf<CompletableFuture<Void>>()
 
     fun resume() {
         if (destroyed || active) return
         active = true
         if (service == null && status == Status.IDLE) startNew() else {
             if (service?.stats()?.stopping == true &&
-                status != Status.WAITING_RELEASE && status != Status.RELEASE_FAILED
+                status != Status.WAITING_RELEASE && status != Status.WAITING_AVAILABILITY && status != Status.RELEASE_FAILED
             ) status = Status.FAILED
             changed()
         }
@@ -35,7 +40,7 @@ internal class CameraUnknownRuntime<T>(
     fun pause() {
         active = false
         retrySerial++ // A release callback cannot carry a retry into another foreground session.
-        if (status == Status.WAITING_RELEASE) status = Status.FAILED
+        if (status == Status.WAITING_RELEASE || status == Status.WAITING_AVAILABILITY) status = Status.FAILED
         service?.discardPending("camera_test_paused")
     }
 
@@ -46,16 +51,20 @@ internal class CameraUnknownRuntime<T>(
         val request = ++retrySerial
         status = Status.WAITING_RELEASE
         old.closeAsync()
-        old.releasedFuture().whenComplete { _, error -> dispatch {
-            if (destroyed || request != retrySerial || service !== old) return@dispatch
-            if (error != null || !old.stats().nativeReleaseConfirmed) {
-                status = Status.RELEASE_FAILED
-                if (active) changed()
+        val epoch = old.sessionEpoch
+        val ownerRef = WeakReference(this)
+        old.releasedFuture().whenComplete { _, error -> ownerRef.get()?.dispatch callback@{
+            val owner = ownerRef.get() ?: return@callback
+            val current = owner.service ?: return@callback
+            if (owner.destroyed || request != owner.retrySerial || current.sessionEpoch != epoch) return@callback
+            if (error != null || !current.stats().nativeReleaseConfirmed) {
+                owner.status = Status.RELEASE_FAILED
+                if (owner.active) owner.changed()
             } else {
-                service = null
-                backendName = null
-                status = Status.IDLE
-                if (active) startNew()
+                owner.service = null
+                owner.backendName = null
+                owner.status = Status.IDLE
+                if (owner.active) owner.startNew()
             }
         } }
     }
@@ -68,24 +77,35 @@ internal class CameraUnknownRuntime<T>(
         status = Status.WAITING_RELEASE
         changed()
         old.closeAsync()
-        old.releasedFuture().whenComplete { _, error -> dispatch {
-            if (!active || destroyed || request != retrySerial || service !== old) return@dispatch
-            if (error != null || !old.stats().nativeReleaseConfirmed) {
-                status = Status.RELEASE_FAILED
-                changed()
-            } else startNew()
+        val epoch = old.sessionEpoch
+        val ownerRef = WeakReference(this)
+        old.releasedFuture().whenComplete { _, error -> ownerRef.get()?.dispatch callback@{
+            val owner = ownerRef.get() ?: return@callback
+            val current = owner.service ?: return@callback
+            if (!owner.active || owner.destroyed || request != owner.retrySerial || current.sessionEpoch != epoch) return@callback
+            if (error != null || !current.stats().nativeReleaseConfirmed) {
+                owner.status = Status.RELEASE_FAILED
+                owner.changed()
+            } else owner.startNew()
         } }
     }
 
     fun failed(epoch: Long) = dispatch {
         if (!owns(epoch)) return@dispatch
-        if (status != Status.WAITING_RELEASE && status != Status.RELEASE_FAILED) status = Status.FAILED
+        if (status != Status.WAITING_RELEASE && status != Status.WAITING_AVAILABILITY && status != Status.RELEASE_FAILED)
+            status = Status.FAILED
         if (active) changed()
     }
 
     fun accepts(epoch: Long): Boolean {
         val current = service ?: return false
         return active && !destroyed && current.sessionEpoch == epoch && current.isReady
+    }
+
+    /** Physical receipts survive detaching a service from the camera's current slot. */
+    fun retainedReleaseReceipts(): List<CompletableFuture<Void>> = synchronized(retainedReleases) {
+        retainedReleases.removeAll { it.isDone && !it.isCompletedExceptionally && !it.isCancelled }
+        retainedReleases.toList()
     }
 
     fun destroy() {
@@ -102,28 +122,64 @@ internal class CameraUnknownRuntime<T>(
         if (!active || destroyed) return
         service = null // Retired callbacks lose ownership before the replacement is constructed.
         backendName = null
-        val created = try { create(nextEpoch.incrementAndGet()) } catch (_: Exception) {
+        val created = try { create(nextEpoch.incrementAndGet()) } catch (error: Exception) {
+            if (waitForAvailability(null, error)) return
             status = Status.FAILED
             changed()
             return
         }
+        synchronized(retainedReleases) {
+            retainedReleases.removeAll { it.isDone && !it.isCompletedExceptionally && !it.isCancelled }
+            retainedReleases += created.releasedFuture()
+        }
         service = created
         status = Status.LOADING
         changed()
+        val epoch = created.sessionEpoch
+        val ownerRef = WeakReference(this)
         try {
-            created.start().whenComplete { info, error -> dispatch {
-                if (!owns(created.sessionEpoch)) return@dispatch
-                backendName = info?.actualBackend?.name
-                if (status != Status.WAITING_RELEASE && status != Status.RELEASE_FAILED) {
-                    status = if (error == null && !created.stats().stopping) Status.READY else Status.FAILED
+            created.start().whenComplete { info, error -> ownerRef.get()?.dispatch callback@{
+                val owner = ownerRef.get() ?: return@callback
+                if (!owner.owns(epoch)) return@callback
+                if (error != null && owner.status != Status.WAITING_RELEASE &&
+                    owner.status != Status.RELEASE_FAILED && owner.waitForAvailability(epoch, error)) return@callback
+                owner.backendName = info?.actualBackend?.name
+                if (owner.status != Status.WAITING_RELEASE && owner.status != Status.WAITING_AVAILABILITY &&
+                    owner.status != Status.RELEASE_FAILED) {
+                    owner.status = if (error == null && owner.service?.stats()?.stopping == false) Status.READY else Status.FAILED
                 }
-                if (active) changed()
+                if (owner.active) owner.changed()
             } }
-        } catch (_: Exception) {
+        } catch (error: Exception) {
             created.closeAsync()
+            if (waitForAvailability(epoch, error)) return
             status = Status.FAILED
             changed()
         }
+    }
+
+    /** A foreign cohort is availability, not a new model failure or permission to reuse its receipt. */
+    private fun waitForAvailability(epoch: Long?, error: Throwable): Boolean {
+        val busy = VisionRuntimeFailures.busy(error) ?: return false
+        if (!active || destroyed) return true
+        val request = ++retrySerial
+        status = Status.WAITING_AVAILABILITY
+        changed()
+        val current = service
+        current?.closeAsync()
+        val ownRelease = current?.releasedFuture() ?: CompletableFuture.completedFuture<Void>(null)
+        val ownerRef = WeakReference(this)
+        CompletableFuture.allOf(ownRelease, busy.availabilityReceipt.toCompletableFuture())
+            .whenComplete { _, releaseError -> ownerRef.get()?.dispatch callback@{
+                val owner = ownerRef.get() ?: return@callback
+                if (!owner.active || owner.destroyed || request != owner.retrySerial ||
+                    owner.service?.sessionEpoch != epoch) return@callback
+                if (releaseError != null) {
+                    owner.status = Status.RELEASE_FAILED
+                    owner.changed()
+                } else owner.startNew()
+            } }
+        return true
     }
 
     private companion object {

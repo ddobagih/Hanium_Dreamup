@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.inference
 
 import java.io.Closeable
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRuntimeFailures
 
 /** Native cleanup failed, so opening a replacement could retain two live native runtimes. */
 internal class DetectorNativeCleanupFailure(cause: Throwable) : RuntimeException("native runtime cleanup failed", cause)
@@ -62,6 +63,8 @@ internal class DelegateFallbackRuntime<T : Closeable>(
     private fun canFallback(error: Throwable): Boolean =
         activeDelegate != "cpu" && options.fallbackToCpu &&
             error !is DetectorNativeCleanupFailure &&
+            error !is DetectorCohortRetired &&
+            VisionRuntimeFailures.busy(error) == null &&
             error !is DetectorTensorContractViolation &&
             (error is RuntimeException || error is LinkageError)
 

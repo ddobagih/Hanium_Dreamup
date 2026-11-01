@@ -10,6 +10,7 @@ public final class UnknownRuntimeServiceTestFactory {
     public final AtomicInteger creations = new AtomicInteger();
     public final AtomicInteger nativeCloses = new AtomicInteger();
     public volatile RuntimeException closeFailure;
+    public volatile RuntimeException loadFailure;
     public CountDownLatch loadEntered;
     public CountDownLatch releaseLoad;
     public volatile CountDownLatch closeEntered;
@@ -22,6 +23,7 @@ public final class UnknownRuntimeServiceTestFactory {
             if (loadEntered != null) loadEntered.countDown();
             if (releaseLoad != null && !releaseLoad.await(3, TimeUnit.SECONDS))
                 throw new IllegalStateException("test load was not released");
+            if (loadFailure != null) throw loadFailure;
             final long owner = Thread.currentThread().getId();
             final FastSamRuntimeInfo runtime = new FastSamRuntimeInfo(options,
                 FastSamRuntimeOptions.Backend.CPU, null, owner, 0);

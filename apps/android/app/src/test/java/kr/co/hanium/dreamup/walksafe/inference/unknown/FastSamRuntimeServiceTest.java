@@ -77,6 +77,63 @@ public final class FastSamRuntimeServiceTest {
         s.start().get(3,TimeUnit.SECONDS);s.submitArgb(2,1,new int[2],token(1),null);await(error);failed(s.releasedFuture(),close);failed(s.closeAsync(),invoke);assertFalse(s.stats().nativeReleaseConfirmed);
     }
 
+    @Test public void remoteCloseFailureWaitsForActualDeathAndCanRecoverItsReleaseReceipt()throws Exception {
+        FastSamRuntimeOptions o=options(false);RuntimeException marker=new RuntimeException("remote close result failed");
+        CompletableFuture<Void> physical=new CompletableFuture<>();
+        FastSamEngine.Factory factory=new FastSamEngine.Factory(){
+            public FastSamEngine create(){Engine e=new Engine(o);e.closeFailure=marker;return e;}
+            public CompletableFuture<Void> actualReleasedFuture(){return physical;}
+        };
+        FastSamRuntimeService<Void> s=new FastSamRuntimeService<>(12,o,r->{},factory,System::nanoTime);
+        s.start().get(3,TimeUnit.SECONDS);failed(s.closeAsync(),marker);
+        assertFalse(s.releasedFuture().isDone());assertFalse(s.stats().nativeReleaseConfirmed);
+        physical.complete(null);s.releasedFuture().get(3,TimeUnit.SECONDS);
+        assertTrue(s.stats().nativeReleaseConfirmed);failed(s.closeAsync(),marker);
+    }
+
+    @Test public void remoteOpenFailureCannotLoseTheAcquiredCohortsPhysicalReceipt()throws Exception {
+        FastSamRuntimeOptions o=options(false);RuntimeException marker=new RuntimeException("remote open failed");
+        CompletableFuture<Void> physical=new CompletableFuture<>();
+        FastSamEngine.Factory factory=new FastSamEngine.Factory(){
+            public FastSamEngine create(){throw marker;}
+            public CompletableFuture<Void> actualReleasedFuture(){return physical;}
+        };
+        FastSamRuntimeService<Void> s=new FastSamRuntimeService<>(12,o,r->{},factory,System::nanoTime);
+        failed(s.start(),marker);failed(s.closeAsync(),marker);
+        assertFalse(s.releasedFuture().isDone());assertFalse(s.stats().nativeReleaseConfirmed);
+        physical.complete(null);s.releasedFuture().get(3,TimeUnit.SECONDS);assertTrue(s.stats().nativeReleaseConfirmed);
+    }
+
+    @Test public void physicalRemoteAckCannotReleaseAConsumerThatIsStillDraining()throws Exception {
+        FastSamRuntimeOptions o=options(false);CompletableFuture<Void> physical=new CompletableFuture<>();
+        CountDownLatch entered=new CountDownLatch(1),consumerRelease=new CountDownLatch(1);
+        FastSamEngine.Factory factory=new FastSamEngine.Factory(){
+            public FastSamEngine create(){return new Engine(o);}
+            public CompletableFuture<Void> actualReleasedFuture(){return physical;}
+        };
+        FastSamRuntimeService<Void> s=new FastSamRuntimeService<>(12,o,r->{entered.countDown();await(consumerRelease);},factory,System::nanoTime);
+        s.start().get(3,TimeUnit.SECONDS);s.submitArgb(2,1,new int[2],token(1),null);await(entered);
+        CompletableFuture<Void> close=s.closeAsync();physical.complete(null);
+        assertFalse(close.isDone());assertFalse(s.releasedFuture().isDone());
+        consumerRelease.countDown();close.get(3,TimeUnit.SECONDS);s.releasedFuture().get(3,TimeUnit.SECONDS);
+    }
+
+    @Test public void closingDuringRemoteCreationRequestsControlCancellationOnceWithoutForgingRelease()throws Exception {
+        FastSamRuntimeOptions o=options(false);CompletableFuture<Void> physical=new CompletableFuture<>();
+        CountDownLatch entered=new CountDownLatch(1),cancelled=new CountDownLatch(1),returnLoad=new CountDownLatch(1);
+        AtomicInteger cancellations=new AtomicInteger();RuntimeException marker=new RuntimeException("retired remote OPEN");
+        FastSamEngine.Factory factory=new FastSamEngine.Factory(){
+            public FastSamEngine create()throws Exception{entered.countDown();await(returnLoad);throw marker;}
+            public CompletableFuture<Void> actualReleasedFuture(){return physical;}
+            public void cancelPendingLoad(){cancellations.incrementAndGet();cancelled.countDown();}
+        };
+        FastSamRuntimeService<Void> s=new FastSamRuntimeService<>(12,o,r->{},factory,System::nanoTime);
+        s.start();await(entered);CompletableFuture<Void> close=s.closeAsync();s.closeAsync();await(cancelled);
+        assertEquals(1,cancellations.get());assertFalse(close.isDone());assertFalse(s.releasedFuture().isDone());
+        returnLoad.countDown();failed(close,marker);assertFalse(s.releasedFuture().isDone());
+        physical.complete(null);s.releasedFuture().get(3,TimeUnit.SECONDS);
+    }
+
     @Test public void finalPrototypeNaNIsFatalBeforeResult()throws Exception {
         FastSamRuntimeOptions o=options(false);CountDownLatch error=new CountDownLatch(1);AtomicReference<Throwable> failure=new AtomicReference<>();FastSamRuntimeService<Void> s=new FastSamRuntimeService<>(12,o,new FastSamRuntimeService.Listener<Void>(){public void onResult(FastSamResult<Void> r){fail();}public void onError(Throwable e){failure.set(e);error.countDown();}},()->{Engine e=new Engine(o);e.nonFinite=true;return e;},System::nanoTime);
         s.start().get(3,TimeUnit.SECONDS);s.submitArgb(2,1,new int[2],token(1),null);await(error);s.releasedFuture().get(3,TimeUnit.SECONDS);failed(s.closeAsync(),failure.get());assertTrue(s.stats().nativeReleaseConfirmed);

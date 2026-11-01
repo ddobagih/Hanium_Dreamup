@@ -8,7 +8,10 @@ import kr.co.hanium.dreamup.walksafe.runtime.metric.RuntimeMetricPreflightAdmiss
 import kr.co.hanium.dreamup.walksafe.runtime.metric.RuntimeMetricPreflightRenderer
 import kr.co.hanium.dreamup.walksafe.runtime.metric.RuntimeMetricPreflightPresentation
 import kr.co.hanium.dreamup.walksafe.runtime.metric.RuntimeMetricLossLifecycle
-import kr.co.hanium.dreamup.walksafe.runtime.metric.RuntimeMetricSupportProbe
+import kr.co.hanium.dreamup.walksafe.runtime.metric.RemoteMetricSupportProbe
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRuntimeContext
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.RemoteVisionClient
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionOwnerRetirement
 import kr.co.hanium.dreamup.walksafe.runtime.metric.AndroidRuntimeMetricFrameEvidence
 import kr.co.hanium.dreamup.walksafe.runtime.metric.RuntimeMetricPreflightResultStore
 import kr.co.hanium.dreamup.walksafe.runtime.vision.capture.*
@@ -1116,6 +1119,9 @@ open class MainActivity @JvmOverloads constructor(
             }
         }
     private var cameraEntryReleasePending = false
+    private var cameraRetirementSerial = 0L
+    private var cameraRetirementContinuation: ((Boolean) -> Unit)? = null
+    private var visionFinalRetirementStarted = false
     private var primaryRestoreAfterCameraScreen = false
     private var awaitedCameraRuntimeRelease: java.util.concurrent.CompletableFuture<Unit>? = null
     private var detectorComparisonAfterCameraRelease = false
@@ -1666,6 +1672,52 @@ private val framePipelineController: FramePipelineController<ArSessionLease, ArS
     }
 
     private val frozenReportFrameCoordinator get() = riskFeedbackComponents.frozenReportFrameCoordinator
+    private val visionRuntimeOwnerId = "main-${java.util.UUID.randomUUID()}"
+    private val visionRuntimeContext by lazy { VisionRuntimeContext(applicationContext, visionRuntimeOwnerId) }
+
+    private fun retireVisionOwner(participant: CameraRuntimeHandoff.Claim,
+        primaryDrained: java.util.concurrent.CompletionStage<Unit>,
+        auxiliaryAfterDrain: () -> List<java.util.concurrent.CompletionStage<*>>, reason: String) {
+        val ownerId = visionRuntimeOwnerId
+        val client = if (Build.VERSION.SDK_INT >= 31) RemoteVisionClient.forMainProcess(applicationContext) else null
+        // These callbacks retain application context and IDs only, never this Activity.
+        VisionOwnerRetirement.begin(ownerId, participant, primaryDrained, auxiliaryAfterDrain,
+            { client?.retirementSnapshot(ownerId) },
+            { lease -> client?.requestExit(lease, reason); Unit },
+            { error -> android.util.Log.w("WalkSafeVisionRetirement", reason, error); Unit })
+    }
+
+    private fun beginDestroyedVisionRetirement() {
+        if (visionFinalRetirementStarted) return
+        visionFinalRetirementStarted = true
+        val participant = CameraRuntimeHandoff.joinRetirement()
+        primaryDetectorOwner.fenceForClose()
+        val auxiliaryRef = if (unknownServiceOwnerLazy.isInitialized())
+            java.lang.ref.WeakReference(unknownServiceOwner) else null
+        retireVisionOwner(participant, primaryDetectorOwner.closedFuture(),
+            { auxiliaryRef?.get()?.retainedReleaseReceipts().orEmpty() }, "main_destroyed")
+    }
+
+    /** The preceding primary/auxiliary per-model barriers have already completed. */
+    private fun retireVisionOwnerBeforeCamera(continuation: (Boolean) -> Unit) {
+        val serial = ++cameraRetirementSerial
+        cameraRetirementContinuation = continuation
+        val participant = CameraRuntimeHandoff.joinRetirement()
+        val activityRef = java.lang.ref.WeakReference(this)
+        participant.released.whenComplete { _, error ->
+            activityRef.get()?.runOnUiThread {
+                activityRef.get()?.let { activity ->
+                    if (activity.cameraRetirementSerial == serial) {
+                        val callback = activity.cameraRetirementContinuation
+                        activity.cameraRetirementContinuation = null
+                        callback?.invoke(error == null)
+                    }
+                }
+            }
+        }
+        retireVisionOwner(participant, java.util.concurrent.CompletableFuture.completedFuture(Unit),
+            { emptyList() }, "home_camera_entry")
+    }
     private val backgroundRenderer = CameraBackgroundRenderer()
     private val visionPrimaryComposition = createVisionPrimaryComposition()
     private fun createVisionPrimaryComposition() = VisionPrimaryComposition(
@@ -3814,7 +3866,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
     private val detectorWatchdogHandler by lazy { Handler(Looper.getMainLooper()) }
     private val visionUnknownComposition = createVisionUnknownComposition()
     private fun createVisionUnknownComposition() = VisionUnknownComposition(
-        { applicationContext }, { this }, { primaryDetectorOwner }, { primaryRuntimeCalibrationOwner },
+        { visionRuntimeContext }, { this }, { primaryDetectorOwner }, { primaryRuntimeCalibrationOwner },
         { frameStateLock }, { unknownCaptureClock },
         authority = { object : UnknownRuntimeServiceAuthority {
                 override fun destroyedOrDetectorClosing() = isDestroyed || primaryDetectorOwner.projection().closing
@@ -4480,6 +4532,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                 }
                 override fun cancelCalibration(reason: String) { cancelDeviceRuntimeCalibration(reason) }
                 override fun cancelMetricPreflight(reason: String) {
+                    cancelMetricSupportCheck()
                     if (postLoginMetricPreflightStarted || metricPreflightPostLoginBinding != null ||
                         arSessionOwner.observe().purpose == ArSessionPurpose.PREFLIGHT) this@MainActivity.runtimeMetricInvalidation.invalidate(reason)
                     else runtimeMetricSession.clearPreflightBinding()
@@ -5211,10 +5264,19 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
         )
     }
 
+    private val runtimeMetricSupportProbeDelegate = lazy {
+        RemoteMetricSupportProbe(applicationContext,
+            absoluteDeadlineMs = { postLoginDeviceCheckController.runtimeDeadlineMs })
+    }
+
+    private fun cancelMetricSupportCheck() {
+        if (runtimeMetricSupportProbeDelegate.isInitialized()) runtimeMetricPreflight.cancelSupportCheck()
+    }
+
     private val runtimeMetricPreflight by lazy {
         RuntimeMetricPreflightCoordinator(
             runtimeMetricStateLock, { runtimeMetricSession }, { arSessionOwner }, runtimeCameraPlatform,
-            RuntimeMetricSupportProbe(runtimeCameraPlatform, AndroidRuntimeMetricFrameEvidence::automaticDepthSupported), AndroidRuntimeMetricFrameEvidence(RUNTIME_METRIC_MIN_RAW_CONFIDENCE),
+            runtimeMetricSupportProbeDelegate.value, AndroidRuntimeMetricFrameEvidence(RUNTIME_METRIC_MIN_RAW_CONFIDENCE),
             object : RuntimeMetricPreflightAdmission {
                 override fun cameraPermission() = hasCameraPermission()
                 override fun metricDistanceAllowed() = startupCapabilityDecision?.allowsMetricDistance()
@@ -5384,7 +5446,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                 override fun loadOrCurrent() = reportRuntimeConfig ?: loadReportRuntimeConfig().also { reportRuntimeConfig = it }
                 override fun current() = reportRuntimeConfig
                 override fun sha256() = reportModelConfigSha256
-            }, AndroidPrimaryLifecyclePlatform { applicationContext },
+            }, AndroidPrimaryLifecyclePlatform { visionRuntimeContext },
             object : PrimaryPreparationInteraction {
                 override fun metricDistanceEnabled() = postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE)
                 override fun walkRuntimeActive() = isWalkSessionRuntimeActive()
@@ -7909,6 +7971,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
     }
 
     override fun onPause() {
+        cancelMetricSupportCheck()
         closeRecognitionDisplay(restoreFocus = false)
         guidanceTouchGuardContent?.cancelHold()
         dismissNativeGuidanceConfirmation()
@@ -8029,6 +8092,10 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
     }
 
     override fun onDestroy() {
+        cancelMetricSupportCheck()
+        cameraRetirementSerial++
+        cameraRetirementContinuation = null
+        beginDestroyedVisionRetirement()
         closeGuidanceTouchGuard()
         closeVoiceHelp(announce = false)
         dismissWalkExitConfirmation()
@@ -8045,7 +8112,6 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
         fieldDiagnosticRecording.closeHeartbeat()
         walkStopDelivery.close()
         if (runtimeLoadObservationSourceHolder.isInitialized()) runtimeLoadObservationSource.close()
-        primaryDetectorOwner.fenceForClose()
         cancelDestinationSearchLocation()
         initialAppPermissionExitDialog?.dismiss()
         initialAppPermissionExitDialog = null
@@ -8073,6 +8139,11 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
         routeArchiveController.detach()
         privacyStartupInspectionController.clearPendingReady()
         if (!privacyStartupInspectionComplete) {
+            if (unknownServiceOwnerLazy.isInitialized()) {
+                unknownServiceOwner.releaseLoadingIfPresent()
+                unknownServiceOwner.closeActiveForDetector()
+            }
+            primaryDetectorOwner.closeAfterCalibrationDrains()
             runCatching { privacyStartupResources.closeOnUiThread() }
             if (::accountDeletionActivityLease.isInitialized) {
                 accountDeletionProcessCoordinator.detach(accountDeletionActivityLease)
@@ -14030,23 +14101,30 @@ generation != cameraFallbackGeneration
                                 "추가 인식 모델의 종료를 확인하지 못했습니다. 앱을 완전히 종료한 뒤 다시 실행해 주세요.")
                             return@runOnUiThread
                         }
-                        cameraEntryReleasePending = false
-                        primaryDetectorLifecycleController.finishCompositeCheck(reload = false)
-                        if (current()) try {
-                            startActivity(Intent().setClassName(this, "$packageName.CameraTestActivity"))
-                        } catch (error: RuntimeException) {
-                            if (error is android.content.ActivityNotFoundException || error is SecurityException) {
-                                // These failures reject the launch before CameraTest obtains native ownership.
-                                primaryRestoreAfterCameraScreen = true
-                                restorePrimaryAfterCameraScreenIfReady()
-                                updateStatus("카메라 화면 열기 실패", "기본 인식 모델을 다시 준비합니다.")
-                            } else {
-                                cameraEntryReleasePending = true
-                                updateStatus("카메라 전환 확인 필요",
-                                    "화면 전환 완료를 확인하지 못했습니다. 앱을 완전히 종료한 뒤 다시 실행해 주세요.")
+                        retireVisionOwnerBeforeCamera { cohortReleased ->
+                            if (!cohortReleased) {
+                                if (!isDestroyed && !isFinishing) updateStatus("카메라 준비 종료 확인 필요",
+                                    "이전 인식 실행부의 실제 종료를 확인하지 못했습니다.")
+                                return@retireVisionOwnerBeforeCamera
                             }
+                            cameraEntryReleasePending = false
+                            primaryDetectorLifecycleController.finishCompositeCheck(reload = false)
+                            if (current()) try {
+                                startActivity(Intent().setClassName(this, "$packageName.CameraTestActivity"))
+                            } catch (error: RuntimeException) {
+                                if (error is android.content.ActivityNotFoundException || error is SecurityException) {
+                                    // These failures reject the launch before CameraTest obtains native ownership.
+                                    primaryRestoreAfterCameraScreen = true
+                                    restorePrimaryAfterCameraScreenIfReady()
+                                    updateStatus("카메라 화면 열기 실패", "기본 인식 모델을 다시 준비합니다.")
+                                } else {
+                                    cameraEntryReleasePending = true
+                                    updateStatus("카메라 전환 확인 필요",
+                                        "화면 전환 완료를 확인하지 못했습니다. 앱을 완전히 종료한 뒤 다시 실행해 주세요.")
+                                }
+                            }
+                            else restorePrimaryAfterCameraScreenIfReady()
                         }
-                        else restorePrimaryAfterCameraScreenIfReady()
                     }
                 } } catch (_: RuntimeException) {
                     if (!isDestroyed && !isFinishing) updateStatus("카메라 준비 종료 확인 필요",

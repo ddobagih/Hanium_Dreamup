@@ -2,19 +2,15 @@ package kr.co.hanium.dreamup.walksafe.inference
 
 import android.content.Context
 import android.media.Image
-import android.os.Build
+import android.os.SystemClock
 import kr.co.hanium.dreamup.walksafe.depth.DetectionCandidate
-import org.tensorflow.lite.Interpreter
-import org.tensorflow.lite.DataType
-import org.tensorflow.lite.TensorFlowLite
-import org.tensorflow.lite.gpu.CompatibilityList
-import org.tensorflow.lite.gpu.GpuDelegate
-import org.tensorflow.lite.gpu.GpuDelegateFactory
 import java.io.Closeable
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.nio.MappedByteBuffer
-import java.nio.channels.FileChannel
+import java.util.concurrent.CompletionStage
+import java.util.concurrent.CompletableFuture
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionPurpose
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRuntimeFailures
 
 /**
  * Executes either one unified model or the complete custom-tactile/COCO legacy pair described by
@@ -35,6 +31,7 @@ class TfliteAndroidFrameDetector private constructor(
     private val rgbScratch = DetectorRgbScratch(preprocessor)
     private val personSupplementMerger = PersonSupplementMerger()
     private var closed = false
+    private var tensorFactory: PrimaryTensorEngineFactory? = null
 
     override fun detect(
         cameraImage: Image,
@@ -278,6 +275,9 @@ class TfliteAndroidFrameDetector private constructor(
         if (threadOwner != null) threadOwner.close(release) else release()
     }
 
+    fun actualReleasedFuture(): CompletionStage<Unit> =
+        tensorFactory?.actualReleasedFuture ?: CompletableFuture.completedFuture(Unit)
+
     /** Includes later first-inference and native-close events from this load generation. */
     fun lifecycleTiming(): AndroidDetectorLoadTiming = loadRecorder.snapshot()
 
@@ -289,6 +289,9 @@ class TfliteAndroidFrameDetector private constructor(
             } catch (error: Throwable) {
                 if (failure == null) failure = error else failure?.addSuppressed(error)
             }
+        }
+        try { tensorFactory?.close() } catch (error: Throwable) {
+            if (failure == null) failure = error else if (failure !== error) failure?.addSuppressed(error)
         }
         failure?.let { throw it }
     }
@@ -416,6 +419,7 @@ class TfliteAndroidFrameDetector private constructor(
                 val config = recorder.measure(AndroidDetectorLoadPhase.CONFIG_LOAD) { TwoModelRuntimeConfig.load(context) }
                 createRecorded(context, config, runtimeOverride, preprocessingStrategy, recorder)
             } catch (error: Exception) {
+                VisionRuntimeFailures.busy(error)?.let { throw it }
                 AndroidDetectorLoadResult(
                     detector = null,
                     configLoaded = false,
@@ -438,12 +442,22 @@ class TfliteAndroidFrameDetector private constructor(
             return createRecorded(context, config, runtimeOverride, preprocessingStrategy, DetectorLoadTimingRecorder())
         }
 
+        /** Explicit local entry for the disposable fixture child; never selected by a parent caller. */
+        internal fun createWithStatusLocal(
+            context: Context,
+            config: TwoModelRuntimeConfig,
+            runtimeOverride: ModelRuntimeOptions? = null,
+            preprocessingStrategy: YuvPreprocessingStrategy = YuvPreprocessingStrategy.LEGACY_TWO_PASS,
+        ): AndroidDetectorLoadResult = createRecorded(context, config, runtimeOverride, preprocessingStrategy,
+            DetectorLoadTimingRecorder(), local = true)
+
         private fun createRecorded(
             context: Context,
             config: TwoModelRuntimeConfig,
             runtimeOverride: ModelRuntimeOptions?,
             preprocessingStrategy: YuvPreprocessingStrategy,
             recorder: DetectorLoadTimingRecorder,
+            local: Boolean = false,
         ): AndroidDetectorLoadResult {
             val effectiveConfig = if (runtimeOverride == null) config else config.copy(
                 unifiedWalksafe = config.unifiedWalksafe?.copy(runtime = runtimeOverride),
@@ -451,29 +465,40 @@ class TfliteAndroidFrameDetector private constructor(
                 cocoGeneral = config.cocoGeneral?.copy(runtime = runtimeOverride),
                 personSupplement = config.personSupplement?.copy(runtime = runtimeOverride),
             )
-            val owner = if (effectiveConfig.requiresGpuThreadOwner) DetectorThreadOwner() else null
+            val factory = try {
+                if (local) PrimaryTensorEngines.local(context)
+                else PrimaryTensorEngines.remote(context, SystemClock.elapsedRealtime() + 60_000L)
+            } catch (error: Exception) {
+                VisionRuntimeFailures.busy(error)?.let { throw it }
+                return AndroidDetectorLoadResult(null, true, false, null, false, error.javaClass.simpleName,
+                    loadTiming = recorder.finishLoad(false), actualReleasedFuture = CompletableFuture.completedFuture(Unit))
+            }
+            val owner = if (factory.requiresOwnerThread || effectiveConfig.requiresGpuThreadOwner) DetectorThreadOwner() else null
             val queuedNs = recorder.now()
             var createEntered = false
             val create = {
                 createEntered = true
                 if (owner != null) recorder.record(AndroidDetectorLoadPhase.OWNER_QUEUE, queuedNs)
-                createOnOwner(context, effectiveConfig, owner, preprocessingStrategy, recorder)
+                createOnOwner(context, effectiveConfig, owner, preprocessingStrategy, recorder, factory)
             }
             val result = try {
                 val result = owner?.call(create) ?: create()
-                if (result.detector == null) owner?.close {}
+                if (result.detector == null) {
+                    if (owner != null) owner.close { factory.close() } else factory.close()
+                }
                 result
             } catch (error: Throwable) {
                 if (owner != null && !createEntered) recorder.record(AndroidDetectorLoadPhase.OWNER_QUEUE, queuedNs, failure = error)
                 try {
-                    owner?.close {}
+                    if (owner != null) owner.close { factory.close() } else factory.close()
                 } catch (closeError: Throwable) {
-                    error.addSuppressed(closeError)
+                    if (closeError !== error) error.addSuppressed(closeError)
                 }
+                VisionRuntimeFailures.busy(error)?.let { throw it }
                 if (error !is Exception && error !is LinkageError) throw error
                 AndroidDetectorLoadResult(null, true, false, null, false, error.javaClass.simpleName)
             }
-            return result.copy(loadTiming = recorder.finishLoad(result.detectorAvailable))
+            return result.copy(loadTiming = recorder.finishLoad(result.detectorAvailable), actualReleasedFuture = factory.actualReleasedFuture)
         }
 
         private fun createOnOwner(
@@ -482,10 +507,11 @@ class TfliteAndroidFrameDetector private constructor(
             owner: DetectorThreadOwner?,
             preprocessingStrategy: YuvPreprocessingStrategy,
             recorder: DetectorLoadTimingRecorder,
+            factory: PrimaryTensorEngineFactory,
         ): AndroidDetectorLoadResult {
-            return try {
+            val loaded = try {
                 if (config.primaryModelKey == TwoModelRuntimeConfig.UNIFIED_MODEL_KEY) {
-                    val unifiedAttempt = createUnified(context, config, owner, preprocessingStrategy, recorder)
+                    val unifiedAttempt = createUnified(context, config, owner, preprocessingStrategy, recorder, factory)
                     val unified = unifiedAttempt.value
                     if (unified != null) {
                         AndroidDetectorLoadResult(
@@ -497,7 +523,7 @@ class TfliteAndroidFrameDetector private constructor(
                             reason = "unified_loaded",
                         )
                     } else {
-                        val legacy = createLegacyFallbackOrNull(context, config, owner, preprocessingStrategy, recorder)
+                        val legacy = createLegacyFallbackOrNull(context, config, owner, preprocessingStrategy, recorder, factory)
                         AndroidDetectorLoadResult(
                             detector = legacy,
                             configLoaded = true,
@@ -510,7 +536,7 @@ class TfliteAndroidFrameDetector private constructor(
                     }
                 } else {
                     AndroidDetectorLoadResult(
-                        detector = createLegacyTwoModel(context, config, owner, preprocessingStrategy, recorder),
+                        detector = createLegacyTwoModel(context, config, owner, preprocessingStrategy, recorder, factory),
                         configLoaded = true,
                         detectorAvailable = true,
                         modelKey = TwoModelRuntimeConfig.LEGACY_TWO_MODEL_KEY,
@@ -519,6 +545,7 @@ class TfliteAndroidFrameDetector private constructor(
                     )
                 }
             } catch (error: Exception) {
+                VisionRuntimeFailures.busy(error)?.let { throw it }
                 AndroidDetectorLoadResult(
                     detector = null,
                     configLoaded = true,
@@ -529,6 +556,8 @@ class TfliteAndroidFrameDetector private constructor(
                     failureCode = ModelAssetIntegrity.classify(error),
                 )
             }
+            loaded.detector?.tensorFactory = factory
+            return loaded
         }
 
         /** Keeps the historical prefix while exposing the preserved primary-model cause. */
@@ -548,6 +577,7 @@ class TfliteAndroidFrameDetector private constructor(
             owner: DetectorThreadOwner?,
             preprocessingStrategy: YuvPreprocessingStrategy,
             recorder: DetectorLoadTimingRecorder,
+            factory: PrimaryTensorEngineFactory,
         ): ModelLoadAttempt<TfliteAndroidFrameDetector> {
             val unifiedConfig = config.unifiedWalksafe ?: return ModelLoadAttempt(null, null)
             if (config.primaryModelKey != TwoModelRuntimeConfig.UNIFIED_MODEL_KEY || !unifiedConfig.enabled) {
@@ -558,7 +588,7 @@ class TfliteAndroidFrameDetector private constructor(
                 recorder.measure(AndroidDetectorLoadPhase.ASSET_INTEGRITY, UNIFIED_MODEL_KEY) {
                     requireAssetIntegrity(context, unifiedConfig, "unified")
                 }
-                val unified = createSingleModelDetector(context, unifiedConfig, recorder, UNIFIED_MODEL_KEY)
+                val unified = createSingleModelDetector(unifiedConfig, recorder, UNIFIED_MODEL_KEY, factory)
                 var person: TfliteSingleModelDetector? = null
                 try {
                     config.personSupplement?.takeIf { it.enabled }?.let { personConfig ->
@@ -566,8 +596,8 @@ class TfliteAndroidFrameDetector private constructor(
                             TwoModelRuntimeConfig.PERSON_SUPPLEMENT_MODEL_KEY) {
                             requireAssetIntegrity(context, personConfig, "person_supplement")
                         }
-                        person = createSingleModelDetector(context, personConfig, recorder,
-                            TwoModelRuntimeConfig.PERSON_SUPPLEMENT_MODEL_KEY)
+                        person = createSingleModelDetector(personConfig, recorder,
+                            TwoModelRuntimeConfig.PERSON_SUPPLEMENT_MODEL_KEY, factory)
                     }
                     TfliteAndroidFrameDetector(
                         threadOwner = owner,
@@ -598,7 +628,11 @@ class TfliteAndroidFrameDetector private constructor(
         } catch (error: DetectorNativeCleanupFailure) {
             // A failed native close must also prevent switching to the legacy model pair.
             throw error
+        } catch (error: DetectorCohortRetired) {
+            // A failed remote cohort cannot be combined with another model's old handle.
+            throw error
         } catch (error: Exception) {
+            VisionRuntimeFailures.busy(error)?.let { throw it }
             ModelLoadAttempt(null, ModelAssetIntegrity.classify(error))
         }
 
@@ -613,12 +647,13 @@ class TfliteAndroidFrameDetector private constructor(
             owner: DetectorThreadOwner?,
             preprocessingStrategy: YuvPreprocessingStrategy,
             recorder: DetectorLoadTimingRecorder,
+            factory: PrimaryTensorEngineFactory,
         ): TfliteAndroidFrameDetector? {
             if (config.fallbackModelKey != TwoModelRuntimeConfig.LEGACY_TWO_MODEL_KEY) {
                 return null
             }
             return loadModelOrNull {
-                createLegacyTwoModel(context, config, owner, preprocessingStrategy, recorder)
+                createLegacyTwoModel(context, config, owner, preprocessingStrategy, recorder, factory)
             }
         }
 
@@ -628,6 +663,7 @@ class TfliteAndroidFrameDetector private constructor(
             owner: DetectorThreadOwner?,
             preprocessingStrategy: YuvPreprocessingStrategy,
             recorder: DetectorLoadTimingRecorder,
+            factory: PrimaryTensorEngineFactory,
         ): TfliteAndroidFrameDetector {
             val customConfig = requireNotNull(config.customTactile) {
                 "custom_tactile model config is required in legacy two-model mode"
@@ -641,13 +677,13 @@ class TfliteAndroidFrameDetector private constructor(
             recorder.measure(AndroidDetectorLoadPhase.ASSET_INTEGRITY, COCO_MODEL_KEY) {
                 requireAssetIntegrity(context, cocoConfig, "coco_general")
             }
-            val custom = createSingleModelDetector(context, customConfig, recorder, CUSTOM_MODEL_KEY)
+            val custom = createSingleModelDetector(customConfig, recorder, CUSTOM_MODEL_KEY, factory)
             return try {
                 TfliteAndroidFrameDetector(
                     threadOwner = owner,
                     loadRecorder = recorder,
                     customDetector = custom,
-                    cocoDetector = createSingleModelDetector(context, cocoConfig, recorder, COCO_MODEL_KEY),
+                    cocoDetector = createSingleModelDetector(cocoConfig, recorder, COCO_MODEL_KEY, factory),
                     preprocessingStrategy = preprocessingStrategy,
                 )
             } catch (error: Throwable) {
@@ -661,57 +697,11 @@ class TfliteAndroidFrameDetector private constructor(
         }
 
         private fun createSingleModelDetector(
-            context: Context,
             config: ModelRuntimeConfig,
             recorder: DetectorLoadTimingRecorder,
             modelKey: String,
-        ): TfliteSingleModelDetector {
-            val model = recorder.measure(AndroidDetectorLoadPhase.ASSET_MAP, modelKey) { loadMappedAsset(context, config.asset) }
-            val cache = if (config.runtime.delegate == "gpu") {
-                GpuSerializationCache.prepare(config.runtime.gpuSerializationCacheEnabled) {
-                    recorder.measure(AndroidDetectorLoadPhase.GPU_CACHE_PREPARE, modelKey, "gpu") {
-                        val contract = GpuSerializationContract(
-                            inputSize = config.inputSize,
-                            numThreads = config.runtime.numThreads,
-                            precisionLossAllowed = config.runtime.gpuPrecisionLossAllowed,
-                            nativeRuntimeVersion = TensorFlowLite.runtimeVersion(),
-                            deviceFingerprint = Build.FINGERPRINT,
-                            supportedAbis = Build.SUPPORTED_ABIS.toList(),
-                            sdkInt = Build.VERSION.SDK_INT,
-                        )
-                        GpuSerializationParameters(
-                            GpuSerializationCache.privateDirectory(context.noBackupFilesDir),
-                            contract.modelToken(model),
-                        )
-                    }
-                }
-            } else null
-            return TfliteSingleModelDetector(
-                model = model,
-                loadRecorder = recorder,
-                modelKey = modelKey,
-                inputSize = config.inputSize,
-                runtime = config.runtime,
-                gpuSerializationCache = cache,
-                outputFormat = config.outputFormat,
-                outputShape = config.outputTensorShape(),
-                classCount = config.classes.size,
-                nmsIouThreshold = config.nmsIouThreshold,
-                maxDetections = config.maxDetections,
-                classNameForId = config::classNameForId,
-                thresholdForClass = config::thresholdForClass,
-                thresholdForClassId = config::thresholdForClassId,
-                allowClass = config::isAllowedClass,
-            )
-        }
-
-        private fun loadMappedAsset(context: Context, assetPath: String): MappedByteBuffer {
-            context.assets.openFd(assetPath).use { descriptor ->
-                descriptor.createInputStream().channel.use { channel ->
-                    return channel.map(FileChannel.MapMode.READ_ONLY, descriptor.startOffset, descriptor.length)
-                }
-            }
-        }
+            factory: PrimaryTensorEngineFactory,
+        ): TfliteSingleModelDetector = TfliteSingleModelDetector(config, recorder, modelKey, factory)
 
         private fun elapsedMs(startNs: Long): Long = (System.nanoTime() - startNs) / 1_000_000L
 
@@ -732,204 +722,73 @@ data class AndroidDetectorLoadResult(
     val failureCode: DetectorLoadFailureCode? = null,
     /** Snapshot at load completion; ask the detector for later inference/close phases. */
     val loadTiming: AndroidDetectorLoadTiming? = null,
+    /** Independent physical proof, retained even when remote OPEN returns no detector. */
+    val actualReleasedFuture: CompletionStage<Unit>? = null,
 )
 
 /** Exactly one of [value] or [failureCode] is set, except an unconfigured model (both null). */
 internal class ModelLoadAttempt<T>(val value: T?, val failureCode: DetectorLoadFailureCode?)
 
-private data class SingleModelDetectionResult(
+internal data class SingleModelDetectionResult(
     val detections: List<DetectionCandidate>,
     val inferenceMs: Long,
     val parseMs: Long,
     val runtime: AndroidDetectorRuntime,
 )
 
-private class TfliteSingleModelDetector(
-    private val model: MappedByteBuffer,
+/** Host-only tensor preparation/output parsing; this class never creates a native interpreter. */
+internal class TfliteSingleModelDetector(
+    private val config: ModelRuntimeConfig,
     private val loadRecorder: DetectorLoadTimingRecorder,
     private val modelKey: String,
-    val inputSize: Int,
-    private val runtime: ModelRuntimeOptions,
-    private val gpuSerializationCache: GpuSerializationCache?,
-    private val outputFormat: YoloOutputFormat,
-    private val outputShape: IntArray,
-    classCount: Int,
-    nmsIouThreshold: Float,
-    maxDetections: Int,
-    classNameForId: (Int) -> String?,
-    thresholdForClass: (String) -> Float,
-    thresholdForClassId: (Int) -> Float,
-    allowClass: (String) -> Boolean = { true },
+    private val factory: PrimaryTensorEngineFactory,
 ) : Closeable {
-    // Allocate host buffers and parsers before native handles so allocation failure cannot leak a delegate.
-    private val flatOutput = FloatArray(outputShape.fold(1) { size, axis -> size * axis })
+    val inputSize = config.inputSize
+    private val flatOutput = FloatArray(config.outputTensorShape().fold(1) { size, axis -> size * axis })
     private val output = ByteBuffer.allocateDirect(flatOutput.size * Float.SIZE_BYTES).order(ByteOrder.nativeOrder())
     private val outputFloats = output.asFloatBuffer()
-    private val parser = YoloEndToEndOutputParser(
-        inputSize = inputSize,
-        classNameForId = classNameForId,
-        thresholdForClass = thresholdForClass,
-        thresholdForClassId = thresholdForClassId,
-        pixelCoordinates = outputFormat == YoloOutputFormat.END_TO_END_XYXY_PIXELS,
-        allowClass = allowClass,
-    )
-
-    private val rawParser = if (outputFormat.isRaw) {
-        YoloRawOutputParser(inputSize, classCount, classNameForId, thresholdForClass, allowClass,
-            nmsIouThreshold, maxDetections,
-            normalizedCoordinates = outputFormat == YoloOutputFormat.RAW_XYWH_NORMALIZED)
+    private val parser = YoloEndToEndOutputParser(inputSize = inputSize,
+        classNameForId = config::classNameForId, thresholdForClass = config::thresholdForClass,
+        thresholdForClassId = config::thresholdForClassId,
+        pixelCoordinates = config.outputFormat == YoloOutputFormat.END_TO_END_XYXY_PIXELS,
+        allowClass = config::isAllowedClass)
+    private val rawParser = if (config.outputFormat.isRaw) {
+        YoloRawOutputParser(inputSize, config.classes.size, config::classNameForId, config::thresholdForClass,
+            config::isAllowedClass, config.nmsIouThreshold, config.maxDetections,
+            normalizedCoordinates = config.outputFormat == YoloOutputFormat.RAW_XYWH_NORMALIZED)
     } else null
-
     private var hasCompletedOutput = false
     private var firstInferenceAttempted = false
-
-    private val interpreterRuntime = DelegateFallbackRuntime(runtime) { delegate ->
-        if (delegate == "gpu" && gpuSerializationCache != null) {
-            loadRecorder.measure(AndroidDetectorLoadPhase.GPU_COMPATIBILITY, modelKey, delegate) {
-                CompatibilityList().use { compatibility ->
-                    check(compatibility.isDelegateSupportedOnThisDevice) { "GPU delegate unsupported on this device" }
-                }
-            }
-            gpuSerializationCache.create { serialization ->
-                createInterpreter(model, runtime, delegate, inputSize, outputShape, loadRecorder, modelKey, serialization)
-            }
-        } else createInterpreter(model, runtime, delegate, inputSize, outputShape, loadRecorder, modelKey)
+    private val interpreterRuntime = DelegateFallbackRuntime(config.runtime) { delegate ->
+        factory.open(config, delegate, loadRecorder, modelKey)
     }
 
     fun detect(input: PreprocessedImage, validImageCrop: YuvCropRect? = null): SingleModelDetectionResult {
-        // Checked before the delegate runs, so a wrong tensor never triggers a CPU replacement.
         DetectorTensorContract.requireModelInput(input, inputSize)
         input.inputBuffer.rewind()
-        val inferenceStartedNs = System.nanoTime()
         hasCompletedOutput = false
-        val recordFirstInference = !firstInferenceAttempted
+        val first = !firstInferenceAttempted
         firstInferenceAttempted = true
-        interpreterRuntime.run { handle ->
-            input.inputBuffer.rewind()
-            output.rewind()
-            if (recordFirstInference) {
-                // Each native attempt keeps its actual delegate: failed GPU and retried CPU are separate.
-                loadRecorder.measure(AndroidDetectorLoadPhase.FIRST_INFERENCE, modelKey,
-                    interpreterRuntime.runtime.activeDelegate) { handle.interpreter.run(input.inputBuffer, output) }
-            } else {
-                handle.interpreter.run(input.inputBuffer, output)
-            }
+        val startedNs = System.nanoTime()
+        val observed = interpreterRuntime.run { engine ->
+            input.inputBuffer.rewind(); output.rewind()
+            val invoke = { engine.invoke(input.inputBuffer, output, inputSize, inputSize,
+                if (first) VisionPurpose.WARMUP else VisionPurpose.LIVE) }
+            val result = if (first) loadRecorder.measure(AndroidDetectorLoadPhase.FIRST_INFERENCE, modelKey,
+                interpreterRuntime.runtime.activeDelegate, invoke) else invoke()
+            PrimaryTensorContract.observedRuntime(result.runtime, interpreterRuntime.runtime)
         }
-        val inferenceMs = elapsedMs(inferenceStartedNs)
+        val inferenceMs = (System.nanoTime() - startedNs) / 1_000_000L
         val parseStartedNs = System.nanoTime()
         outputFloats.rewind()
         outputFloats.get(flatOutput)
         val parsed = rawParser?.parse(flatOutput, input.transform, validImageCrop) ?: parser.parse(flatOutput)
         val detections = parsed.mapNotNull(input.transform::modelDetectionToImageDetection)
         hasCompletedOutput = true
-        return SingleModelDetectionResult(
-            detections = detections,
-            inferenceMs = inferenceMs,
-            parseMs = elapsedMs(parseStartedNs),
-            runtime = interpreterRuntime.runtime.copy(
-                gpuSerializationCacheStatus = gpuSerializationCache?.status,
-                gpuSerializationCacheToken = gpuSerializationCache?.modelToken,
-                gpuSerializationCacheFailureReason = gpuSerializationCache?.failureReason,
-            ),
-        )
+        return SingleModelDetectionResult(detections, inferenceMs,
+            (System.nanoTime() - parseStartedNs) / 1_000_000L, observed)
     }
 
-    override fun close() {
-        interpreterRuntime.close()
-    }
-
+    override fun close() = interpreterRuntime.close()
     fun copyLastOutput(): FloatArray? = if (hasCompletedOutput) flatOutput.copyOf() else null
-
-    private companion object {
-        fun validateTensorContract(interpreter: Interpreter, inputSize: Int, outputShape: IntArray) {
-            val inputCount = interpreter.inputTensorCount
-            val outputCount = interpreter.outputTensorCount
-            val input = if (inputCount == 1) interpreter.getInputTensor(0) else null
-            val output = if (outputCount == 1) interpreter.getOutputTensor(0) else null
-            DetectorTensorContract.requireInterpreterContract(
-                inputTensorCount = inputCount,
-                outputTensorCount = outputCount,
-                inputFloat32 = input?.dataType() == DataType.FLOAT32,
-                outputFloat32 = output?.dataType() == DataType.FLOAT32,
-                inputShape = input?.shape() ?: IntArray(0),
-                outputShape = output?.shape() ?: IntArray(0),
-                inputSize = inputSize,
-                expectedOutputShape = outputShape,
-            )
-        }
-
-        fun elapsedMs(startNs: Long): Long = (System.nanoTime() - startNs) / 1_000_000L
-
-        fun createInterpreter(
-            model: MappedByteBuffer,
-            runtime: ModelRuntimeOptions,
-            delegate: String,
-            inputSize: Int,
-            outputShape: IntArray,
-            recorder: DetectorLoadTimingRecorder,
-            modelKey: String,
-            serialization: GpuSerializationParameters? = null,
-        ): InterpreterHandle {
-            var gpuDelegate: GpuDelegate? = null
-            var interpreter: Interpreter? = null
-            try {
-                val options = createOptions(runtime, useNnapi = delegate == "nnapi")
-                if (delegate == "gpu") {
-                    val gpuOptions = GpuDelegateFactory.Options()
-                        .setPrecisionLossAllowed(runtime.gpuPrecisionLossAllowed)
-                        .setInferencePreference(GpuDelegateFactory.Options.INFERENCE_PREFERENCE_SUSTAINED_SPEED)
-                        .setQuantizedModelsAllowed(true)
-                    serialization?.let { gpuOptions.setSerializationParams(it.directory.absolutePath, it.modelToken) }
-                    gpuDelegate = recorder.measure(AndroidDetectorLoadPhase.DELEGATE_INIT, modelKey, delegate) {
-                        GpuDelegate(gpuOptions)
-                    }
-                    options.addDelegate(gpuDelegate)
-                }
-                val createdInterpreter = recorder.measure(AndroidDetectorLoadPhase.INTERPRETER_INIT, modelKey, delegate) {
-                    Interpreter(model, options)
-                }
-                interpreter = createdInterpreter
-                recorder.measure(AndroidDetectorLoadPhase.TENSOR_CHECK, modelKey, delegate) {
-                    validateTensorContract(createdInterpreter, inputSize, outputShape)
-                }
-                return InterpreterHandle(createdInterpreter, gpuDelegate)
-            } catch (error: Throwable) {
-                var cleanupFailed = false
-                try {
-                    interpreter?.close()
-                } catch (closeError: Throwable) {
-                    cleanupFailed = true
-                    error.addSuppressed(closeError)
-                }
-                try {
-                    gpuDelegate?.close()
-                } catch (closeError: Throwable) {
-                    cleanupFailed = true
-                    error.addSuppressed(closeError)
-                }
-                if (cleanupFailed) throw DetectorNativeCleanupFailure(error)
-                throw error
-            }
-        }
-
-        @Suppress("DEPRECATION")
-        fun createOptions(runtime: ModelRuntimeOptions, useNnapi: Boolean): Interpreter.Options {
-            return Interpreter.Options()
-                .setNumThreads(runtime.numThreads)
-                .setUseNNAPI(useNnapi)
-        }
-    }
-}
-
-private class InterpreterHandle(
-    val interpreter: Interpreter,
-    private val gpuDelegate: GpuDelegate?,
-) : Closeable {
-    override fun close() {
-        try {
-            interpreter.close()
-        } finally {
-            gpuDelegate?.close()
-        }
-    }
 }

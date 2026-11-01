@@ -12,6 +12,9 @@ public final class FastSamRuntimeInfo {
     public final int gpuInitializationAttempts;
     public final String fallbackReason;
     public final long modelOwnerThreadId;
+    /** Observed native identity; zero/null denotes an older local caller with no process proof. */
+    public final long modelOwnerProcessId;
+    public final String modelInstanceId,cohortId;
     public final double loadMs;
     FastSamRuntimeInfo(FastSamRuntimeOptions options,FastSamRuntimeOptions.Backend actual,
             String fallbackReason,long owner,double loadMs) {
@@ -21,6 +24,11 @@ public final class FastSamRuntimeInfo {
     FastSamRuntimeInfo(FastSamRuntimeOptions options,FastSamRuntimeOptions.Backend actual,
             String fallbackReason,long owner,double loadMs,String cacheStatus,String cacheToken,
             String cacheFailureReason,int gpuAttempts) {
+        this(options,actual,fallbackReason,owner,loadMs,cacheStatus,cacheToken,cacheFailureReason,gpuAttempts,0L,null,null);
+    }
+    FastSamRuntimeInfo(FastSamRuntimeOptions options,FastSamRuntimeOptions.Backend actual,
+            String fallbackReason,long owner,double loadMs,String cacheStatus,String cacheToken,
+            String cacheFailureReason,int gpuAttempts,long ownerProcessId,String modelInstanceId,String cohortId) {
         requestedBackend=options.requestedBackend;actualBackend=actual;numThreads=options.numThreads;
         this.fallbackReason=fallbackReason;fallbackUsed=actual!=requestedBackend;
         gpuDelegateAttached=actual==FastSamRuntimeOptions.Backend.GPU;
@@ -32,5 +40,6 @@ public final class FastSamRuntimeInfo {
         gpuSerializationCacheConfigured=gpuDelegateAttached && "configured".equals(cacheStatus);
         gpuInitializationAttempts=gpuAttempts;
         modelOwnerThreadId=owner;this.loadMs=loadMs;
+        modelOwnerProcessId=ownerProcessId;this.modelInstanceId=modelInstanceId;this.cohortId=cohortId;
     }
 }

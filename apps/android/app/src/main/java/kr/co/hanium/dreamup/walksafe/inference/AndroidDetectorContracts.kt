@@ -253,6 +253,13 @@ data class AndroidDetectorRuntime(
     val gpuSerializationCacheStatus: String? = null,
     val gpuSerializationCacheToken: String? = null,
     val gpuSerializationCacheFailureReason: String? = null,
+    /** Observed native owner, distinct from the parent's preprocessing/parser thread. */
+    val modelOwnerPid: Int? = null,
+    val modelOwnerThreadId: Long? = null,
+    val modelInstanceId: String? = null,
+    val cohortId: String? = null,
+    val nativeLoadMs: Double? = null,
+    val nativeRuntimeVersion: String? = null,
 )
 
 /** Only executed phases are present. A missing phase is not a successful zero-duration phase. */

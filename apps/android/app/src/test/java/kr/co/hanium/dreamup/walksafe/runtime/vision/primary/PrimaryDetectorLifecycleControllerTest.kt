@@ -3,6 +3,7 @@ package kr.co.hanium.dreamup.walksafe.runtime.vision.primary
 import java.io.Closeable
 import java.util.concurrent.AbstractExecutorService
 import java.util.concurrent.CancellationException
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -16,6 +17,8 @@ import kr.co.hanium.dreamup.walksafe.inference.composite.AndroidJointRuntimeLoad
 import kr.co.hanium.dreamup.walksafe.inference.composite.JointRuntimeReleaseFence
 import kr.co.hanium.dreamup.walksafe.inference.tracking.*
 import kr.co.hanium.dreamup.walksafe.runtime.vision.frame.*
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionCohortBusyException
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionReleaseReceipt
 import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
 import org.junit.Assert.*
 import org.junit.Test
@@ -643,6 +646,158 @@ class PrimaryDetectorLifecycleControllerTest {
         assertEquals(0, f.ui.pending); assertEquals(0, f.tuning.pending)
     }
 
+    @Test fun failedOpenWithoutAReturnedDetectorStillRetainsItsPhysicalReleaseReceipt() {
+        val f = Fixture(); val physical = CompletableFuture<Unit>()
+        f.selectWork = { AndroidDetectorLoadResult(null, true, false, null, false,
+            "DetectorCohortRetired", actualReleasedFuture = physical) }
+        f.lifecycle.loadForCurrentProcess(); f.tuning.next()
+        while (f.native.pending > 0) f.native.next()
+        while (f.ui.pending > 0) f.ui.next()
+        assertEquals("DetectorCohortRetired", f.lifecycle.metadata().loadReason)
+        assertFalse(f.execution.projection().available)
+        f.lifecycle.closeAsync(); f.tuning.next(); f.native.next()
+        assertFalse("No detector pointer does not prove failed OPEN native release", f.execution.closedFuture().isDone)
+        physical.complete(Unit)
+        assertEquals(Unit, f.execution.closedFuture().getNow(null))
+    }
+
+    @Test fun aCancelledLateOpenFailureCannotPublishMetadataOrLoseItsPhysicalReceipt() {
+        val f = Fixture(); val physical = CompletableFuture<Unit>()
+        f.selectWork = {
+            f.lifecycle.cancelPendingLoad()
+            AndroidDetectorLoadResult(null, true, false, null, false, "DetectorCohortRetired", actualReleasedFuture = physical)
+        }
+        f.lifecycle.loadForCurrentProcess(); f.tuning.next()
+        while (f.native.pending > 0) f.native.next()
+        while (f.ui.pending > 0) f.ui.next()
+        assertNull(f.lifecycle.metadata().loadReason)
+        assertFalse(f.lifecycle.metadata().loadInFlight)
+        f.lifecycle.closeAsync(); f.tuning.next(); f.native.next()
+        assertFalse(f.execution.closedFuture().isDone)
+        physical.complete(Unit)
+        assertEquals(Unit, f.execution.closedFuture().getNow(null))
+    }
+
+    @Test fun aThrownRemoteFailurePreservesTheTypedReasonAndLateReleaseReceipt() {
+        val f = Fixture(); val physical = CompletableFuture<Unit>()
+        f.loadFailure = DetectorCohortRetired(IllegalStateException("OPEN timeout"), physical)
+        f.lifecycle.loadForCurrentProcess(); f.tuning.next()
+        while (f.native.pending > 0) f.native.next()
+        while (f.ui.pending > 0) f.ui.next()
+        assertEquals("DetectorCohortRetired", f.lifecycle.metadata().loadReason)
+        assertFalse(f.lifecycle.metadata().loadInFlight)
+        f.lifecycle.closeAsync(); f.tuning.next(); f.native.next()
+        assertFalse(f.execution.closedFuture().isDone)
+        physical.complete(Unit)
+        assertEquals(Unit, f.execution.closedFuture().getNow(null))
+    }
+
+    @Test fun busyAvailabilityRetriesTheSameLiveAttemptWithoutPublishingAPerformanceFailure() {
+        val f = Fixture(); val available = CompletableFuture<VisionReleaseReceipt>()
+        f.loadFailure = VisionCohortBusyException(available)
+        f.lifecycle.loadForCurrentProcess(); f.tuning.next()
+        assertTrue(f.lifecycle.metadata().loadInFlight)
+        assertNull(f.lifecycle.metadata().loadReason)
+        assertFalse(f.execution.projection().closing)
+        assertEquals(0, f.native.pending)
+        f.loadFailure = null
+        available.complete(VisionReleaseReceipt("old", 234))
+        assertEquals(1, f.tuning.pending)
+        f.tuning.next(); f.native.next(); f.ui.next()
+        assertEquals("loaded", f.lifecycle.metadata().loadReason)
+        assertEquals(2, f.events.count { it == "select:false" })
+        assertFalse(f.events.any { it.startsWith("unavailable:") })
+    }
+
+    @Test fun aCancelledBusyAvailabilityCannotRestartOrModifyANewerAttempt() {
+        val f = Fixture(); val available = CompletableFuture<VisionReleaseReceipt>()
+        f.loadFailure = VisionCohortBusyException(available)
+        f.lifecycle.loadForCurrentProcess(); f.tuning.next()
+        f.lifecycle.cancelPendingLoad()
+        f.loadFailure = null
+        f.lifecycle.loadForCurrentProcess()
+        assertEquals(1, f.tuning.pending)
+        available.complete(VisionReleaseReceipt("old", 234))
+        assertEquals(1, f.tuning.pending)
+        f.tuning.next(); f.native.next(); f.ui.next()
+        assertEquals("loaded", f.lifecycle.metadata().loadReason)
+        assertEquals(2, f.events.count { it == "select:false" })
+        assertFalse(f.execution.projection().closing)
+    }
+
+    @Test fun availabilityAtTheExactWaitDeadlineOrAfterClockRollbackCannotRetry() {
+        for (now in listOf(15_000L, -1L)) {
+            val f = Fixture(); val available = CompletableFuture<VisionReleaseReceipt>()
+            f.loadFailure = VisionCohortBusyException(available)
+            f.lifecycle.loadForCurrentProcess(); f.tuning.next()
+            f.now = now; f.loadFailure = null
+            available.complete(VisionReleaseReceipt("old", 234))
+            assertEquals(0, f.tuning.pending)
+            assertEquals(0, f.native.pending)
+            assertFalse(f.lifecycle.metadata().loadInFlight)
+            assertNull(f.lifecycle.metadata().loadReason)
+            assertFalse(f.execution.projection().closing)
+        }
+    }
+
+    @Test fun aQueuedAvailabilityRetryCannotOpenAfterTheOriginalWaitDeadline() {
+        val f = Fixture(); val available = CompletableFuture<VisionReleaseReceipt>()
+        f.loadFailure = VisionCohortBusyException(available)
+        f.lifecycle.loadForCurrentProcess(); f.tuning.next()
+        f.now = 14_999L; f.loadFailure = null
+        available.complete(VisionReleaseReceipt("old", 234))
+        assertEquals(1, f.tuning.pending)
+        f.now = 15_000L; f.tuning.next()
+        assertEquals(1, f.events.count { it == "select:false" })
+        assertEquals(0, f.native.pending)
+        assertFalse(f.lifecycle.metadata().loadInFlight)
+        assertNull(f.lifecycle.metadata().loadReason)
+    }
+
+    @Test fun anEarlyAvailabilityTimerRearmsOnlyTheRemainingBudgetAndDoesNotPublishLimitedSuccess() {
+        val f = Fixture(); val available = CompletableFuture<VisionReleaseReceipt>()
+        f.loadFailure = VisionCohortBusyException(available)
+        f.lifecycle.loadForCurrentProcess(); f.tuning.next()
+        assertEquals(15_000L, f.timers.single().second)
+        f.now = 1_000L; f.timers.single().first.run()
+        assertTrue(f.lifecycle.metadata().loadInFlight)
+        assertEquals(14_000L, f.timers.last().second)
+        f.now = 15_000L; f.timers.last().first.run()
+        assertFalse(f.lifecycle.metadata().loadInFlight)
+        assertFalse(f.lifecycle.metadata().loadAttempted)
+        assertEquals("이전 인식 작업 대기 만료", f.lifecycle.metadata().statusText)
+        assertFalse(f.events.any { it.startsWith("unavailable:") || it == "loaded" })
+        available.complete(VisionReleaseReceipt("old", 234))
+        assertEquals(0, f.tuning.pending)
+    }
+
+    @Test fun aSynchronousEarlyAvailabilityTimerCannotRecurseOrOpenANativeModel() {
+        val f = Fixture(); val available = CompletableFuture<VisionReleaseReceipt>()
+        f.loadFailure = VisionCohortBusyException(available)
+        f.timerAction = { timeout, _ -> timeout.run(); true }
+        f.lifecycle.loadForCurrentProcess(); f.tuning.next()
+        assertEquals(1, f.timers.size)
+        assertFalse(f.lifecycle.metadata().loadInFlight)
+        assertEquals("이전 인식 작업 대기 중단", f.lifecycle.metadata().statusText)
+        available.complete(VisionReleaseReceipt("old", 234))
+        assertEquals(0, f.tuning.pending); assertEquals(0, f.native.pending)
+        assertFalse(f.execution.projection().closing)
+    }
+
+    @Test fun backgroundAvailabilityNeedsAnExplicitCurrentForegroundRequestToRetry() {
+        val f = Fixture(); val available = CompletableFuture<VisionReleaseReceipt>()
+        f.loadFailure = VisionCohortBusyException(available)
+        f.lifecycle.loadForCurrentProcess(); f.tuning.next()
+        f.foreground = false; f.loadFailure = null
+        available.complete(VisionReleaseReceipt("old", 234))
+        assertEquals(0, f.tuning.pending); assertFalse(f.lifecycle.metadata().loadInFlight)
+        assertNull(f.lifecycle.metadata().loadReason)
+        f.foreground = true; f.lifecycle.loadForCurrentProcess()
+        assertEquals(1, f.tuning.pending)
+        f.tuning.next(); f.native.next(); f.ui.next()
+        assertEquals("loaded", f.lifecycle.metadata().loadReason)
+    }
+
     private class Lane : AbstractExecutorService() {
         val tasks = ArrayDeque<Runnable>(); var reject = false; var closed = false
         val pending get() = tasks.size
@@ -683,6 +838,7 @@ class PrimaryDetectorLifecycleControllerTest {
         var measuredWork: ((TwoModelRuntimeConfig, ValidatedJointRuntimeChoice, () -> Boolean) -> AndroidDetectorLoadResult)? = null
         val closed = mutableListOf<TfliteAndroidFrameDetector>(); val statuses = mutableListOf<Pair<String, String>>()
         val timers = mutableListOf<Pair<Runnable, Long>>()
+        var timerAction: ((Runnable, Long) -> Boolean)? = null
         var sample = AndroidDetectionResult(emptyList(), AndroidDetectorTiming(modelRuntime = AndroidDetectorRuntime("gpu", "gpu", 2)))
         val lifecycle = PrimaryDetectorLifecycleController(lock, execution, calibration, { events += "frame"; frames }, supervisor,
             object : PrimaryLifecycleCurrentness {
@@ -747,7 +903,10 @@ class PrimaryDetectorLifecycleControllerTest {
                 override fun blockReportCandidates() { events += "block-report" }
                 override fun showDetectorUnavailable() { events += "show-unavailable" }
             }, object : PrimaryNativeFlightScheduler {
-                override fun postDelayed(task: Runnable, delayMs: Long): Boolean { events += "timer:$delayMs"; timers += task to delayMs; return true }
+                override fun postDelayed(task: Runnable, delayMs: Long): Boolean {
+                    events += "timer:$delayMs"; timers += task to delayMs
+                    return timerAction?.invoke(task, delayMs) ?: true
+                }
                 override fun remove(task: Runnable) = Unit
             }, { events += "clock"; clockReads += 1; now })
         fun completeLoad() {

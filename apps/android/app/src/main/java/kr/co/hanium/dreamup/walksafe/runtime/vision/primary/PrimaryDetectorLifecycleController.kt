@@ -2,11 +2,15 @@ package kr.co.hanium.dreamup.walksafe.runtime.vision.primary
 
 import java.io.Closeable
 import java.util.concurrent.CancellationException
+import java.util.concurrent.CompletionStage
 import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.atomic.AtomicBoolean
 import kr.co.hanium.dreamup.walksafe.device.RunningDetectorReadiness
 import kr.co.hanium.dreamup.walksafe.inference.*
 import kr.co.hanium.dreamup.walksafe.inference.composite.ValidatedJointRuntimeChoice
 import kr.co.hanium.dreamup.walksafe.runtime.vision.frame.FrameSynthesisController
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionCohortBusyException
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRuntimeFailures
 import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
 
 /** Load/verification metadata and orchestration; the primary execution owner alone holds the native slot. */
@@ -43,6 +47,12 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
     private var choiceOverrideRequestId: String? = null
     @Volatile private var compositeLoadDrainPending = false
     private var failedRetiredLoad: TfliteAndroidFrameDetector? = null
+    private data class AvailabilityWindow(val startedAt: Long, val deadline: Long) {
+        fun accepts(now: Long) = now >= startedAt && now < deadline
+    }
+    private class AvailabilityWait(val request: Long, val detectorGeneration: Long,
+        val window: AvailabilityWindow, val retry: Runnable) { var timeout: Runnable? = null }
+    private var availabilityWait: AvailabilityWait? = null
 
     fun metadata() = PrimaryLifecycleMetadata(configLoaded, reportModelKey, loadedModelKey, fallbackUsed,
         loadReason, loadAttempted, loadInFlight, statusText, fixedFixtureRunning)
@@ -108,6 +118,82 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
         loadInFlight = false
         loadAttempted = false
         comparisonAttempted = false
+        availabilityWait?.timeout?.let { runCatching { scheduler.remove(it) } }
+        availabilityWait = null
+    }
+
+    /** Contention is neither model evidence nor this caller's native-release obligation. */
+    private fun endAvailabilityWait(request: Long, status: String, expected: AvailabilityWait? = null) {
+        val timer = synchronized(frameStateLock) {
+            if (request != loadRequestGeneration || (expected != null && availabilityWait !== expected)) return
+            val timer = availabilityWait?.timeout
+            availabilityWait = null
+            if (!currentness.destroyed() && !loadAdoptionCommitted) {
+                loadInFlight = false
+                loadAttempted = false
+                comparisonAttempted = false
+                comparisonRequested = false
+                configLoaded = false
+                statusText = status
+            }
+            timer
+        }
+        timer?.let { runCatching { scheduler.remove(it) } }
+    }
+
+    private fun armAvailabilityTimeout(wait: AvailabilityWait) {
+        val delay = synchronized(frameStateLock) {
+            if (availabilityWait !== wait) return
+            (wait.window.deadline - elapsedRealtimeMs()).coerceAtLeast(0L)
+        }
+        val registering = AtomicBoolean(true)
+        val synchronousFire = AtomicBoolean(false)
+        val timeout = Runnable {
+            if (registering.get()) synchronousFire.set(true)
+            else {
+                val current = synchronized(frameStateLock) {
+                    availabilityWait === wait && loadInFlight && loadIsCurrent(wait.request, wait.detectorGeneration) &&
+                        currentness.foreground() && wait.window.accepts(elapsedRealtimeMs())
+                }
+                if (current) armAvailabilityTimeout(wait)
+                else endAvailabilityWait(wait.request, "이전 인식 작업 대기 만료", wait)
+            }
+        }
+        synchronized(frameStateLock) {
+            if (availabilityWait !== wait) return
+            wait.timeout = timeout
+        }
+        val posted = runCatching { scheduler.postDelayed(timeout, delay) }.getOrDefault(false)
+        registering.set(false)
+        if (!posted || synchronousFire.get())
+            endAvailabilityWait(wait.request, "이전 인식 작업 대기 중단", wait)
+    }
+
+    private fun waitForAvailability(busy: VisionCohortBusyException, request: Long, generation: Long,
+        window: AvailabilityWindow, retry: Runnable) {
+        val wait = AvailabilityWait(request, generation, window, retry)
+        val admitted = synchronized(frameStateLock) {
+            if (!loadInFlight || !loadIsCurrent(request, generation) || !currentness.foreground() ||
+                !window.accepts(elapsedRealtimeMs())) false
+            else { availabilityWait = wait; statusText = "이전 인식 작업 종료 대기 중"; true }
+        }
+        if (!admitted) { endAvailabilityWait(request, "이전 인식 작업 대기 만료"); return }
+        armAvailabilityTimeout(wait)
+        busy.availabilityReceipt.whenComplete { _, error ->
+            val retryAllowed = synchronized(frameStateLock) {
+                if (availabilityWait !== wait) return@whenComplete
+                if (error != null || !loadInFlight || !loadIsCurrent(request, generation) || !currentness.foreground() ||
+                    !window.accepts(elapsedRealtimeMs())) false
+                else { availabilityWait = null; true }
+            }
+            if (!retryAllowed) {
+                endAvailabilityWait(request, "이전 인식 작업 대기 만료", wait)
+                return@whenComplete
+            }
+            wait.timeout?.let { runCatching { scheduler.remove(it) } }
+            try { detector.tuningLane.execute(retry) }
+            catch (_: RejectedExecutionException) { endAvailabilityWait(request, "이전 인식 작업 대기 중단") }
+        }
     }
 
     /** Both lanes are serial: the tuning barrier follows creation, then native follows adoption/close. */
@@ -133,9 +219,30 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
         try { platform.close(instance) }
         catch (error: Throwable) {
             failedRetiredLoad = instance
-            detector.recordReleaseFailure(error)
+            detector.recordDetectorReleaseFailure(instance, error)
             detector.fenceForClose()
             throw error
+        }
+    }
+
+    private fun failedPreparationRelease(error: Throwable, proof: CompletionStage<Unit>?, request: Long,
+        reason: String, metricDistanceWasEnabled: Boolean) {
+        // Ownership survives cancellation, while obsolete requests have no authority over the UI.
+        detector.recordReleaseFailure(error, proof ?: (error as? DetectorCohortRetired)?.actualReleasedFuture)
+        val ownsRequest = synchronized(frameStateLock) {
+            detector.fenceForClose()
+            (request == loadRequestGeneration && !currentness.destroyed()).also { owns -> if (owns) {
+                loadInFlight = false
+                configLoaded = false
+                loadReason = reason
+                statusText = "detector=$loadReason"
+            } }
+        }
+        platform.logPreparationFailure(error)
+        if (ownsRequest) presentation.onUi {
+            if (request != loadRequestGeneration || currentness.destroyed()) return@onUi
+            if (preparation.featureGatePassed()) preparation.modelUnavailable(metricDistanceWasEnabled)
+            preparation.loaded()
         }
     }
 
@@ -171,11 +278,24 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
             requestGeneration = loadRequestGeneration
             loadGeneration = detector.projection().loadGeneration
             choiceOverrideRequestId = choiceOverride?.measurementId
+            availabilityWait?.timeout?.let { runCatching { scheduler.remove(it) } }
+            availabilityWait = null
         }
-        val loadTask = Runnable loadTask@{
+        var availabilityWindow: AvailabilityWindow? = null
+        lateinit var loadTask: Runnable
+        loadTask = Runnable loadTask@{
             if (requestGeneration != loadRequestGeneration) return@loadTask
+            fun mayRetryAvailability(): Boolean {
+                val window = availabilityWindow ?: return true
+                if (loadIsCurrent(requestGeneration, loadGeneration) && loadInFlight && currentness.foreground() &&
+                    window.accepts(elapsedRealtimeMs())) return true
+                endAvailabilityWait(requestGeneration, "이전 인식 작업 대기 만료")
+                return false
+            }
+            if (!mayRetryAvailability()) return@loadTask
             val load = try {
                 val config = configuration.loadOrCurrent()
+                if (!mayRetryAvailability()) return@loadTask
                 if (choiceOverride != null) {
                     if (!loadIsCurrent(requestGeneration, loadGeneration)) throw CancellationException("Measured preparation retired")
                     platform.prepareMeasuredChoice(requireNotNull(config) { "Explicit choice requires its model configuration" },
@@ -190,25 +310,20 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
                         }
                     } })
             } catch (error: Throwable) {
-                if (error is DetectorNativeCleanupFailure) {
-                    detector.recordReleaseFailure(error)
-                    val ownsRequest = synchronized(frameStateLock) {
-                        // Physical release failure outlives logical cancellation. Even an obsolete
-                        // request must fence allocations, without publishing obsolete metadata.
-                        detector.fenceForClose()
-                        (requestGeneration == loadRequestGeneration).also { owns -> if (owns) {
-                            loadInFlight = false
-                            configLoaded = false
-                            loadReason = error.javaClass.simpleName
-                            statusText = "detector=$loadReason"
-                        } }
+                VisionRuntimeFailures.busy(error)?.let { busy ->
+                    val started = availabilityWindow?.startedAt ?: elapsedRealtimeMs()
+                    if (started < 0L || started > Long.MAX_VALUE - verification.pendingDeadlineMs) {
+                        endAvailabilityWait(requestGeneration, "이전 인식 작업 대기 만료")
+                    } else {
+                        val window = availabilityWindow ?: AvailabilityWindow(started, started + verification.pendingDeadlineMs)
+                            .also { availabilityWindow = it }
+                        waitForAvailability(busy, requestGeneration, loadGeneration, window, loadTask)
                     }
-                    platform.logPreparationFailure(error)
-                    if (ownsRequest) presentation.onUi {
-                        if (requestGeneration != loadRequestGeneration) return@onUi
-                        if (preparation.featureGatePassed()) preparation.modelUnavailable(metricDistanceWasEnabled)
-                        preparation.loaded()
-                    }
+                    return@loadTask
+                }
+                if (error is DetectorNativeCleanupFailure || error is DetectorCohortRetired) {
+                    failedPreparationRelease(error, (error as? DetectorCohortRetired)?.actualReleasedFuture,
+                        requestGeneration, error.javaClass.simpleName, metricDistanceWasEnabled)
                     return@loadTask
                 }
                 if (error is CancellationException) {
@@ -220,6 +335,15 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
                 if (requestGeneration != loadRequestGeneration) return@loadTask
                 platform.logPreparationFailure(error)
                 AndroidDetectorLoadResult(null, false, false, null, false, error.javaClass.simpleName)
+            }
+            // OPEN may have failed without producing a Java detector. Keep its stable physical
+            // receipt before checking request freshness or enqueueing native adoption/retirement.
+            detector.retainPhysicalRelease(load.actualReleasedFuture, load.detector)
+            if (load.reason == DetectorCohortRetired::class.java.simpleName ||
+                load.reason == DetectorNativeCleanupFailure::class.java.simpleName) {
+                failedPreparationRelease(IllegalStateException(load.reason), load.actualReleasedFuture,
+                    requestGeneration, load.reason, metricDistanceWasEnabled)
+                return@loadTask
             }
             try {
                 detector.nativeLane.execute nativeAdoption@{

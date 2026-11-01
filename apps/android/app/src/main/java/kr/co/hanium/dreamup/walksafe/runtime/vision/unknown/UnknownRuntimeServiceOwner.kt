@@ -1,6 +1,8 @@
 package kr.co.hanium.dreamup.walksafe.runtime.vision.unknown
 
 import java.util.concurrent.Executor
+import java.util.concurrent.CompletableFuture
+import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kr.co.hanium.dreamup.walksafe.depth.unknown.FrozenUnknownDepthCapture
@@ -21,6 +23,8 @@ import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamRuntimeOptions
 import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamRuntimeService
 import kr.co.hanium.dreamup.walksafe.inference.unknown.tuning.UnknownRuntimeAttachment
 import kr.co.hanium.dreamup.walksafe.inference.unknown.tuning.UnknownRuntimeBinding
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionCohortBusyException
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRuntimeFailures
 
 /** One actual native auxiliary slot. Constructor only stores dependencies; it performs no SDK query. */
 internal class UnknownRuntimeServiceOwner(
@@ -39,6 +43,8 @@ internal class UnknownRuntimeServiceOwner(
     private class WalkingRequest(val source: UnknownWalkingSource,
         val config: () -> TwoModelRuntimeConfig?, val candidate: () -> RuntimeCandidate?)
     @Volatile private var walkingRequest: WalkingRequest? = null
+    private class WalkingAvailability(val request: WalkingRequest, val startedNs: Long)
+    @Volatile private var walkingAvailability: WalkingAvailability? = null
     private class WalkingService(val service: FastSamRuntimeService<UnknownRuntimeAttachment>, val request: WalkingRequest)
     private var activeWalkingService: WalkingService? = null
     @Volatile private var unknownRuntimeService: FastSamRuntimeService<UnknownRuntimeAttachment>? = null
@@ -118,7 +124,15 @@ internal class UnknownRuntimeServiceOwner(
     private fun startRelease(attempt: ServiceReleaseAttempt) {
         if (!attempt.started.compareAndSet(false, true)) return
         attempt.service.closeAsync()
-        attempt.service.releasedFuture().whenComplete { _, error -> mainDispatcher { finishRelease(attempt, error) } }
+        // An unreclaimed driver must retain metadata, not a destroyed Activity's listeners.
+        val ownerRef = WeakReference(this)
+        val attemptRef = WeakReference(attempt)
+        attempt.service.releasedFuture().whenComplete { _, error ->
+            ownerRef.get()?.mainDispatcher {
+                val retained = attemptRef.get()
+                if (retained != null) ownerRef.get()?.finishRelease(retained, error)
+            }
+        }
     }
 
     private fun requestRelease(service: FastSamRuntimeService<UnknownRuntimeAttachment>): ServiceReleaseAttempt {
@@ -145,6 +159,11 @@ internal class UnknownRuntimeServiceOwner(
 
     val currentService get() = unknownRuntimeService
     val loadingService get() = unknownLoadingService
+    /** Read after the tuning barrier to include late creation and already-detached close owners. */
+    fun retainedReleaseReceipts(): List<CompletableFuture<Void>> = synchronized(ownerLock) {
+        listOfNotNull(unknownRuntimeService, preparation?.service, release?.service)
+            .distinct().map { it.releasedFuture() }
+    }
     val binding get() = unknownRuntimeBinding
     val closing get() = unknownRuntimeClosing
     val calibrationRunning get() = unknownCalibration?.isRunning == true
@@ -220,6 +239,11 @@ internal class UnknownRuntimeServiceOwner(
     private fun continueWalkingPreparation() {
         val request = walkingRequest ?: return
         if (!walkingCurrent(request)) return
+        val waiting = walkingAvailability
+        if (waiting != null && waiting.request === request) {
+            if (!busyWaitCurrent(waiting)) resumeAfterBusy(waiting, IllegalStateException("availability_wait_expired"))
+            return
+        }
         val unmeasured = synchronized(ownerLock) {
             unknownRuntimeService?.takeIf { profiles.requiresJointChoice && unknownJointChoice == null }?.let {
                 unknownRuntimeService = null
@@ -275,6 +299,11 @@ internal class UnknownRuntimeServiceOwner(
             unknownRuntimeStatus = "이름 없는 물체 인식 준비 중"
             service.start().whenComplete { info, error -> mainDispatcher {
                 if (!ownsPreparation(attempt)) return@mainDispatcher
+                val busy = VisionRuntimeFailures.busy(error)
+                if (busy != null && walkingCurrent(request)) {
+                    waitForAvailability(request, service, busy)
+                    return@mainDispatcher
+                }
                 val matches = joint == null || info != null && !info.fallbackUsed &&
                     info.actualBackend.name == joint.candidate.auxiliary.backend.name &&
                     info.numThreads == joint.candidate.auxiliary.numThreads
@@ -294,10 +323,11 @@ internal class UnknownRuntimeServiceOwner(
                 if (adopted) finishPreparation(attempt) else {
                     synchronized(ownerLock) { if (walkingRequest === request) walkingRequest = null }
                     releaseUnknownLoadingService(service)
-                    if (joint != null && (!matches || error != null)) deviceTuningExecutor.execute {
+                    if (joint != null && busy == null && (!matches || error != null)) deviceTuningExecutor.execute {
                         profiles.invalidateJointChoice(joint)
                     }
-                    unknownRuntimeStatus = if (joint != null && (!matches || error != null || !workloadMatches)) "기기 점검 필요 · 인식 실행 설정을 확인하지 못했습니다."
+                    unknownRuntimeStatus = if (busy != null) "추가 물체 인식 준비 전"
+                        else if (joint != null && (!matches || error != null || !workloadMatches)) "기기 점검 필요 · 인식 실행 설정을 확인하지 못했습니다."
                         else if (error != null) "이름 없는 물체 준비 실패: ${error.javaClass.simpleName}"
                         else "추가 물체 인식 준비 전"
                 }
@@ -310,8 +340,54 @@ internal class UnknownRuntimeServiceOwner(
         } }
     }
 
+    private fun busyWaitCurrent(waiting: WalkingAvailability): Boolean {
+        val now = clock.elapsedRealtimeNanos()
+        return waiting.startedNs >= 0L && now >= waiting.startedNs &&
+            now - waiting.startedNs < 15_000_000_000L
+    }
+
+    private fun waitForAvailability(request: WalkingRequest,
+        service: FastSamRuntimeService<UnknownRuntimeAttachment>, busy: VisionCohortBusyException) {
+        val waiting = WalkingAvailability(request, clock.elapsedRealtimeNanos())
+        val reserved = synchronized(ownerLock) {
+            if (walkingRequest !== request) false
+            else { walkingAvailability = waiting; true }
+        }
+        if (!reserved) { releaseUnknownLoadingService(service); return }
+        unknownRuntimeStatus = "이전 인식 작업 종료 대기 중"
+        // Reserve the wait before closing this empty service: its synchronous release callback
+        // must not immediately retry a still-busy cohort and start an unbounded preparation loop.
+        releaseUnknownLoadingService(service)
+        val ownerRef = WeakReference(this)
+        val waitingRef = WeakReference(waiting)
+        busy.availabilityReceipt.whenComplete { _, error ->
+            ownerRef.get()?.mainDispatcher {
+                val retained = waitingRef.get()
+                if (retained != null) ownerRef.get()?.resumeAfterBusy(retained, error)
+            }
+        }
+    }
+
+    private fun resumeAfterBusy(waiting: WalkingAvailability, error: Throwable?) {
+        val retry = error == null && busyWaitCurrent(waiting) && walkingCurrent(waiting.request)
+        val owned = synchronized(ownerLock) {
+            if (walkingAvailability !== waiting || walkingRequest !== waiting.request) false
+            else {
+                walkingAvailability = null
+                if (!retry) walkingRequest = null
+                true
+            }
+        }
+        if (!owned) return
+        if (retry) continueWalkingPreparation()
+        else unknownRuntimeStatus = "이전 인식 작업 대기 만료 · 다시 준비해 주세요."
+    }
+
     /** Cancel intent before native close can synchronously acknowledge while Activity is still foreground. */
-    private fun clearWalkingIntent() { synchronized(ownerLock) { walkingRequest = null } }
+    private fun clearWalkingIntent() { synchronized(ownerLock) {
+        walkingRequest = null
+        walkingAvailability = null
+    } }
 
     /** Called on the existing tuning executor; native release is not awaited on UI/GL. */
     fun prepareComposition(config: TwoModelRuntimeConfig, primary: TfliteAndroidFrameDetector,
@@ -368,7 +444,7 @@ internal class UnknownRuntimeServiceOwner(
                         "추가 물체 인식 · 저장된 ${info.actualBackend} 설정" else "추가 물체 인식 · ${info.actualBackend} 임시 설정"
                     finishPreparation(attempt)
                 } else {
-                    if (error != null && current() && !unknownRuntimeClosing) {
+                    if (error != null && VisionRuntimeFailures.busy(error) == null && current() && !unknownRuntimeClosing) {
                         deviceTuningExecutor.execute { profiles.markPending(binding, DeviceTuningRecheckReason.EXECUTION_RECOVERY) }
                     }
                     if (current()) unknownRuntimeStatus = "추가 물체 인식 준비 미완료"
@@ -513,6 +589,7 @@ internal class UnknownRuntimeServiceOwner(
     fun releaseBeforePrimaryCalibration(): Boolean {
         val releaseAttempt = synchronized(ownerLock) {
             walkingRequest = null
+            walkingAvailability = null
             activeWalkingService = null
             val loading = preparation
             loading?.terminal?.set(true)
@@ -529,6 +606,7 @@ internal class UnknownRuntimeServiceOwner(
     fun closeActiveForDetector() {
         val releaseAttempt = synchronized(ownerLock) {
             walkingRequest = null
+            walkingAvailability = null
             activeWalkingService = null
             unknownRuntimeService?.also { unknownRuntimeService = null }?.let(::reserveRelease)
         }

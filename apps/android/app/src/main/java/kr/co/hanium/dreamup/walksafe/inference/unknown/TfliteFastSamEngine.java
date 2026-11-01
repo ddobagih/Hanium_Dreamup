@@ -40,6 +40,7 @@ final class TfliteFastSamEngine implements FastSamEngine {
     private boolean releaseUnconfirmed;
 
     TfliteFastSamEngine(Context context,FastSamRuntimeOptions options)throws Exception {
+        FastSamNativeBridge.requireNativeProcess(context);
         long started=SystemClock.elapsedRealtimeNanos();
         try {
             deadline(options);
@@ -70,7 +71,7 @@ final class TfliteFastSamEngine implements FastSamEngine {
             outputs.put(0,ByteBuffer.allocateDirect(a.numBytes()).order(ByteOrder.nativeOrder()));
             outputs.put(1,ByteBuffer.allocateDirect(b.numBytes()).order(ByteOrder.nativeOrder()));
             info=new FastSamRuntimeInfo(options,initialized.actual,initialized.fallbackReason,owner,ms(started),
-                cache.status,cache.token,cache.failureReason,initialized.gpuAttempts);
+                cache.status,cache.token,cache.failureReason,initialized.gpuAttempts,android.os.Process.myPid(),null,null);
         } catch(Throwable failure) {
             try{close();}catch(Throwable closeFailure){failure.addSuppressed(closeFailure);throw new NativeReleaseFailure(failure);}
             if(releaseUnconfirmed)throw new NativeReleaseFailure(failure);

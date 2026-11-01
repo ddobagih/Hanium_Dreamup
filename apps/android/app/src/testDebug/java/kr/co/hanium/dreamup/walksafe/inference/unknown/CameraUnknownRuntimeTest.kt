@@ -1,14 +1,86 @@
 package kr.co.hanium.dreamup.walksafe.inference.unknown
 
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kr.co.hanium.dreamup.walksafe.CameraUnknownRuntime
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionCohortBusyException
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionReleaseReceipt
 import org.junit.Assert.*
 import org.junit.Test
 
 class CameraUnknownRuntimeTest {
+    @Test fun foreignCohortBusyWaitsForAvailabilityWithoutConfusingItWithOwnedNativeRelease() {
+        val available = CompletableFuture<VisionReleaseReceipt>()
+        Fixture(busyFirstLoad = VisionCohortBusyException(available)).use { f ->
+            f.runtime.resume()
+            val old = requireNotNull(f.runtime.service)
+            runCatching { old.start().get(3, TimeUnit.SECONDS) }
+            f.awaitStatus(CameraUnknownRuntime.Status.WAITING_AVAILABILITY)
+            old.releasedFuture().get(3, TimeUnit.SECONDS)
+            assertTrue(old.stats().nativeReleaseConfirmed)
+            assertEquals(0, f.nativeCount.get())
+            assertFalse(available.isDone)
+            assertEquals(1, f.services.size)
+            available.complete(VisionReleaseReceipt("foreign-cohort", 77))
+            f.awaitStatus(CameraUnknownRuntime.Status.READY)
+            assertEquals(2, f.services.size)
+            assertNotSame(old, f.runtime.service)
+            assertEquals(1, f.maximumNative.get())
+        }
+    }
+
+    @Test fun leavingBusyCameraPreventsLateAvailabilityFromStartingAnotherModel() {
+        val available = CompletableFuture<VisionReleaseReceipt>()
+        Fixture(busyFirstLoad = VisionCohortBusyException(available)).use { f ->
+            f.runtime.resume()
+            val old = requireNotNull(f.runtime.service)
+            runCatching { old.start().get(3, TimeUnit.SECONDS) }
+            f.awaitStatus(CameraUnknownRuntime.Status.WAITING_AVAILABILITY)
+            f.runtime.pause()
+            val pausedUpdates = f.changes
+            available.complete(VisionReleaseReceipt("foreign-cohort", 77))
+            f.drain()
+            assertEquals(1, f.services.size)
+            assertEquals(pausedUpdates, f.changes)
+            f.runtime.resume()
+            f.runtime.retry()
+            f.awaitStatus(CameraUnknownRuntime.Status.READY)
+            assertEquals(2, f.services.size)
+        }
+    }
+
+    @Test fun destroyingAClosingAuxiliaryRetainsItsActualReleaseUntilNativeCloseAcknowledges() =
+        Fixture(blockClose = true).use { f ->
+            val old = f.start()
+            f.runtime.pauseAndRelease()
+            assertTrue(f.closeEntered.await(3, TimeUnit.SECONDS))
+            f.runtime.destroy()
+            assertNull(f.runtime.service)
+            val receipts = f.runtime.retainedReleaseReceipts()
+            assertEquals(1, receipts.size)
+            assertSame(old.releasedFuture(), receipts.single())
+            assertFalse(receipts.single().isDone)
+            f.closeGate.countDown()
+            receipts.single().get(3, TimeUnit.SECONDS)
+            assertTrue(old.stats().nativeReleaseConfirmed)
+        }
+
+    @Test fun destroyedAuxiliaryKeepsAReleaseFailureInsteadOfTreatingAnEmptySlotAsReleased() =
+        Fixture(failClose = true).use { f ->
+            val old = f.start()
+            f.runtime.pauseAndRelease()
+            runCatching { old.releasedFuture().get(3, TimeUnit.SECONDS) }
+            f.runtime.destroy()
+            assertNull(f.runtime.service)
+            val receipts = f.runtime.retainedReleaseReceipts()
+            assertEquals(1, receipts.size)
+            assertTrue(receipts.single().isCompletedExceptionally)
+            assertFalse(old.stats().nativeReleaseConfirmed)
+        }
+
     @Test fun explicitRetryReplacesFailedEngineAndAcceptsFramesWithUniqueEpoch() = Fixture().use { f ->
         val old = f.start()
         f.fail(old)
@@ -210,7 +282,7 @@ class CameraUnknownRuntimeTest {
     }
 
     private class Fixture(val blockClose: Boolean = false, val failClose: Boolean = false,
-        val blockLoad: Boolean = false) : AutoCloseable {
+        val blockLoad: Boolean = false, val busyFirstLoad: VisionCohortBusyException? = null) : AutoCloseable {
         val loadGate = CountDownLatch(if (blockLoad) 1 else 0)
         val loadEntered = CountDownLatch(1)
         val closeGate = CountDownLatch(if (blockClose) 1 else 0)
@@ -264,6 +336,7 @@ class CameraUnknownRuntimeTest {
             }, {
                 loadEntered.countDown()
                 check(loadGate.await(3, TimeUnit.SECONDS))
+                if (first && busyFirstLoad != null) throw busyFirstLoad
                 val count = nativeCount.incrementAndGet()
                 maximumNative.accumulateAndGet(count, ::maxOf)
                 object : FastSamEngine {

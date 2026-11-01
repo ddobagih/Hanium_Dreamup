@@ -64,13 +64,125 @@ import java.util.Locale
 import kr.co.hanium.dreamup.walksafe.depth.DepthPredictionPresentation
 import java.util.concurrent.Executors
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionStage
+import java.util.concurrent.CancellationException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.lang.ref.WeakReference
+import java.util.UUID
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.RemoteVisionClient
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionCohortLease
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionOwnerRetirement
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRetirementSnapshot
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRuntimeContext
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRuntimeFailures
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+
+/** A failed close operation cannot replace the model's independent physical release receipt. */
+internal fun closeCameraPrimaryRuntime(
+    close: () -> Unit,
+    actualReleased: () -> CompletionStage<Unit>,
+    onSemanticFailure: (Throwable) -> Unit = {},
+): CompletableFuture<Unit> {
+    try { close() } catch (error: Throwable) { runCatching { onSemanticFailure(error) } }
+    val released = CompletableFuture<Unit>()
+    try {
+        actualReleased().whenComplete { _, error ->
+            if (error == null) released.complete(Unit) else released.completeExceptionally(error)
+        }
+    } catch (error: Throwable) { released.completeExceptionally(error) }
+    return released
+}
+
+/** The queue barrier covers Images/invoke/output consumers before collecting detached models. */
+internal fun drainCameraPrimaryForRetirement(
+    enqueue: (() -> Unit) -> Unit,
+    closeCurrent: () -> CompletionStage<Unit>,
+    retiredReleases: () -> List<CompletionStage<*>>,
+): CompletableFuture<Unit> {
+    val drained = CompletableFuture<Unit>()
+    try { enqueue drain@{
+        val releases = try { (listOf(closeCurrent()) + retiredReleases()).distinct() }
+        catch (error: Throwable) { drained.completeExceptionally(error); return@drain }
+        try {
+            CompletableFuture.allOf(*releases.map { it.toCompletableFuture() }.toTypedArray())
+                .whenComplete { _, error ->
+                    if (error == null) drained.complete(Unit) else drained.completeExceptionally(error)
+                }
+        } catch (error: Throwable) { drained.completeExceptionally(error) }
+    } } catch (error: Throwable) { drained.completeExceptionally(error) }
+    return drained
+}
+
+/** Serializes a detached model's retirement with primary work on the same camera worker. */
+internal fun enqueueCameraPrimaryRetirement(
+    enqueue: (() -> Unit) -> Unit,
+    physicalReleases: MutableCollection<CompletableFuture<Unit>>,
+    retire: () -> CompletionStage<Unit>,
+    onUnprovenDrain: (Throwable) -> Unit,
+): CompletableFuture<Unit> {
+    val released = CompletableFuture<Unit>()
+    try { enqueue {
+        // Only the worker may register an accepted cleanup. Otherwise a preparation already
+        // running on this lane could wait for this task queued behind that same preparation.
+        physicalReleases.add(released)
+        try {
+            retire().whenComplete { _, error ->
+                if (error == null) released.complete(Unit) else released.completeExceptionally(error)
+            }
+        } catch (error: Throwable) {
+            released.completeExceptionally(error)
+            onUnprovenDrain(error)
+        }
+    } } catch (error: Throwable) {
+        released.completeExceptionally(error)
+        // Rejection has no queued dependency: retain an already-terminal unproven drain.
+        physicalReleases.add(released)
+        onUnprovenDrain(error)
+    }
+    return released
+}
+
+/** Runtime ownership is separate from camera viewport/geometry revisions. */
+internal class CameraPrimaryRuntimeAuthority(private val lock: Any) {
+    @Volatile private var revision = 0L
+
+    fun beginPreparation(): Long = synchronized(lock) { ++revision }
+    fun isCurrent(request: Long): Boolean = revision == request
+
+    fun invalidateIf(isOwned: () -> Boolean, detach: () -> Unit): Boolean = synchronized(lock) {
+        if (!isOwned()) false else { revision++; detach(); true }
+    }
+
+    fun publish(request: Long, lifecycleCurrent: () -> Boolean, adopt: () -> Unit): Boolean = synchronized(lock) {
+        if (!isCurrent(request) || !lifecycleCurrent()) false else { adopt(); true }
+    }
+
+    fun clearFailed(request: Long, clear: () -> Unit): Boolean = synchronized(lock) {
+        if (!isCurrent(request)) false else { clear(); true }
+    }
+}
+
+/** Camera owns one participant; joining again would make its own successful cleanup wait forever. */
+internal fun retireCameraRuntime(
+    ownerId: String,
+    participant: CameraRuntimeHandoff.Claim?,
+    joinRetirement: () -> CameraRuntimeHandoff.Claim,
+    primaryDrained: CompletionStage<Unit>,
+    cameraReleased: List<CompletionStage<*>>,
+    auxiliaryAfterPrimaryDrain: () -> List<CompletionStage<*>>,
+    nativeAfterConsumers: () -> VisionRetirementSnapshot?,
+    requestExit: (VisionCohortLease) -> Unit,
+    onProblem: (Throwable) -> Unit = {},
+): CameraRuntimeHandoff.Claim {
+    val claim = participant ?: joinRetirement()
+    VisionOwnerRetirement.begin(ownerId, claim, primaryDrained,
+        { cameraReleased + auxiliaryAfterPrimaryDrain() }, nativeAfterConsumers, requestExit, onProblem)
+    return claim
+}
 
 /** A primary reload may resume only after the preceding auxiliary native owner actually closed. */
 internal fun deferCameraRuntimeUntilAuxiliaryReleased(
@@ -85,7 +197,7 @@ internal fun deferCameraRuntimeUntilAuxiliaryReleased(
     if (!state.stopping || state.nativeReleaseConfirmed) return false
     previous.releasedFuture().whenComplete { _, error -> dispatch {
         if (isCurrent()) {
-            if (error == null && previous.stats().nativeReleaseConfirmed) onReleased() else onReleaseFailure()
+            if (error == null) onReleased() else onReleaseFailure()
         }
     } }
     return true
@@ -180,6 +292,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
     }
     @Volatile private var preparedCameraGeneration = -1
     private val jointChoiceLock = Any()
+    private val primaryRuntimeAuthority = CameraPrimaryRuntimeAuthority(jointChoiceLock)
     @Volatile private var jointChoice: ValidatedJointRuntimeChoice? = null
     @Volatile private var primaryCandidate: RuntimeCandidate? = null
     @Volatile private var auxiliaryCandidate: RuntimeCandidate? = null
@@ -197,7 +310,8 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
     private var waitingHandoff: CompletableFuture<Unit>? = null
     private val cameraNativeReleases = ConcurrentHashMap<Long, CompletableFuture<Unit>>()
     private val retiredPrimaryReleases = ConcurrentLinkedQueue<CompletableFuture<Unit>>()
-    private var failedPrimaryRelease: TfliteAndroidFrameDetector? = null
+    private val visionRuntimeOwnerId = "camera-${UUID.randomUUID()}"
+    private val visionRuntimeContext by lazy { VisionRuntimeContext(applicationContext, visionRuntimeOwnerId) }
     private val closingCamera get() = cameraRelease.blocksStart
     private var startingCamera = false
     private var installRequested = false
@@ -283,67 +397,100 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
     private fun prepareCameraDetector() {
         if (detector != null && preparedCameraGeneration == generation && jointChoice != null) return
         val epoch = generation
+        val activityRef = WeakReference(this)
+        val handler = feedbackHandler
         if (deferCameraRuntimeUntilAuxiliaryReleased(unknownRuntime.service,
-                dispatch = { action -> feedbackHandler.post { action() } },
-                isCurrent = { foreground && !isDestroyed && !isFinishing && generation == epoch },
-                onReleased = { prepareCameraDetector() },
+                dispatch = { action -> handler.post { action() }; Unit },
+                isCurrent = { activityRef.get()?.let {
+                    it.foreground && !it.isDestroyed && !it.isFinishing && it.generation == epoch
+                } == true },
+                onReleased = { activityRef.get()?.prepareCameraDetector(); Unit },
                 onReleaseFailure = {
-                    status.text = "이전 추가 인식 모델의 해제가 확인되지 않아 시작할 수 없습니다. 화면을 닫아 주세요."
+                    activityRef.get()?.status?.text = "이전 추가 인식 모델의 해제가 확인되지 않아 시작할 수 없습니다. 화면을 닫아 주세요."
                 })) {
             status.text = "이전 추가 인식 모델의 종료를 기다리는 중"
             return
         }
+        val request = primaryRuntimeAuthority.beginPreparation()
         val modelQueuedNs = System.nanoTime()
         worker.execute {
             fun current() = foreground && !isDestroyed && !isFinishing && epoch == generation &&
-                runtimeHandoff?.released?.isCompletedExceptionally != true
+                primaryRuntimeAuthority.isCurrent(request) && runtimeHandoff?.released?.isCompletedExceptionally != true
             if (!current()) return@execute
             if (detector != null && preparedCameraGeneration == epoch && jointChoice != null) return@execute
             logCameraQueue("model_load_queue", generation, modelQueuedNs)
             val previous = detector
             detector = null
             var owned: TfliteAndroidFrameDetector? = null
+            var preparationFailure: Throwable? = null
             val loaded = runCatching {
-                closePrimaryNative(previous)
+                // A semantic close error is reported separately; only actual release admits a replacement.
+                closePrimaryNative(previous).get()
+                CompletableFuture.allOf(*retiredPrimaryReleases.toTypedArray()).get()
                 val config = TwoModelRuntimeConfig.load(applicationContext)
-                val prepared = requireNotNull(AndroidJointRuntimeLoader.restore(applicationContext,
+                val prepared = requireNotNull(AndroidJointRuntimeLoader.restore(visionRuntimeContext,
                     config, ::current)) { "Device check joint runtime required" }
                 owned = prepared.load.detector
-                check(current())
-                synchronized(jointChoiceLock) { jointChoice = prepared.choice }
-                primaryCandidate = prepared.choice.candidate.primary
-                auxiliaryCandidate = prepared.choice.candidate.auxiliary
-                primarySetting = "샘플 이미지 성능 점검 설정 · ${prepared.choice.candidate.primaryIntervalMs}ms 간격"
-                auxiliarySetting = "샘플 이미지 성능 점검 설정 · ${prepared.choice.candidate.auxiliaryIntervalMs}ms 간격"
-                primaryInferencePacing.configureMinimumInterval(prepared.choice.candidate.primaryIntervalMs)
-                preparedCameraGeneration = epoch
+                if (!primaryRuntimeAuthority.publish(request, ::current) {
+                    primaryInferencePacing.configureMinimumInterval(prepared.choice.candidate.primaryIntervalMs)
+                    jointChoice = prepared.choice
+                    primaryCandidate = prepared.choice.candidate.primary
+                    auxiliaryCandidate = prepared.choice.candidate.auxiliary
+                    primarySetting = "샘플 이미지 성능 점검 설정 · ${prepared.choice.candidate.primaryIntervalMs}ms 간격"
+                    auxiliarySetting = "샘플 이미지 성능 점검 설정 · ${prepared.choice.candidate.auxiliaryIntervalMs}ms 간격"
+                    preparedCameraGeneration = epoch
+                    detector = prepared.load.detector
+                }) throw CancellationException("Camera model preparation retired")
                 prepared.load
             }.onFailure {
+                preparationFailure = it
+                primaryRuntimeAuthority.clearFailed(request) {
+                    primaryCandidate = null
+                    auxiliaryCandidate = null
+                    preparedCameraGeneration = -1
+                    jointChoice = null
+                    detector = null
+                }
                 runCatching { closePrimaryNative(owned) }
-                if (it is kr.co.hanium.dreamup.walksafe.inference.DetectorNativeCleanupFailure || it.suppressed.isNotEmpty())
-                    runtimeHandoff?.fail(it)
                 owned = null
-                primaryCandidate = null
-                auxiliaryCandidate = null
-                preparedCameraGeneration = -1
-                synchronized(jointChoiceLock) { jointChoice = null }
                 Log.e("WalkSafeCameraTest", "Model initialization failed", it)
             }.getOrNull()
-            primaryInferencePacing.reset()
-            detector = loaded?.detector
+            if (primaryRuntimeAuthority.isCurrent(request)) primaryInferencePacing.reset()
             Log.i("WalkSafeCameraTest", "Model initialization: ${loaded?.reason ?: "exception"} " +
                 "measurement=sample_images primary=$primaryCandidate primarySetting=$primarySetting auxiliary=$auxiliaryCandidate")
             logDetectorTiming("model_load", loaded?.loadTiming)
             runOnUiThread {
-                if (isDestroyed || isFinishing) return@runOnUiThread
+                if (!foreground || isDestroyed || isFinishing || generation != epoch ||
+                    !primaryRuntimeAuthority.isCurrent(request)) return@runOnUiThread
                 if (detector == null) {
-                    status.text = "기기 점검 필요 · 홈에서 기기 점검을 다시 진행해 주세요."
-                    unknownStatus.text = "기기 점검 설정을 확인하지 못해 추가 인식을 시작하지 않았습니다."
+                    val busy = VisionRuntimeFailures.busy(preparationFailure)
+                    if (busy != null) {
+                        status.text = "이전 화면의 모델 종료를 기다리는 중 · 점검 설정은 유지됩니다."
+                        unknownStatus.text = "모델을 사용할 수 있을 때 추가 인식을 준비합니다."
+                        awaitModelAvailability(busy.availabilityReceipt, epoch, request)
+                    } else {
+                        status.text = "기기 점검 설정을 준비하지 못했습니다. 이전 모델 해제가 확인된 뒤 홈에서 다시 점검해 주세요."
+                        unknownStatus.text = "모델 준비 실패로 추가 인식을 시작하지 않았습니다."
+                    }
                 }
                 else if (foreground) {
                     status.text = "객체 인식 준비 완료 · $primarySetting"
                     resumeUnknownAfterPrimaryLiveAttempt()
                 }
+            }
+        }
+    }
+
+    private fun awaitModelAvailability(receipt: CompletionStage<*>, epoch: Int, request: Long) {
+        val activityRef = WeakReference(this)
+        receipt.whenComplete { _, error ->
+            activityRef.get()?.runOnUiThread {
+                val activity = activityRef.get() ?: return@runOnUiThread
+                if (!activity.foreground || activity.isDestroyed || activity.isFinishing ||
+                    activity.generation != epoch || activity.detector != null ||
+                    !activity.primaryRuntimeAuthority.isCurrent(request)) return@runOnUiThread
+                if (error == null) activity.prepareCameraDetector()
+                else activity.status.text = "이전 화면의 모델 해제가 확인되지 않았습니다. 앱을 완전히 종료한 뒤 다시 실행해 주세요."
             }
         }
     }
@@ -358,7 +505,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         auxiliaryPacing.begin(epoch, choice.candidate.auxiliaryIntervalMs)
         val selected = choice.candidate.auxiliary
         Log.i("WalkSafeCameraTest", "FastSAM preparation: candidate=$selected setting=$auxiliarySetting primary=$primaryCandidate")
-        return FastSamRuntimeService(applicationContext, epoch,
+        return FastSamRuntimeService(visionRuntimeContext, epoch,
             FastSamRuntimeOptions(FastSamRuntimeOptions.Backend.valueOf(selected.backend.name),
                 selected.numThreads, false,
                 SystemClock.elapsedRealtimeNanos() + 60_000_000_000L, 800L, false, false, true),
@@ -384,6 +531,8 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                     auxiliaryPacing.cancelService(epoch)
                     Log.e("WalkSafeCameraTest", "FastSAM failed", error)
                     unknownMaterialPoints.invalidate(epoch)
+                    // Contention before acquiring a lease is not evidence against the measured choice.
+                    if (VisionRuntimeFailures.busy(error) != null) return
                     unknownRuntime.failed(epoch)
                     invalidateJointRuntime(choice, "auxiliary_execution_failed")
                 }
@@ -400,30 +549,27 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun invalidateJointRuntime(expected: ValidatedJointRuntimeChoice, reason: String) {
-        val (retired, releaseReceipt) = synchronized(jointChoiceLock) {
-            if (jointChoice !== expected) return
-            val receipt = CompletableFuture<Unit>()
-            retiredPrimaryReleases.add(receipt)
+        if (!primaryRuntimeAuthority.invalidateIf({ jointChoice === expected }) {
             unknownGeometryGeneration.incrementAndGet()
             jointChoice = null
-            detector.also {
-                detector = null; preparedCameraGeneration = -1
-            } to receipt
-        }
-        try { worker.execute {
-            try {
-                try { AndroidJointRuntimeChoiceStore(applicationContext).invalidateIfMatches(expected) }
-                finally { closePrimaryNative(retired) }
-                releaseReceipt.complete(Unit)
-            } catch (error: Throwable) {
-                releaseReceipt.completeExceptionally(error)
-                runtimeHandoff?.fail(error)
-                Log.e("WalkSafeCameraTest", "Runtime release failed", error)
-            }
-        } } catch (error: RuntimeException) {
-            releaseReceipt.completeExceptionally(error)
-            runtimeHandoff?.fail(error)
-        }
+            val retired = detector
+            detector = null
+            preparedCameraGeneration = -1
+            // Reserve cleanup before a newer preparation can enter this same worker queue.
+            enqueueCameraPrimaryRetirement(
+                enqueue = { action -> worker.execute { action() } },
+                physicalReleases = retiredPrimaryReleases,
+                retire = {
+                    try { AndroidJointRuntimeChoiceStore(applicationContext).invalidateIfMatches(expected) }
+                    catch (error: Throwable) {
+                        // Preference failure is not native release evidence. Always continue close.
+                        Log.e("WalkSafeCameraTest", "Runtime invalidation failed", error)
+                    }
+                    closePrimaryNative(retired)
+                },
+                onUnprovenDrain = { error -> runtimeHandoff?.fail(error); Unit },
+            )
+        }) return
         runOnUiThread {
             if (isDestroyed || isFinishing) return@runOnUiThread
             unknownRuntime.pauseAndRelease()
@@ -466,6 +612,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
             CameraUnknownRuntime.Status.READY -> "이름 없는 영역 · ${unknownRuntime.backendName ?: "FastSAM"} · $auxiliarySetting"
             CameraUnknownRuntime.Status.FAILED -> "이름 없는 영역 실패 · 카메라 다시 연결을 눌러 재시도하세요"
             CameraUnknownRuntime.Status.WAITING_RELEASE -> "이름 없는 영역 · 이전 모델 종료를 기다리는 중"
+            CameraUnknownRuntime.Status.WAITING_AVAILABILITY -> "이름 없는 영역 · 다른 화면의 모델 종료를 기다리는 중"
             CameraUnknownRuntime.Status.RELEASE_FAILED -> "이름 없는 영역 · 이전 모델 해제 미확인으로 재시작할 수 없습니다"
         })
     }
@@ -713,41 +860,43 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         auxiliaryPacing.reset()
         loadObservations.close()
         unknownMaterialPoints.invalidate()
-        val auxiliary = unknownRuntime.service
-        val auxiliaryRelease = CompletableFuture<Unit>()
-        try { unknownRuntime.destroy() }
-        catch (error: Throwable) { auxiliaryRelease.completeExceptionally(error); runtimeHandoff?.fail(error) }
-        if (auxiliary == null) auxiliaryRelease.complete(Unit) else {
-            auxiliary.releasedFuture().whenComplete { _, error ->
-                if (error == null && auxiliary.stats().nativeReleaseConfirmed) auxiliaryRelease.complete(Unit)
-                else auxiliaryRelease.completeExceptionally(error ?: IllegalStateException("Auxiliary native release unconfirmed"))
-            }
-        }
-        synchronized(jointChoiceLock) { jointChoice = null }
+        // Stop auxiliary admission before the primary worker barrier returns its final Image/copy.
+        val auxiliaryStop = CompletableFuture<Unit>()
+        try { unknownRuntime.destroy(); auxiliaryStop.complete(Unit) }
+        catch (error: Throwable) { auxiliaryStop.completeExceptionally(error) }
+        val auxiliaryReleases = unknownRuntime.retainedReleaseReceipts().toList() + auxiliaryStop
+        primaryRuntimeAuthority.invalidateIf({ true }) { jointChoice = null }
         val closingEpoch = generation
         val closeQueuedNs = System.nanoTime()
-        val primaryRelease = CompletableFuture<Unit>()
-        try { worker.execute {
-            logCameraQueue("detector_close_queue", closingEpoch, closeQueuedNs)
-            val model = detector
-            try { closePrimaryNative(model); detector = null; primaryRelease.complete(Unit) }
-            catch (error: Throwable) { primaryRelease.completeExceptionally(error) }
-            finally { logDetectorTiming("detector_close", model?.lifecycleTiming()) }
-        } } catch (error: RuntimeException) { primaryRelease.completeExceptionally(error) }
-        runtimeHandoff?.completeAfter(cameraNativeReleases.values.toList() + retiredPrimaryReleases.toList() +
-            listOf(primaryRelease, auxiliaryRelease))
+        val primaryRelease = drainCameraPrimaryForRetirement(
+            enqueue = { action -> worker.execute { action() } },
+            closeCurrent = {
+                logCameraQueue("detector_close_queue", closingEpoch, closeQueuedNs)
+                val model = detector
+                detector = null
+                try { closePrimaryNative(model) }
+                finally { logDetectorTiming("detector_close", model?.lifecycleTiming()) }
+            },
+            retiredReleases = { retiredPrimaryReleases.toList() },
+        )
+        val ownerId = visionRuntimeOwnerId
+        val client = if (Build.VERSION.SDK_INT >= 31) RemoteVisionClient.forMainProcess(applicationContext) else null
+        // No callback below retains this Activity, a listener, an Image or a model wrapper.
+        runtimeHandoff = retireCameraRuntime(ownerId, runtimeHandoff, CameraRuntimeHandoff::joinRetirement,
+            primaryRelease, cameraNativeReleases.values.toList(), { auxiliaryReleases },
+            { client?.retirementSnapshot(ownerId) },
+            { lease -> client?.requestExit(lease, "camera_destroyed"); Unit },
+            { error -> Log.w("WalkSafeCameraRetirement", "Camera resource release unconfirmed", error); Unit })
         worker.shutdown()
         if (!startingCamera && (!closingCamera || cameraRelease.failure != null)) cameraWorker.shutdown()
         super.onDestroy()
     }
 
-    private fun closePrimaryNative(model: TfliteAndroidFrameDetector?) {
-        try { model?.close() }
-        catch (error: Throwable) {
-            failedPrimaryRelease = model
-            runtimeHandoff?.fail(error)
-            throw error
-        }
+    private fun closePrimaryNative(model: TfliteAndroidFrameDetector?): CompletableFuture<Unit> {
+        if (model == null) return CompletableFuture.completedFuture(Unit)
+        return closeCameraPrimaryRuntime(model::close, model::actualReleasedFuture,
+            { error -> Log.w("WalkSafeCameraTest", "Primary close failed; waiting for actual release", error); Unit })
+            .also { retiredPrimaryReleases.add(it) }
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {

@@ -4,12 +4,14 @@ import android.media.Image
 import java.io.Closeable
 import java.nio.ByteBuffer
 import java.util.concurrent.AbstractExecutorService
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.FutureTask
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.TimeUnit
 import kr.co.hanium.dreamup.walksafe.inference.AndroidDetectionResult
 import kr.co.hanium.dreamup.walksafe.inference.AndroidFrameDetector
+import kr.co.hanium.dreamup.walksafe.inference.DetectorCohortRetired
 import kr.co.hanium.dreamup.walksafe.inference.NoopAndroidFrameDetector
 import kr.co.hanium.dreamup.walksafe.inference.OwnedYuvFrame
 import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
@@ -357,6 +359,89 @@ class PrimaryDetectorExecutionOwnerTest {
         assertSame(detector, f.owner.projection().detector)
         assertTrue(f.owner.projection().closing); assertFalse(f.owner.projection().available)
         f.owner.closeAfterCalibrationDrains(); assertEquals(1, detector.closes)
+    }
+
+    @Test fun remoteCloseFailureWaitsForLatePhysicalProofAfterBothConsumerBarriers() {
+        val f = Fixture(); val physical = CompletableFuture<Unit>()
+        val detector = Detector().also { it.closeFailure = DetectorCohortRetired(IllegalStateException("close timeout"), physical) }
+        f.owner.adoptLoadedOnNativeLane(f.owner.beginLoad(), PrimaryLoadedDetector(detector, true)) { false }
+        val closed = f.owner.closedFuture()
+        f.owner.closeAfterCalibrationDrains(); f.tuning.runNext(); f.lane.runNext()
+        assertFalse("A semantic timeout cannot finish the physical release future", closed.isDone)
+        assertSame(detector, f.owner.projection().detector)
+        physical.complete(Unit)
+        assertEquals(Unit, closed.getNow(null))
+        assertTrue(f.owner.projection().detector is NoopAndroidFrameDetector)
+        assertEquals(1, detector.closes)
+    }
+
+    @Test fun earlyChildDeathCannotAcknowledgeAcceptedConsumerWorkBeforeItsBarrier() {
+        val f = Fixture(); val physical = CompletableFuture<Unit>()
+        f.owner.recordReleaseFailure(DetectorCohortRetired(IllegalStateException("OPEN timeout"), physical))
+        f.lane.execute { f.events += "accepted consumer drained" }
+        f.owner.closeAfterCalibrationDrains()
+        physical.complete(Unit)
+        assertFalse(f.owner.closedFuture().isDone)
+        f.tuning.runNext(); f.lane.runNext()
+        assertEquals(listOf("accepted consumer drained"), f.events)
+        assertFalse(f.owner.closedFuture().isDone)
+        f.lane.runNext()
+        assertEquals(Unit, f.owner.closedFuture().getNow(null))
+    }
+
+    @Test fun childDeathCannotRepairARejectedConsumerDrainBarrier() {
+        val f = Fixture(); val physical = CompletableFuture<Unit>()
+        f.owner.recordReleaseFailure(DetectorCohortRetired(IllegalStateException("OPEN timeout"), physical))
+        f.lane.reject = true
+        f.owner.closeAfterCalibrationDrains(); f.tuning.runNext()
+        assertTrue(f.owner.closedFuture().isCompletedExceptionally)
+        physical.complete(Unit)
+        assertTrue(f.owner.closedFuture().isCompletedExceptionally)
+        assertTrue(f.owner.projection().closing)
+    }
+
+    @Test fun aNormalCloseReturnStillWaitsForTheIndependentModelReleaseReceipt() {
+        val f = Fixture(); val physical = CompletableFuture<Unit>(); val detector = Detector()
+        f.owner.retainPhysicalRelease(physical, detector)
+        f.owner.adoptLoadedOnNativeLane(f.owner.beginLoad(), PrimaryLoadedDetector(detector, true)) { false }
+        f.owner.closeAfterCalibrationDrains(); f.tuning.runNext(); f.lane.runNext()
+        assertEquals(1, detector.closes)
+        assertSame(detector, f.owner.projection().detector)
+        assertFalse(f.owner.closedFuture().isDone)
+        physical.complete(Unit)
+        assertEquals(Unit, f.owner.closedFuture().getNow(null))
+        assertTrue(f.owner.projection().detector is NoopAndroidFrameDetector)
+    }
+
+    @Test fun aRegisteredPhysicalReceiptCanResolveAWrappedCloseErrorWithoutHidingTheFailure() {
+        val f = Fixture(); val physical = CompletableFuture<Unit>(); val failure = IllegalStateException("wrapper close")
+        val detector = Detector().also { it.closeFailure = failure }
+        f.owner.retainPhysicalRelease(physical, detector)
+        f.owner.adoptLoadedOnNativeLane(f.owner.beginLoad(), PrimaryLoadedDetector(detector, true)) { false }
+        f.owner.closeAfterCalibrationDrains(); f.tuning.runNext(); f.lane.runNext()
+        assertFalse(f.owner.closedFuture().isDone)
+        assertTrue(f.owner.projection().closing); assertFalse(f.owner.projection().available)
+        assertSame(failure, detector.closeFailure)
+        physical.complete(Unit)
+        assertEquals(Unit, f.owner.closedFuture().getNow(null))
+        assertTrue(f.owner.projection().closing) // Physical recovery does not authorize another load.
+    }
+
+    @Test fun reloadCannotAllocateAnotherOwnerFromACloseReturnWithoutPhysicalProof() {
+        val f = Fixture(); val physical = CompletableFuture<Unit>(); val previous = Detector()
+        f.owner.retainPhysicalRelease(physical, previous)
+        val claim = f.owner.beginLoad()
+        f.owner.adoptLoadedOnNativeLane(claim, PrimaryLoadedDetector(previous, true)) { false }
+        assertTrue(runCatching {
+            f.owner.retireLoadedForReloadOnNativeLane(claim, { true }) { (it as Closeable).close() }
+        }.exceptionOrNull() is IllegalStateException)
+        assertTrue(f.owner.projection().closing)
+        assertFalse(f.owner.adoptLoadedOnNativeLane(f.owner.beginLoad(), PrimaryLoadedDetector(Detector(), true)) { false })
+        f.owner.closeAfterCalibrationDrains(); f.tuning.runNext(); f.lane.runNext()
+        assertFalse(f.owner.closedFuture().isDone)
+        physical.complete(Unit)
+        assertEquals(Unit, f.owner.closedFuture().getNow(null))
+        assertEquals(1, previous.closes)
     }
 
     @Test fun rejectedTuningBarrierCannotAcknowledgeOrCloseInline() {
