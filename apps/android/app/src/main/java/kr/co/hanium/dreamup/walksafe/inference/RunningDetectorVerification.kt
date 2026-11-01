@@ -183,12 +183,17 @@ class RunningDetectorVerificationGate(
         if (current == null || current.instance !== instance || current.failed) {
             return RunningDetectorVerificationStep.STALE
         }
+        if (overdue(current, nowMs)) {
+            verified = null
+            current.failed = true
+            return RunningDetectorVerificationStep.FAILED
+        }
         if (verify(instance, identity, evidence) != null) {
             attempt = null
             return RunningDetectorVerificationStep.VERIFIED
         }
         current.failures += 1
-        if (current.failures >= maxAttempts || overdue(current, nowMs)) {
+        if (current.failures >= maxAttempts) {
             current.failed = true
             return RunningDetectorVerificationStep.FAILED
         }

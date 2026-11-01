@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import java.io.Closeable
@@ -72,6 +73,7 @@ class AndroidKoreanTextToSpeechSynthesisProbe(
         },
         timeoutScheduler = AndroidKoreanTextToSpeechProbeTimeoutScheduler(mainHandler),
         timeoutMs = timeoutMs,
+        elapsedRealtimeMs = SystemClock::elapsedRealtime,
         onResult = { result ->
             if (Looper.myLooper() == Looper.getMainLooper()) {
                 onResult(result)
@@ -136,12 +138,17 @@ internal class KoreanTextToSpeechSynthesisProbeSession(
     private val timeoutMs: Long,
     private val onResult: (KoreanTextToSpeechSynthesisProbeResult) -> Unit,
     private val utteranceId: String = "walksafe-korean-tts-${UUID.randomUUID()}",
+    private val elapsedRealtimeMs: () -> Long = { System.nanoTime() / 1_000_000L },
 ) : Closeable {
     private val lock = Any()
     private var state = ProbeState.IDLE
     private var engine: KoreanTextToSpeechProbeEngine? = null
     private var outputFile: File? = null
     private var timeoutCancellation: KoreanTextToSpeechProbeTimeoutCancellation? = null
+    private var timeoutRegistration: TimeoutRegistration? = null
+    private var startedAtMs = 0L
+
+    private class TimeoutRegistration(val delayMs: Long) { var registering = true }
 
     init {
         require(timeoutMs > 0L) { "timeoutMs must be positive" }
@@ -151,29 +158,12 @@ internal class KoreanTextToSpeechSynthesisProbeSession(
     fun start() {
         synchronized(lock) {
             check(state == ProbeState.IDLE) { "Korean TTS synthesis probe may only be started once" }
+            startedAtMs = elapsedRealtimeMs()
             state = ProbeState.RUNNING
         }
 
-        val scheduledTimeout = runCatching {
-            timeoutScheduler.schedule(timeoutMs) {
-                finish(KoreanTextToSpeechSynthesisProbeResult.TIMED_OUT)
-            }
-        }.getOrElse {
-            finish(KoreanTextToSpeechSynthesisProbeResult.TIMEOUT_SCHEDULING_FAILED)
-            return
-        }
-        val timeoutRetained = synchronized(lock) {
-            if (state == ProbeState.RUNNING) {
-                timeoutCancellation = scheduledTimeout
-                true
-            } else {
-                false
-            }
-        }
-        if (!timeoutRetained) {
-            runCatching { scheduledTimeout.cancel() }
-            return
-        }
+        if (!armTimeout()) return
+        if (!isCurrent(null)) return
 
         val createdEngine = runCatching { engineFactory.create() }.getOrElse {
             finish(KoreanTextToSpeechSynthesisProbeResult.INITIALIZATION_FAILED)
@@ -191,6 +181,7 @@ internal class KoreanTextToSpeechSynthesisProbeSession(
             runCatching { createdEngine.close() }
             return
         }
+        if (!isCurrent(createdEngine)) return
 
         runCatching {
             createdEngine.setInitializationListener { initialized ->
@@ -229,6 +220,7 @@ internal class KoreanTextToSpeechSynthesisProbeSession(
             )
             return
         }
+        if (!isCurrent(initializedEngine)) return
 
         val createdOutput = runCatching { outputFileFactory.create() }.getOrElse {
             finish(KoreanTextToSpeechSynthesisProbeResult.OUTPUT_FILE_UNAVAILABLE)
@@ -252,6 +244,7 @@ internal class KoreanTextToSpeechSynthesisProbeSession(
                 object : KoreanTextToSpeechProbeProgressListener {
                     override fun onDone(callbackUtteranceId: String?) {
                         if (callbackUtteranceId != utteranceId) return
+                        if (!isCurrent(initializedEngine)) return
                         val completedOutput = synchronized(lock) {
                             outputFile.takeIf {
                                 state == ProbeState.RUNNING && engine === initializedEngine
@@ -301,21 +294,82 @@ internal class KoreanTextToSpeechSynthesisProbeSession(
         }
     }
 
-    private fun isCurrent(candidate: KoreanTextToSpeechProbeEngine): Boolean =
-        synchronized(lock) {
-            state == ProbeState.RUNNING && engine === candidate
+    private fun isCurrent(candidate: KoreanTextToSpeechProbeEngine?): Boolean {
+        var expired = false
+        val current = synchronized(lock) {
+            if (state != ProbeState.RUNNING || engine !== candidate) false
+            else if (deadlineReached(elapsedRealtimeMs())) {
+                expired = true
+                false
+            } else true
         }
+        if (expired) finish(KoreanTextToSpeechSynthesisProbeResult.TIMED_OUT)
+        return current
+    }
+
+    /** Called under lock; the timer is not required to run before a late callback is rejected. */
+    private fun deadlineReached(nowMs: Long) = nowMs < startedAtMs || nowMs - startedAtMs >= timeoutMs
+
+    private fun armTimeout(): Boolean {
+        var previous: KoreanTextToSpeechProbeTimeoutCancellation? = null
+        val registration = synchronized(lock) {
+            if (state != ProbeState.RUNNING) return false
+            val nowMs = elapsedRealtimeMs()
+            if (deadlineReached(nowMs)) null else {
+                previous = timeoutCancellation.also { timeoutCancellation = null }
+                TimeoutRegistration(timeoutMs - (nowMs - startedAtMs)).also { timeoutRegistration = it }
+            }
+        } ?: run {
+            finish(KoreanTextToSpeechSynthesisProbeResult.TIMED_OUT)
+            return false
+        }
+        runCatching { previous?.cancel() }
+        val scheduled = runCatching {
+            timeoutScheduler.schedule(registration.delayMs) { onTimeout(registration) }
+        }.getOrElse {
+            finish(KoreanTextToSpeechSynthesisProbeResult.TIMEOUT_SCHEDULING_FAILED)
+            return false
+        }
+        val retained = synchronized(lock) {
+            registration.registering = false
+            if (state == ProbeState.RUNNING && timeoutRegistration === registration) {
+                timeoutCancellation = scheduled
+                true
+            } else false
+        }
+        if (!retained) runCatching { scheduled.cancel() }
+        return retained
+    }
+
+    private fun onTimeout(registration: TimeoutRegistration) {
+        val (expired, inline) = synchronized(lock) {
+            if (state != ProbeState.RUNNING || timeoutRegistration !== registration) return
+            deadlineReached(elapsedRealtimeMs()) to registration.registering
+        }
+        when {
+            expired -> finish(KoreanTextToSpeechSynthesisProbeResult.TIMED_OUT)
+            // A scheduler invoking a delayed task inline cannot be retried recursively.
+            inline -> finish(KoreanTextToSpeechSynthesisProbeResult.TIMEOUT_SCHEDULING_FAILED)
+            else -> armTimeout()
+        }
+    }
 
     private fun finish(
         result: KoreanTextToSpeechSynthesisProbeResult,
         closing: Boolean = false,
     ) {
+        var acceptedResult = result
         val cleanup = synchronized(lock) {
             if (state != ProbeState.RUNNING) {
                 if (closing) state = ProbeState.CLOSED
                 null
             } else {
+                // WAV reading/validation can itself cross the deadline after onDone arrives.
+                if (result == KoreanTextToSpeechSynthesisProbeResult.AVAILABLE && deadlineReached(elapsedRealtimeMs())) {
+                    acceptedResult = KoreanTextToSpeechSynthesisProbeResult.TIMED_OUT
+                }
                 state = if (closing) ProbeState.CLOSED else ProbeState.TERMINAL
+                timeoutRegistration = null
                 ProbeCleanup(timeoutCancellation, engine, outputFile).also {
                     timeoutCancellation = null
                     engine = null
@@ -327,7 +381,7 @@ internal class KoreanTextToSpeechSynthesisProbeSession(
         runCatching { cleanup.timeoutCancellation?.cancel() }
         runCatching { cleanup.engine?.close() }
         runCatching { cleanup.outputFile?.delete() }
-        onResult(result)
+        onResult(acceptedResult)
     }
 
     override fun close() {

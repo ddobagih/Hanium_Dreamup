@@ -30,6 +30,8 @@ internal class PostLoginDeviceCheckController(
     private var overallTimeout: DeviceCheckScheduledTask? = null
     var runtimeDeadlineMs: Long? = null
         private set
+    private var runtimeStartedAtMs: Long? = null
+    private var permissionObservationPending: PostLoginDeviceCheckBinding? = null
     private var timeoutGeneration = 0L
     private var runtimeCallbackGeneration = 0L
     private var storedMetricRefresh: StoredDeviceCheckMetricRefresh? = null
@@ -75,7 +77,8 @@ internal class PostLoginDeviceCheckController(
     fun isSnapshotBindingLive(binding: PostLoginDeviceCheckBinding): Boolean =
         PostLoginDeviceCheckPolicy.isCurrent(current, binding) && isSessionBindingLive(binding)
     fun isRunningBindingCurrent(binding: PostLoginDeviceCheckBinding): Boolean =
-        facts.actor().foreground && current.state == PostLoginDeviceCheckState.RUNNING && isSnapshotBindingLive(binding)
+        permissionObservationPending != binding && facts.actor().foreground &&
+            current.state == PostLoginDeviceCheckState.RUNNING && isSnapshotBindingLive(binding)
 
     /** Identifies the same successful attempt across reentrant output teardown. */
     fun isPassedSnapshotCurrent(expected: PostLoginDeviceCheckSnapshot): Boolean =
@@ -234,13 +237,22 @@ internal class PostLoginDeviceCheckController(
     fun completePermissionObservation(expectedBinding: PostLoginDeviceCheckBinding? = null) {
         val binding = expectedBinding ?: current.bindingOrNull ?: return
         if (current.state != PostLoginDeviceCheckState.REQUESTING_PERMISSIONS || !isSnapshotBindingLive(binding)) return
+        if (permissionObservationPending == binding) return
+        val observationGeneration = runtimeCallbackGeneration
+        permissionObservationPending = binding
         publish(PostLoginDeviceCheckPolicy.beginRunning(current, binding, facts.actor().foreground))
-        if (!effects.recordPermissionObservation(binding)) {
-            cancel("jit_transition_rejected")
+        val observedSnapshot = current
+        val accepted = runCatching { effects.recordPermissionObservation(binding) }.getOrDefault(false)
+        // A reentrant newer attempt can own its own observation while this callback unwinds.
+        if (permissionObservationPending == binding) permissionObservationPending = null
+        if (!accepted || observationGeneration != runtimeCallbackGeneration) {
+            rejectOnboardingTransition(observedSnapshot)
             return
         }
+        if (current !== observedSnapshot || !isRunningBindingCurrent(binding)) return
         startRuntime(binding)
-        effects.afterPermissionObservation(binding)
+        if (isSnapshotBindingLive(binding) && (current.state == PostLoginDeviceCheckState.RUNNING || current.passesFeatureGate))
+            effects.afterPermissionObservation(binding)
     }
 
     fun startRuntime(binding: PostLoginDeviceCheckBinding) {
@@ -248,47 +260,82 @@ internal class PostLoginDeviceCheckController(
         resourceWaitThermal = null
         probes.clearStoredBindingValidation()
         val callbackGeneration = ++runtimeCallbackGeneration
+        fun mayContinueRuntimeWork(): Boolean = callbackGeneration == runtimeCallbackGeneration &&
+            isRunningBindingCurrent(binding) && !expireBeforeAcceptance(binding)
         // Synchronous capability callbacks may start the camera stage. Its single shared deadline
         // must exist before any source is allowed to publish readiness.
         armOverallTimeout(binding)
+        if (!mayContinueRuntimeWork()) return
         probes.restartCapabilityAndResources(binding) {
-            if (callbackGeneration != runtimeCallbackGeneration) return@restartCapabilityAndResources
+            if (!mayContinueRuntimeWork()) return@restartCapabilityAndResources
             maybeContinue(binding)
             effects.refreshReadinessPresentation()
         }
+        if (!mayContinueRuntimeWork()) return
         probes.prepareVoiceModelAndDetector()
+        if (!mayContinueRuntimeWork()) return
         probes.startAutomaticProbes(binding)
+        if (!mayContinueRuntimeWork()) return
         maybeContinue(binding)
     }
 
     private fun armOverallTimeout(binding: PostLoginDeviceCheckBinding) {
         clearOverallTimeout()
         val started = elapsedRealtimeMs().coerceAtLeast(0L)
+        runtimeStartedAtMs = started
         runtimeDeadlineMs = if (started > Long.MAX_VALUE - config.overallTimeoutMs) Long.MAX_VALUE
             else started + config.overallTimeoutMs
         val generation = ++timeoutGeneration
         overallTimeout = scheduler.schedule(config.overallTimeoutMs) {
             if (generation != timeoutGeneration || !isRunningBindingCurrent(binding)) return@schedule
             overallTimeout = null
-            val previous = current
-            publish(PostLoginDeviceCheckPolicy.timeout(previous, binding, facts.actor().foreground))
-            if (current != previous) {
-                cancel("check_timeout")
-                effects.announceTerminal("기기 점검 시간이 초과되었습니다. 화면의 대기 항목을 확인하세요.")
-                effects.showStatus("기기 점검 시간 초과", effects.failureMessage(current.failure))
-                effects.refreshReadinessPresentation()
-            }
+            terminateTimedOutAttempt(binding)
         }
+    }
+
+    /** Keep ownership predicates time-independent: the Controller, including an overdue timer,
+     * must still be able to publish the terminal transition and cancel its resources. */
+    private fun expireBeforeAcceptance(binding: PostLoginDeviceCheckBinding,
+        completingSnapshot: PostLoginDeviceCheckSnapshot? = null): Boolean {
+        val observed = current
+        val deadline = runtimeDeadlineMs ?: return false
+        val started = runtimeStartedAtMs
+        if ((observed.state != PostLoginDeviceCheckState.RUNNING &&
+                !(observed === completingSnapshot && observed.passesFeatureGate)) ||
+            !isSnapshotBindingLive(binding) || !facts.actor().foreground) return false
+        val now = elapsedRealtimeMs()
+        if (started != null && now >= started && now < deadline) return false
+        terminateTimedOutAttempt(binding, completingSnapshot)
+        return true
+    }
+
+    private fun terminateTimedOutAttempt(binding: PostLoginDeviceCheckBinding,
+        completingSnapshot: PostLoginDeviceCheckSnapshot? = null) {
+        val previous = current
+        val next = if (previous === completingSnapshot && previous.passesFeatureGate && isSnapshotBindingLive(binding)) {
+            previous.copy(state = PostLoginDeviceCheckState.FAIL,
+                failure = PostLoginDeviceCheckFailure.CHECK_TIMEOUT, disabledFeatures = emptySet())
+        } else PostLoginDeviceCheckPolicy.timeout(previous, binding, facts.actor().foreground)
+        if (next == previous) return
+        publish(next)
+        cancel("check_timeout")
+        effects.announceTerminal("기기 점검 시간이 초과되었습니다. 화면의 대기 항목을 확인하세요.")
+        effects.showStatus("기기 점검 시간 초과", effects.failureMessage(next.failure))
+        effects.refreshReadinessPresentation()
     }
 
     fun maybeContinue(expectedBinding: PostLoginDeviceCheckBinding? = null) {
         val binding = expectedBinding ?: current.bindingOrNull ?: return
         if (!isRunningBindingCurrent(binding)) return
+        if (expireBeforeAcceptance(binding)) return
         val hardware = facts.hardware()
+        if (!isRunningBindingCurrent(binding) || expireBeforeAcceptance(binding)) return
         val observation = observation(hardware)
+        if (!isRunningBindingCurrent(binding) || expireBeforeAcceptance(binding)) return
         resourceWaitThermal = if (hardware.resourceReadiness == WalkSessionReadinessStatus.PENDING) hardware.thermalThrottled == true else null
         evaluate(binding, observation)
-        if (current.state != PostLoginDeviceCheckState.RUNNING) return
+        if (!isRunningBindingCurrent(binding)) return
+        if (expireBeforeAcceptance(binding)) return
         if (listOf(observation.minimumAndroidVersion, observation.coreHardwareAndServices, observation.deviceResources,
                 observation.detector, observation.koreanTextToSpeech).any { it == PostLoginDeviceCheckSignal.PENDING }) return
         if (observation.cameraPipeline == PostLoginDeviceCheckSignal.PENDING) {
@@ -301,9 +348,12 @@ internal class PostLoginDeviceCheckController(
 
     fun evaluate(expectedBinding: PostLoginDeviceCheckBinding? = null, observation: PostLoginDeviceCheckObservation = observation()) {
         val binding = expectedBinding ?: current.bindingOrNull ?: return
-        if (!isSnapshotBindingLive(binding)) return
+        if (permissionObservationPending == binding || !isSnapshotBindingLive(binding)) return
+        if (expireBeforeAcceptance(binding)) return
         val previous = current
         val next = PostLoginDeviceCheckPolicy.evaluate(previous, binding, facts.actor().foreground, observation)
+        if (current !== previous || !isSnapshotBindingLive(binding)) return
+        if (next.passesFeatureGate && expireBeforeAcceptance(binding)) return
         publish(next)
         if (next == previous) return
         when (next.state) {
@@ -392,33 +442,56 @@ internal class PostLoginDeviceCheckController(
     }
 
     private fun completePass() {
-        val binding = current.bindingOrNull
+        val completedSnapshot = current
+        val binding = completedSnapshot.bindingOrNull
         if (binding == null || currentSessionBinding() != binding) {
-            failForSessionChange()
+            if (current === completedSnapshot) failForSessionChange()
             return
         }
+        if (expireBeforeAcceptance(binding, completedSnapshot)) return
         val deferred = probes.signals.cameraPipeline != PostLoginDeviceCheckSignal.READY &&
-            PostLoginDeviceCheckFeature.OBSTACLE_DETECTION !in current.disabledFeatures
+            PostLoginDeviceCheckFeature.OBSTACLE_DETECTION !in completedSnapshot.disabledFeatures
         val resultBinding = facts.resultBinding(binding.actorId)
-        if (resultBinding == null || !savedResults.save(current, resultBinding, deferred, probes.signals.metricDepth)) {
+        if (current !== completedSnapshot) return
+        if (!isSnapshotBindingLive(binding)) { failForSessionChange(); return }
+        if (expireBeforeAcceptance(binding, completedSnapshot)) return
+        // The synchronous store's in-I/O deadline/cancellation race needs the separate durable
+        // publication transaction. This guard admits only a still-current, unexpired candidate.
+        if (resultBinding == null || !savedResults.save(completedSnapshot, resultBinding, deferred, probes.signals.metricDepth)) {
             publish(current.copy(state = PostLoginDeviceCheckState.FAIL, failure = PostLoginDeviceCheckFailure.RESULT_SAVE_FAILED, disabledFeatures = emptySet()))
             cancel("result_save_failed")
             effects.showStatus("기기 점검 결과 저장 실패", "점검 결과를 저장하지 못했습니다. 저장공간을 확인한 뒤 다시 시도하세요.")
             effects.refreshReadinessPresentation()
             return
         }
+        if (current !== completedSnapshot) return
         cameraDependentChecksDeferred = deferred
         clearOverallTimeout()
         probes.cancelFunctionalProbes()
         probes.stopCamera()
-        when (effects.afterPassed(current)) {
+        val continuation = runCatching { effects.afterPassed(completedSnapshot) }
+            .getOrDefault(PostLoginDeviceCheckPassContinuation.TRANSITION_REJECTED)
+        if (current !== completedSnapshot) return
+        when (continuation) {
             PostLoginDeviceCheckPassContinuation.SESSION_CHANGED -> failForSessionChange()
-            PostLoginDeviceCheckPassContinuation.TRANSITION_REJECTED -> return
+            PostLoginDeviceCheckPassContinuation.TRANSITION_REJECTED -> rejectOnboardingTransition(completedSnapshot)
             PostLoginDeviceCheckPassContinuation.COMPLETED -> {
                 effects.refreshReadinessPresentation()
                 effects.scheduleCalibration()
             }
         }
+    }
+
+    private fun rejectOnboardingTransition(expectedSnapshot: PostLoginDeviceCheckSnapshot) {
+        val binding = expectedSnapshot.bindingOrNull ?: return
+        if (current !== expectedSnapshot || !isSnapshotBindingLive(binding)) return
+        publish(expectedSnapshot.copy(state = PostLoginDeviceCheckState.FAIL,
+            failure = PostLoginDeviceCheckFailure.ONBOARDING_TRANSITION_REJECTED, disabledFeatures = emptySet()))
+        cancel("onboarding_transition_rejected")
+        val detail = effects.failureMessage(PostLoginDeviceCheckFailure.ONBOARDING_TRANSITION_REJECTED)
+        effects.announceTerminal("기기 점검이 중지되었습니다. $detail")
+        effects.showStatus("기기 점검 단계 확인 필요", detail)
+        effects.refreshReadinessPresentation()
     }
 
     fun failForSessionChange() {
@@ -449,6 +522,7 @@ internal class PostLoginDeviceCheckController(
         overallTimeout?.cancel()
         overallTimeout = null
         runtimeDeadlineMs = null
+        runtimeStartedAtMs = null
     }
 
     fun enteredBackground() {

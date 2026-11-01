@@ -144,6 +144,7 @@ internal interface PostLoginDeviceCheckEffects {
     fun failureMessage(failure: PostLoginDeviceCheckFailure?): String
     fun refreshReadinessPresentation()
     fun noteCancellation(reason: String)
+    /** A rejection or exception ends only this binding's attempt; it never authorizes runtime work. */
     fun recordPermissionObservation(binding: PostLoginDeviceCheckBinding): Boolean
     fun afterPermissionObservation(binding: PostLoginDeviceCheckBinding)
     fun afterPassed(snapshot: PostLoginDeviceCheckSnapshot): PostLoginDeviceCheckPassContinuation

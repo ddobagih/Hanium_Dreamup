@@ -3,6 +3,7 @@ package kr.co.hanium.dreamup.walksafe.voice
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import java.io.Closeable
 import java.io.File
 
@@ -95,6 +96,7 @@ internal class VoskWakePhraseProbe internal constructor(
     private val listenUntilWake: Boolean = false,
     private val isInputSuppressed: () -> Boolean = { false },
     private val inputGeneration: () -> Long? = { null },
+    private val elapsedRealtimeMs: () -> Long = { System.nanoTime() / 1_000_000L },
 ) : Closeable {
     private enum class State {
         IDLE,
@@ -108,7 +110,13 @@ internal class VoskWakePhraseProbe internal constructor(
     private var activeRunId: Long? = null
     private var stream: VoskWakePhraseStream? = null
     private var timeoutCancellation: VoskWakePhraseProbeCancellation? = null
+    private var timeoutRegistration: PhaseTimeoutRegistration? = null
     private var partialObserved = false
+    private var phaseStartedAtMs = 0L
+
+    private class PhaseTimeoutRegistration(val state: State, val runId: Long?, val delayMs: Long) {
+        var registering = true
+    }
 
     constructor(
         context: Context,
@@ -144,6 +152,7 @@ internal class VoskWakePhraseProbe internal constructor(
         listenUntilWake = listenUntilWake,
         isInputSuppressed = isInputSuppressed,
         inputGeneration = inputGeneration,
+        elapsedRealtimeMs = SystemClock::elapsedRealtime,
     )
 
     init {
@@ -184,6 +193,7 @@ internal class VoskWakePhraseProbe internal constructor(
     fun start(): Boolean {
         synchronized(stateLock) {
             if (state != State.IDLE) return false
+            phaseStartedAtMs = elapsedRealtimeMs()
             state = State.STARTING
         }
         diagnose(VoiceInputDiagnosticEvent.WAKE_START_REQUESTED)
@@ -206,30 +216,9 @@ internal class VoskWakePhraseProbe internal constructor(
             releaseStream(createdStream)
             return false
         }
-
-        val scheduledTimeout = try {
-            dispatcher.postDelayed(timeoutMs) {
-                finish(
-                    VoskWakePhraseProbeResult.unavailable(VoskWakePhraseProbeFailure.TIMEOUT),
-                    expectedState = State.STARTING,
-                )
-            }
-        } catch (_: Throwable) {
-            finishUnavailable(VoskWakePhraseProbeFailure.START_FAILED)
-            return false
-        }
-        val timeoutAccepted = synchronized(stateLock) {
-            if (state == State.STARTING && stream === createdStream) {
-                timeoutCancellation = scheduledTimeout
-                true
-            } else {
-                false
-            }
-        }
-        if (!timeoutAccepted) {
-            runCatching { scheduledTimeout.cancel() }
-            return false
-        }
+        if (!armPhaseTimeout(State.STARTING)) return false
+        if (expireIfDue(State.STARTING)) return false
+        if (synchronized(stateLock) { state != State.STARTING || stream !== createdStream }) return false
 
         return try {
             createdStream.start()
@@ -250,48 +239,36 @@ internal class VoskWakePhraseProbe internal constructor(
 
     private fun handleReady(runId: Long) {
         if (runId <= 0L) return
+        var expired = false
         val preparationTimeout = synchronized(stateLock) {
             if (state != State.STARTING) return
-            activeRunId = runId
-            state = State.LISTENING
-            timeoutCancellation.also { timeoutCancellation = null }
+            val nowMs = elapsedRealtimeMs()
+            if (deadlineReached(nowMs)) {
+                expired = true
+                null
+            } else {
+                activeRunId = runId
+                state = State.LISTENING
+                phaseStartedAtMs = nowMs
+                timeoutRegistration = null
+                timeoutCancellation.also { timeoutCancellation = null }
+            }
+        }
+        if (expired) {
+            finish(VoskWakePhraseProbeResult.unavailable(VoskWakePhraseProbeFailure.TIMEOUT),
+                expectedState = State.STARTING)
+            return
         }
         runCatching { preparationTimeout?.cancel() }
 
-        val listeningTimeout = if (listenUntilWake) null else try {
-            dispatcher.postDelayed(timeoutMs) {
-                finish(
-                    VoskWakePhraseProbeResult.unavailable(VoskWakePhraseProbeFailure.TIMEOUT),
-                    expectedState = State.LISTENING,
-                    expectedRunId = runId,
-                )
-            }
-        } catch (_: Throwable) {
-            finish(
-                VoskWakePhraseProbeResult.unavailable(VoskWakePhraseProbeFailure.START_FAILED),
-                expectedState = State.LISTENING,
-                expectedRunId = runId,
-            )
-            return
-        }
-        val timeoutAccepted = synchronized(stateLock) {
-            if (state == State.LISTENING && activeRunId == runId) {
-                timeoutCancellation = listeningTimeout
-                true
-            } else {
-                false
-            }
-        }
-        if (!timeoutAccepted) {
-            runCatching { listeningTimeout?.cancel() }
-            return
-        }
+        if (!listenUntilWake && !armPhaseTimeout(State.LISTENING, runId)) return
+        if (synchronized(stateLock) { state != State.LISTENING || activeRunId != runId }) return
 
         diagnose(VoiceInputDiagnosticEvent.WAKE_READY)
         runCatching {
             dispatcher.post {
                 val current = synchronized(stateLock) { state == State.LISTENING && activeRunId == runId }
-                if (current) onReady()
+                if (current && !expireIfDue(State.LISTENING, runId)) onReady()
             }
         }
     }
@@ -305,6 +282,7 @@ internal class VoskWakePhraseProbe internal constructor(
             state == State.LISTENING && activeRunId == runId
         }
         if (!current || !isInputCurrent(capturedInputGeneration)) return
+        if (expireIfDue(State.LISTENING, runId)) return
         if (!transcript.isFinal) {
             val firstPartial = synchronized(stateLock) {
                 if (partialObserved) false else {
@@ -381,6 +359,72 @@ internal class VoskWakePhraseProbe internal constructor(
         finish(VoskWakePhraseProbeResult.unavailable(failure, streamingError))
     }
 
+    /** Current phase/run checks precede the clock so stale callbacks cannot expire a new owner. */
+    private fun expireIfDue(expectedState: State, expectedRunId: Long? = null): Boolean {
+        val expired = synchronized(stateLock) {
+            state == expectedState && (expectedRunId == null || activeRunId == expectedRunId) &&
+                deadlineReached(elapsedRealtimeMs())
+        }
+        if (expired) finish(VoskWakePhraseProbeResult.unavailable(VoskWakePhraseProbeFailure.TIMEOUT),
+            expectedState = expectedState, expectedRunId = expectedRunId)
+        return expired
+    }
+
+    /** HOME has no listening upper bound; a backwards phase clock still fails closed. */
+    private fun deadlineReached(nowMs: Long): Boolean = nowMs < phaseStartedAtMs ||
+        ((state == State.STARTING || !listenUntilWake) && nowMs - phaseStartedAtMs >= timeoutMs)
+
+    private fun armPhaseTimeout(expectedState: State, expectedRunId: Long? = null): Boolean {
+        var previous: VoskWakePhraseProbeCancellation? = null
+        val registration = synchronized(stateLock) {
+            if (state != expectedState || (expectedRunId != null && activeRunId != expectedRunId)) return false
+            val nowMs = elapsedRealtimeMs()
+            if (deadlineReached(nowMs)) null else {
+                previous = timeoutCancellation.also { timeoutCancellation = null }
+                PhaseTimeoutRegistration(expectedState, expectedRunId, timeoutMs - (nowMs - phaseStartedAtMs))
+                    .also { timeoutRegistration = it }
+            }
+        } ?: run {
+            finish(VoskWakePhraseProbeResult.unavailable(VoskWakePhraseProbeFailure.TIMEOUT),
+                expectedState, expectedRunId)
+            return false
+        }
+        runCatching { previous?.cancel() }
+        val scheduled = try {
+            dispatcher.postDelayed(registration.delayMs) { onPhaseTimeout(registration) }
+        } catch (_: Throwable) {
+            finish(VoskWakePhraseProbeResult.unavailable(VoskWakePhraseProbeFailure.START_FAILED),
+                expectedState, expectedRunId)
+            return false
+        }
+        val retained = synchronized(stateLock) {
+            registration.registering = false
+            if (timeoutRegistration === registration && state == expectedState &&
+                (expectedRunId == null || activeRunId == expectedRunId)) {
+                timeoutCancellation = scheduled
+                true
+            } else false
+        }
+        if (!retained) runCatching { scheduled.cancel() }
+        return retained
+    }
+
+    private fun onPhaseTimeout(registration: PhaseTimeoutRegistration) {
+        val (expired, inline) = synchronized(stateLock) {
+            if (timeoutRegistration !== registration || state != registration.state ||
+                (registration.runId != null && activeRunId != registration.runId)) return
+            deadlineReached(elapsedRealtimeMs()) to registration.registering
+        }
+        when {
+            expired -> finish(VoskWakePhraseProbeResult.unavailable(VoskWakePhraseProbeFailure.TIMEOUT),
+                registration.state, registration.runId)
+            // Broken delayed scheduling fails once instead of recursively creating more timers.
+            inline -> finish(VoskWakePhraseProbeResult.unavailable(VoskWakePhraseProbeFailure.START_FAILED),
+                registration.state, registration.runId)
+            else -> armPhaseTimeout(registration.state, registration.runId)
+        }
+    }
+
     private fun finish(
         result: VoskWakePhraseProbeResult,
         expectedState: State? = null,
@@ -391,15 +435,22 @@ internal class VoskWakePhraseProbe internal constructor(
             if (state == State.TERMINAL) return
             if (expectedState != null && state != expectedState) return
             if (expectedRunId != null && activeRunId != expectedRunId) return
+            val acceptedResult = if (result.availability == VoskWakePhraseProbeAvailability.AVAILABLE &&
+                deadlineReached(elapsedRealtimeMs())) {
+                VoskWakePhraseProbeResult.unavailable(VoskWakePhraseProbeFailure.TIMEOUT)
+            } else result
             state = State.TERMINAL
+            timeoutRegistration = null
             activeRunId = null
             TerminalResources(
                 timeout = timeoutCancellation.also { timeoutCancellation = null },
                 stream = stream.also { stream = null },
+                result = acceptedResult,
             )
         }
+        val acceptedResult = resources.result
         diagnose(
-            when (result.failure) {
+            when (acceptedResult.failure) {
                 null -> VoiceInputDiagnosticEvent.WAKE_AVAILABLE
                 VoskWakePhraseProbeFailure.TIMEOUT -> VoiceInputDiagnosticEvent.WAKE_TIMEOUT
                 VoskWakePhraseProbeFailure.STREAM_ERROR -> VoiceInputDiagnosticEvent.WAKE_STREAM_ERROR
@@ -413,12 +464,12 @@ internal class VoskWakePhraseProbe internal constructor(
         runCatching {
             dispatcher.post {
                 val delivered = if (
-                    result.availability == VoskWakePhraseProbeAvailability.AVAILABLE &&
+                    acceptedResult.availability == VoskWakePhraseProbeAvailability.AVAILABLE &&
                     !isInputCurrent(expectedInputGeneration)
                 ) {
                     // Cleanup has already ended this attempt; notify its owner without a wake handoff.
                     VoskWakePhraseProbeResult.unavailable(VoskWakePhraseProbeFailure.CANCELLED)
-                } else result
+                } else acceptedResult
                 onResult(delivered)
             }
         }
@@ -441,6 +492,7 @@ internal class VoskWakePhraseProbe internal constructor(
     private data class TerminalResources(
         val timeout: VoskWakePhraseProbeCancellation?,
         val stream: VoskWakePhraseStream?,
+        val result: VoskWakePhraseProbeResult,
     )
 
     private companion object {

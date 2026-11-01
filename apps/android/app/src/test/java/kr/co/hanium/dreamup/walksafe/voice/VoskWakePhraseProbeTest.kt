@@ -8,6 +8,168 @@ import org.junit.Test
 
 class VoskWakePhraseProbeTest {
     @Test
+    fun lateReadyCannotBeatAnUndispatchedPreparationDeadlineOrBackwardsClock() {
+        for (readyAt in listOf(21_000L, 21_001L, 999L)) {
+            val h = ProbeHarness(timeoutMs = 20_000L)
+            h.dispatcher.nowMs = 1_000L
+            assertTrue(h.probe.start())
+            h.dispatcher.nowMs = readyAt
+            h.listener.onReady(7L)
+            h.listener.onReady(7L)
+            h.listener.onTranscript(7L, transcript("길라잡이", confidence = 0.99f))
+            h.dispatcher.runPosted()
+            assertEquals(listOf(VoskWakePhraseProbeResult.unavailable(VoskWakePhraseProbeFailure.TIMEOUT)), h.results)
+            assertEquals(0, h.readyCallbacks)
+            assertEquals(1, h.stream.stopCount)
+            assertEquals(1, h.stream.closeCount)
+        }
+    }
+
+    @Test
+    fun trustedWakeHonorsTheListeningDeadlineWithoutRunningItsTimer() {
+        for (completedAt in listOf(21_999L, 22_000L, 22_001L, 1_999L)) {
+            val h = ProbeHarness(timeoutMs = 20_000L)
+            h.dispatcher.nowMs = 1_000L
+            h.probe.start()
+            h.dispatcher.nowMs = 2_000L
+            h.listener.onReady(7L)
+            h.dispatcher.nowMs = completedAt
+            h.listener.onTranscript(7L, transcript("길라잡이", confidence = 0.99f))
+            h.listener.onTranscript(7L, transcript("길라잡이", confidence = 0.99f))
+            h.dispatcher.runPosted()
+            assertEquals(listOf(if (completedAt == 21_999L) VoskWakePhraseProbeResult.available()
+                else VoskWakePhraseProbeResult.unavailable(VoskWakePhraseProbeFailure.TIMEOUT)), h.results)
+            assertEquals(1, h.stream.stopCount)
+            assertEquals(1, h.stream.closeCount)
+        }
+    }
+
+    @Test
+    fun streamCreationDelayCannotStartInputAfterThePreparationDeadline() {
+        val h = ProbeHarness(timeoutMs = 20_000L)
+        h.dispatcher.nowMs = 1_000L
+        h.factory.onCreate = { h.dispatcher.nowMs = 21_000L }
+        assertFalse(h.probe.start())
+        h.dispatcher.runPosted()
+        assertEquals(listOf(VoskWakePhraseProbeResult.unavailable(VoskWakePhraseProbeFailure.TIMEOUT)), h.results)
+        assertEquals(0, h.stream.startCount)
+        assertEquals(1, h.stream.stopCount)
+        assertEquals(1, h.stream.closeCount)
+    }
+
+    @Test
+    fun preparationFactoryTimeIsDeductedFromTheNoReadyTimeout() {
+        val h = ProbeHarness(timeoutMs = 20_000L)
+        h.factory.onCreate = { h.dispatcher.nowMs = 5_000L }
+        assertTrue(h.probe.start())
+        assertEquals(20_000L, h.dispatcher.scheduledTasks.single().deadlineMs)
+        h.dispatcher.advanceBy(14_999L)
+        h.dispatcher.runPosted()
+        assertTrue(h.results.isEmpty())
+        h.dispatcher.advanceBy(1L)
+        h.dispatcher.runPosted()
+        assertEquals(listOf(VoskWakePhraseProbeResult.unavailable(VoskWakePhraseProbeFailure.TIMEOUT)), h.results)
+        assertEquals(1, h.stream.closeCount)
+    }
+
+    @Test
+    fun earlyTimerRearmsOnlyTheRemainingPreparationOrListeningBudget() {
+        for (ready in listOf(false, true)) {
+            val h = ProbeHarness(timeoutMs = 20_000L)
+            h.probe.start()
+            if (ready) { h.listener.onReady(7L); h.dispatcher.runPosted() }
+            h.dispatcher.nowMs = 19_999L
+            h.dispatcher.fireEarlyTimeout()
+            h.dispatcher.runPosted()
+            assertTrue(h.results.isEmpty())
+            assertEquals(1, h.dispatcher.pendingTimeoutCount)
+            assertEquals(20_000L, h.dispatcher.scheduledTasks.last().deadlineMs)
+            h.dispatcher.advanceBy(1L)
+            h.dispatcher.runPosted()
+            assertEquals(listOf(VoskWakePhraseProbeResult.unavailable(VoskWakePhraseProbeFailure.TIMEOUT)), h.results)
+            assertEquals(1, h.stream.closeCount)
+        }
+    }
+
+    @Test
+    fun synchronousEarlyTimersFailOnceWithoutRecursingInEitherPhase() {
+        for (ready in listOf(false, true)) {
+            val h = ProbeHarness(timeoutMs = 20_000L)
+            if (ready) h.probe.start()
+            h.dispatcher.fireInline = true
+            if (ready) h.listener.onReady(7L) else assertFalse(h.probe.start())
+            h.dispatcher.runPosted()
+            assertEquals(listOf(VoskWakePhraseProbeResult.unavailable(VoskWakePhraseProbeFailure.START_FAILED)), h.results)
+            assertEquals(if (ready) 2 else 1, h.dispatcher.scheduledTasks.size)
+            assertEquals(0, h.dispatcher.pendingTimeoutCount)
+            assertEquals(1, h.stream.stopCount)
+            assertEquals(1, h.stream.closeCount)
+        }
+    }
+
+    @Test
+    fun duplicateReadyCannotExtendTheOriginalListeningDeadline() {
+        val h = ProbeHarness(timeoutMs = 20_000L)
+        h.probe.start()
+        h.dispatcher.nowMs = 1_000L
+        h.listener.onReady(7L)
+        h.dispatcher.runPosted()
+        h.dispatcher.nowMs = 20_999L
+        h.listener.onReady(7L)
+        h.listener.onReady(8L)
+        h.dispatcher.nowMs = 21_000L
+        h.listener.onTranscript(7L, transcript("길라잡이", confidence = 0.99f))
+        h.dispatcher.runPosted()
+        assertEquals(1, h.readyCallbacks)
+        assertEquals(listOf(VoskWakePhraseProbeResult.unavailable(VoskWakePhraseProbeFailure.TIMEOUT)), h.results)
+    }
+
+    @Test
+    fun expiredOldRunOrInputCannotClaimTheCurrentListeningAttempt() {
+        val h = ProbeHarness(timeoutMs = 20_000L)
+        h.probe.start()
+        h.listener.onReady(7L)
+        h.dispatcher.runPosted()
+        h.dispatcher.nowMs = 20_000L
+        h.listener.onTranscript(6L, transcript("길라잡이", confidence = 0.99f))
+        h.listener.onTranscript(7L, transcript("길라잡이", confidence = 0.99f), h.inputGeneration - 1L)
+        h.dispatcher.runPosted()
+        assertTrue(h.results.isEmpty())
+        assertEquals(0, h.stream.closeCount)
+        h.listener.onTranscript(7L, transcript("길라잡이", confidence = 0.99f))
+        h.dispatcher.runPosted()
+        assertEquals(listOf(VoskWakePhraseProbeResult.unavailable(VoskWakePhraseProbeFailure.TIMEOUT)), h.results)
+    }
+
+    @Test
+    fun queuedReadyAfterTheListeningDeadlineTimesOutWithoutAReadyCue() {
+        val h = ProbeHarness(timeoutMs = 20_000L)
+        h.probe.start()
+        h.listener.onReady(7L)
+        h.dispatcher.nowMs = 20_000L
+        // The current ready delivery is allowed to expire the phase; stale input is not involved.
+        h.dispatcher.runPosted()
+        assertEquals(0, h.readyCallbacks)
+        assertEquals(listOf(VoskWakePhraseProbeResult.unavailable(VoskWakePhraseProbeFailure.TIMEOUT)), h.results)
+        assertEquals(1, h.stream.stopCount)
+        assertEquals(1, h.stream.closeCount)
+    }
+
+    @Test
+    fun continuousHomeListeningHasNoUpperDeadlineAfterTimelyReady() {
+        val h = ProbeHarness(timeoutMs = 20_000L, listenUntilWake = true)
+        h.probe.start()
+        h.dispatcher.nowMs = 19_999L
+        h.listener.onReady(7L)
+        h.dispatcher.runPosted()
+        h.dispatcher.nowMs = 200_000L
+        h.listener.onTranscript(7L, transcript("길라잡이", confidence = 0.99f))
+        h.dispatcher.runPosted()
+        assertEquals(listOf(VoskWakePhraseProbeResult.available()), h.results)
+        assertEquals(1, h.stream.closeCount)
+    }
+
+    @Test
     fun becomesAvailableOnlyAfterReadyAndTrustedFinalWakePhrase() {
         val harness = ProbeHarness()
 
@@ -805,6 +967,7 @@ class VoskWakePhraseProbeTest {
             listenUntilWake = listenUntilWake,
             isInputSuppressed = { suppressed },
             inputGeneration = { if (generationReadFails) error("generation unavailable") else inputGeneration },
+            elapsedRealtimeMs = { dispatcher.nowMs },
         )
 
         val listener: VoskStreamingListener
@@ -815,11 +978,13 @@ class VoskWakePhraseProbeTest {
         private val stream: FakeStream,
     ) : VoskWakePhraseStreamFactory {
         var createCount = 0
+        var onCreate: (() -> Unit)? = null
         lateinit var listener: VoskStreamingListener
 
         override fun create(listener: VoskStreamingListener): VoskWakePhraseStream {
             createCount += 1
             this.listener = listener
+            onCreate?.invoke()
             return stream
         }
     }
@@ -850,9 +1015,10 @@ class VoskWakePhraseProbeTest {
     private class FakeDispatcher : VoskWakePhraseProbeDispatcher {
         private val posted = ArrayDeque<() -> Unit>()
         val scheduledTasks = mutableListOf<ScheduledTask>()
-        private var nowMs = 0L
+        var nowMs = 0L
         var rejectScheduleNumber: Int? = null
         var onScheduled: ((Int) -> Unit)? = null
+        var fireInline = false
         var runningPostedTask = false
             private set
         val pendingTimeoutCount: Int
@@ -872,6 +1038,7 @@ class VoskWakePhraseProbeTest {
             val scheduled = ScheduledTask(nowMs + delayMs, task)
             scheduledTasks += scheduled
             onScheduled?.invoke(number)
+            if (fireInline) scheduled.runQueuedCallback()
             return scheduled
         }
 
@@ -890,6 +1057,11 @@ class VoskWakePhraseProbeTest {
         }
 
         fun fireTimeout() {
+            scheduledTasks.lastOrNull()?.let { nowMs = maxOf(nowMs, it.deadlineMs) }
+            fireEarlyTimeout()
+        }
+
+        fun fireEarlyTimeout() {
             scheduledTasks.lastOrNull()?.runUnlessCancelled()
         }
 

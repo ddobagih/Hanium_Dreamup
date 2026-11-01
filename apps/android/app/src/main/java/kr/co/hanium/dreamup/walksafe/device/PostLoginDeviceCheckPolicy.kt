@@ -51,6 +51,7 @@ enum class PostLoginDeviceCheckFailure {
     DEPTH_TIMEOUT,
     CHECK_TIMEOUT,
     RESULT_SAVE_FAILED,
+    ONBOARDING_TRANSITION_REJECTED,
     SESSION_CHANGED,
 }
 

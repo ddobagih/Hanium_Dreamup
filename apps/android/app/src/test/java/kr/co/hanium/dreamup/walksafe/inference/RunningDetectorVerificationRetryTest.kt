@@ -107,6 +107,43 @@ class RunningDetectorVerificationRetryTest {
     }
 
     @Test
+    fun successfulSampleCannotBeatAnUndispatchedDeadlineOrBackwardsClock() {
+        for (completedAt in listOf(15_999L, 16_000L, 16_001L, 999L)) {
+            val gate = RunningDetectorVerificationGate(pendingDeadlineMs = 15_000L)
+            val instance = Any()
+            gate.begin(instance, nowMs = 1_000L)
+            val timely = completedAt == 15_999L
+            assertEquals(
+                "completion at $completedAt without running expire()",
+                if (timely) RunningDetectorVerificationStep.VERIFIED else RunningDetectorVerificationStep.FAILED,
+                gate.recordAttempt(instance, identity(4L), passed, completedAt),
+            )
+            assertEquals(timely, gate.allowsOutput(instance, 4L, configSha))
+            if (!timely) {
+                assertNull(gate.current())
+                assertEquals(RunningDetectorVerificationStep.STALE,
+                    gate.recordAttempt(instance, identity(4L), passed, 1_001L))
+            }
+        }
+    }
+
+    @Test
+    fun expiredOldSampleCannotExpireOrVerifyTheReplacementInstance() {
+        val gate = RunningDetectorVerificationGate(pendingDeadlineMs = 15_000L)
+        val old = Any()
+        val replacement = Any()
+        gate.begin(old, nowMs = 0L)
+        gate.begin(replacement, nowMs = 1_000L)
+        assertEquals(RunningDetectorVerificationStep.STALE,
+            gate.recordAttempt(old, identity(1L), passed, 500_000L))
+        assertEquals(RunningDetectorVerificationState.PENDING, gate.state(replacement))
+        assertNull(gate.current())
+        assertEquals(RunningDetectorVerificationStep.VERIFIED,
+            gate.recordAttempt(replacement, identity(2L), passed, 1_001L))
+        assertFalse(gate.allowsOutput(old, 1L, configSha))
+    }
+
+    @Test
     fun rejectedWorkFailsThePendingVerificationOnce() {
         val gate = RunningDetectorVerificationGate()
         val instance = Any()

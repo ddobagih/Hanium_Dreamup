@@ -48,6 +48,8 @@ adb install -r apps/android/app/build/outputs/apk/debug/app-debug.apk
 
 ### 점검의 실패·취소·재시도 처리
 
+- 점검 Controller와 기본 모델 검증 gate, TTS·호출어 probe는 성공을 수용할 때 단조 시계로 원래 기한을 다시 확인합니다. timeout callback의 실행이 늦어도 기한 이후의 결과로 통과·모델 검증 토큰을 만들지 않습니다. 호출어의 준비·한정 청취 기한과 HOME의 연속 청취는 구분합니다.
+- 최초 권한 관찰과 통과 뒤 화면 전이가 거절되면 현재 시도만 실패·재시도로 끝냅니다. 이전 시도의 늦은 효과가 새 시도의 상태를 바꾸지 않도록 snapshot·binding을 확인합니다. 최종 저장 I/O 중 취소·기한의 결속은 이 앞단 수용 검사와 별개의 저장 계약입니다.
 - `device/postlogin/DeviceCompositeAttemptState`는 기존 모델 퇴역 → 샘플 측정 → 명시한 메모리 선택 적용·검증 → 설정 저장 → 최종 결과 통지를 소유합니다. 적용 전에는 새 선택을 저장하지 않으므로, 그 사이 프로세스가 종료돼도 이전 통과 결과에 미적용 선택이 결합되지 않습니다.
 - `AndroidJointRuntimeLoader.prepare`는 전달받은 선택을 저장소를 거치지 않고 검증·준비합니다. `restore`만 저장된 선택을 읽고 자신의 기록을 CAS로 무효화합니다. 취소된 저장의 `retireIfCurrent`는 이미 없거나 다른 측정으로 교체된 기록을 그대로 두며, 실제 삭제 실패와 구분합니다.
 - `FixtureRuntimeConnectionLease`는 START 전송 허가 이전의 실패와 실제 모델 작업의 종료 미확인을 구분합니다. 전자는 큐에 남은 START 허가를 취소하고 실패한 연결도 정리합니다. 후자는 실제 작업 프로세스의 종료 확인을 요구합니다. 연결 실패 자체를 후보의 성능 실패로 해석하지 않습니다.

@@ -379,6 +379,8 @@ internal class DeviceCheckPresenter(
                     ?: "기기 점검을 완료하지 못했습니다. 화면의 대기 중 항목을 확인하고 다시 점검하세요."
             PostLoginDeviceCheckFailure.RESULT_SAVE_FAILED ->
                 "기기 점검 결과를 저장하지 못했습니다. 저장공간을 확인하고 다시 점검하세요."
+            PostLoginDeviceCheckFailure.ONBOARDING_TRANSITION_REJECTED ->
+                "기기 점검의 다음 단계로 진행하지 못했습니다. 현재 화면과 로그인 상태를 확인한 뒤 다시 점검하세요."
             PostLoginDeviceCheckFailure.SESSION_CHANGED,
             null,
             -> "로그인 세션이 변경되었습니다. 다시 로그인하고 점검하세요."
