@@ -60,4 +60,22 @@ internal class NativeCameraViewComposer(private val context: Context, private va
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 (220 * context.resources.displayMetrics.density).roundToInt()))
     }
+
+    fun createRecognitionStatus(): TextView = createCameraStatus().apply {
+        text = "현재 인식 결과를 기다리고 있습니다."
+        textSize = 16f
+        accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE
+    }
+
+    fun createRecognitionControls(status: TextView, onClose: () -> Unit): LinearLayout = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+        visibility = View.GONE
+        setBackgroundColor(0xee101820.toInt())
+        ViewCompat.setAccessibilityPaneTitle(this, "길안내 인식 현황")
+        addView(style.accessiblePriorityUserButton("인식 현황 닫기", onClick = onClose).apply {
+            contentDescription = "인식 현황 닫기. 길안내 버튼 화면으로 돌아갑니다."
+        })
+        addView(ScrollView(context).apply { addView(status) }, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, (180 * context.resources.displayMetrics.density).roundToInt()))
+    }
 }

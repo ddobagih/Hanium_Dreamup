@@ -24,6 +24,31 @@ internal class FramePresentationController<L : Any>(
     private var lastOverlayUpdateMs = 0L
     private var lastUiUpdateMs = 0L
     private var latestVisualOverlayFrameId = 0L
+    @Volatile private var lastRecognitionUiMs = Long.MIN_VALUE
+    private var recognitionGeneration: Long? = null
+
+    /** A bounded, optional display consumer. Closing/reopening invalidates queued old UI work. */
+    fun showRecognition(scope: FramePresentationScope<L>,
+        prepare: () -> kr.co.hanium.dreamup.walksafe.ui.GuidanceRecognitionDisplay.Frame) {
+        val generation = context.recognitionDisplayGeneration ?: return
+        if (!source.ownsFrame(scope.frameGeneration, scope.walkEpoch) || !source.ownsLease(scope.lease)) return
+        if (recognitionGeneration == generation && scope.elapsedMs >= lastRecognitionUiMs &&
+            scope.elapsedMs - lastRecognitionUiMs < kr.co.hanium.dreamup.walksafe.ui.GuidanceRecognitionDisplay.REFRESH_MS) return
+        recognitionGeneration = generation
+        lastRecognitionUiMs = scope.elapsedMs
+        val width = context.surfaceWidth
+        val height = context.surfaceHeight
+        val uiContext = context.captureStatusContext()
+        // A presentation failure must not abort the caller's route/risk publication.
+        val frame = try { prepare() } catch (_: RuntimeException) { return }
+        view.onUi {
+            if (context.recognitionDisplayGeneration == generation &&
+                lastRecognitionUiMs == scope.elapsedMs && source.ownsFrame(scope.frameGeneration, scope.walkEpoch) &&
+                source.ownsLease(scope.lease) && context.surfaceWidth == width && context.surfaceHeight == height &&
+                context.isStatusContextCurrent(uiContext) && synchronized(frameStateLock) { context.geometryVersion() == uiContext.geometryVersion })
+                view.updateRecognition(frame, uiContext)
+        }
+    }
 
     fun resetUiThrottle() = synchronized(frameStateLock) { lastUiUpdateMs = 0L }
     fun resetOverlayThrottle() = synchronized(frameStateLock) { lastOverlayUpdateMs = 0L }

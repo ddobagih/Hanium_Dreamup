@@ -263,6 +263,51 @@ class FramePresentationControllerTest {
         assertSame(throttled.diagnostics,f.controller.showOverlay(throttled,{native.timestamp}){emptyList()})
         assertEquals(1,native.timestampReads)
     }
+    @Test fun recognitionDisplayOffDoesNotPrepareOrQueueAnything() {
+        val f=Fixture();var prepared=0
+        f.controller.showRecognition(f.scope()){prepared++;recognitionFrame()}
+        assertEquals(0,prepared);assertTrue(f.ui.isEmpty())
+    }
+    @Test fun recognitionDisplayReopenRejectsQueuedOldFrameAndResetsThrottle() {
+        val f=Fixture();f.recognitionGeneration=1
+        f.controller.showRecognition(f.scope()){recognitionFrame()}
+        f.recognitionGeneration=2
+        f.drainUi();assertTrue(f.recognitionFrames.isEmpty())
+        f.controller.showRecognition(f.scope(60_010)){recognitionFrame()}
+        f.drainUi();assertEquals(1,f.recognitionFrames.size)
+        assertEquals(0,f.statusWrites);assertEquals(0,f.uploadRefreshes)
+    }
+    @Test fun recognitionDisplayThrottlesAndRejectsRetiredOrRotatedFrames() {
+        val f=Fixture();f.recognitionGeneration=1;var prepared=0
+        f.controller.showRecognition(f.scope()){prepared++;recognitionFrame()}
+        f.controller.showRecognition(f.scope(60_249)){prepared++;recognitionFrame()}
+        assertEquals(1,prepared)
+        f.geometry=2;f.drainUi();assertTrue(f.recognitionFrames.isEmpty())
+        f.controller.showRecognition(f.scope(60_250)){prepared++;recognitionFrame()}
+        f.leaseCurrent=false;f.drainUi();assertTrue(f.recognitionFrames.isEmpty())
+        assertEquals(2,prepared)
+    }
+    @Test fun recognitionPresentationFailureDoesNotEscapeIntoGuidance() {
+        val f=Fixture();f.recognitionGeneration=1
+        f.controller.showRecognition(f.scope()){throw IllegalArgumentException("retired transform")}
+        assertTrue(f.ui.isEmpty())
+        f.controller.showRecognition(f.scope(60_250)){recognitionFrame()}
+        f.drainUi();assertEquals(1,f.recognitionFrames.size)
+    }
+    @Test fun recognitionDisplayRejectsQueuedResultsAfterCloseAccountPageOrViewportChange() {
+        val mutations: List<(Fixture) -> Unit> = listOf(
+            { it.recognitionGeneration = null }, { it.actor = "other" }, { it.account++ },
+            { it.page = Page.HOME }, { it.surfaceWidth++ }, { it.frameCurrent = false },
+        )
+        for (mutate in mutations) {
+            val f = Fixture(); f.recognitionGeneration = 1
+            f.controller.showRecognition(f.scope()) { recognitionFrame() }
+            mutate(f); f.drainUi()
+            assertTrue(f.recognitionFrames.isEmpty())
+        }
+    }
+    private fun recognitionFrame() = kr.co.hanium.dreamup.walksafe.ui.GuidanceRecognitionDisplay.Frame(60_000,0,emptyList(),"")
+
     private class TimestampFrame:Frame() {
         var value=10_000_000_000L;var timestampReads=0;var forbidTimestamp=false;var failure:RuntimeException?=null
         override fun getTimestamp():Long {
@@ -276,6 +321,8 @@ class FramePresentationControllerTest {
     private data class Mapped(val frameId:Long,val capturedAt:Long)
     private class Fixture {
         val lock=Any();val epoch=WalkRuntimeEpoch("walk",7L);val lease=Lease()
+        var recognitionGeneration:Long?=null
+        val recognitionFrames=mutableListOf<kr.co.hanium.dreamup.walksafe.ui.GuidanceRecognitionDisplay.Frame>()
         var frameCurrent=true;var leaseCurrent=true;var visual=true;var metric=true;var visible=true
         var expectedVisualTimestampNs=10_000_000_000L
         var actor:String?="actor";var account=20L;var page=Page.GUIDANCE;var geometry=1L
@@ -294,6 +341,7 @@ class FramePresentationControllerTest {
                 assertSame(this@Fixture.lease,lease);assertEquals(expectedVisualTimestampNs,frameTimestampNs);assertTrue(tracking);events+="visual_gate"}
         }
         private val context=object:FramePresentationContext {
+            override val recognitionDisplayGeneration get()=recognitionGeneration
             override val cameraVisible get()=visible.also{events+="camera_visible"}
             override val surfaceWidth get()=this@Fixture.surfaceWidth
             override val surfaceHeight get()=this@Fixture.surfaceHeight
@@ -303,6 +351,7 @@ class FramePresentationControllerTest {
             override fun geometryVersion()=geometry.also{assertTrue(Thread.holdsLock(lock));events+="geometry"}
         }
         private val view=object:FramePresentationView {
+            override fun updateRecognition(frame:kr.co.hanium.dreamup.walksafe.ui.GuidanceRecognitionDisplay.Frame, context:FrameStatusUiContext){recognitionFrames+=frame}
             override val overlayWidth get()=this@Fixture.overlayWidth.also{events+="overlay_width"}
             override val overlayHeight get()=this@Fixture.overlayHeight.also{events+="overlay_height"}
             override var cameraStatus:String get()=cameraText;set(value){cameraText=value;events+="camera_write"}

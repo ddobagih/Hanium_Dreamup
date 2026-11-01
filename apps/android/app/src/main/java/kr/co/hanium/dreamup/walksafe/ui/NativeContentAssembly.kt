@@ -9,6 +9,8 @@ internal object NativeContentAssembly {
         val controls: T,
         val walkSafety: T,
         val cameraControls: T,
+        val recognitionOverlay: T? = null,
+        val recognitionControls: T? = null,
     )
 
     interface Target<T> {
@@ -27,9 +29,11 @@ internal object NativeContentAssembly {
         target.addFullscreen(content, layers.surface, false)
         target.addFullscreen(content, layers.fallbackPreview, false)
         target.addFullscreen(content, layers.debugOverlay, false)
+        layers.recognitionOverlay?.let { target.addFullscreen(content, it, false) }
         target.addFullscreen(content, layers.controls, true)
         target.addFullscreen(content, layers.walkSafety, true)
         target.addCameraControls(content, layers.cameraControls)
+        layers.recognitionControls?.let { target.addCameraControls(content, it) }
         val root = target.createRootFrame()
         val column = target.createStatusColumn()
         // A separate row keeps semantic updates from covering camera or controls.

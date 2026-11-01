@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe
 
 import kr.co.hanium.dreamup.walksafe.navigation.DestinationGuidanceResumeAction
+import kr.co.hanium.dreamup.walksafe.ui.GuidanceRecognitionDisplay
 
 import kr.co.hanium.dreamup.walksafe.runtime.metric.RuntimeMetricPreflightCoordinator
 import kr.co.hanium.dreamup.walksafe.runtime.metric.RuntimeMetricPreflightAdmission
@@ -1121,6 +1122,17 @@ open class MainActivity @JvmOverloads constructor(
     private var cameraScreenOwnsWalk = false
     private lateinit var cameraScreenControls: LinearLayout
     private lateinit var cameraScreenStatus: TextView
+    @Volatile private var recognitionDisplayOpen = false
+    @Volatile private var recognitionDisplayGeneration = 0L
+    @Volatile private var recognitionCameraAtMs = Long.MIN_VALUE
+    @Volatile private var recognitionCameraTimestampNs = Long.MIN_VALUE
+    private var recognitionDisplayOwner: Pair<WalkRuntimeEpoch, Long>? = null
+    private var recognitionDisplayFrame: GuidanceRecognitionDisplay.Frame? = null
+    private var recognitionDisplayContext: FrameStatusUiContext? = null
+    private lateinit var recognitionOverlay: DebugBboxOverlayView
+    private lateinit var recognitionControls: LinearLayout
+    private lateinit var recognitionStatus: TextView
+    private val recognitionRefresh = Runnable { renderRecognitionDisplay() }
     private var developmentGuidanceStartRequested = false
     private var developmentGuidanceResumeRequestedEpoch: WalkRuntimeEpoch? = null
     private lateinit var userReportController: UserReportController
@@ -1370,6 +1382,7 @@ private val runtimeCameraLifecycle: RuntimeCameraLifecycleCoordinator<Session, A
                 this@MainActivity.runtimeMetricSession.handleRuntimeMetricFrameFailure(status, detail, purpose, arGeneration, epoch)
             }
             override fun diagnoseRuntimeCapture(capture: ScopedArFrameCapture<ArSessionLease, ArSessionPurpose>) {
+                observeRecognitionCamera(capture.originalFrameTimestampNs, capture.capturedElapsedMs)
                 val arLease = capture.resources.originalLease
                 val frame = capture.frame
                 val elapsedRealtimeMs = capture.capturedElapsedMs
@@ -1602,6 +1615,8 @@ private val framePipelineController: FramePipelineController<ArSessionLease, ArS
                 currentRuntimeVisualDepthProcessingAllowsWork(lease, frameTimestampNs, tracking)
         }, object : FramePresentationContext {
             override val cameraVisible get() = cameraScreenVisible
+            override val recognitionDisplayGeneration get() =
+                this@MainActivity.recognitionDisplayGeneration.takeIf { recognitionDisplayOpen }
             override val surfaceWidth get() = this@MainActivity.surfaceWidth
             override val surfaceHeight get() = this@MainActivity.surfaceHeight
             override val statusOwner get() = statusPresentationOwner
@@ -1631,6 +1646,13 @@ private val framePipelineController: FramePipelineController<ArSessionLease, ArS
             override fun postCameraStatus(delayMs: Long, action: () -> Unit) { cameraScreenStatus.postDelayed({ action() }, delayMs) }
             override fun postStatus(delayMs: Long, action: () -> Unit) { statusText.postDelayed({ action() }, delayMs) }
             override fun updateDebugUploadButton() = this@MainActivity.updateDebugUploadButton()
+            override fun updateRecognition(frame: GuidanceRecognitionDisplay.Frame, context: FrameStatusUiContext) {
+                if (recognitionDisplayOpen) {
+                    recognitionDisplayFrame = frame
+                    recognitionDisplayContext = context
+                    renderRecognitionDisplay()
+                }
+            }
         }, object : FramePresentationDiagnostics {
             override fun depthSupported() = this@MainActivity.depthSupported
             override fun noDetectionStatus(snapshot: DepthFrameSnapshot) = snapshot.statusTextForNoDetection()
@@ -4035,6 +4057,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
             override fun tactileTier(gate: NonMetricAdvisoryGate) = resolveAndroidLocalTactileTier(gate)
         }, object : PrimaryFallbackFrameObservation {
             override fun load(timestampNs: Long, observedAtElapsedRealtimeMs: Long) {
+                observeRecognitionCamera(timestampNs, observedAtElapsedRealtimeMs)
                 runtimeCameraFrameBudgetMs = null
                 runtimeLoadFrameScope = RuntimeFeatureScope.CAMERA_TRACKING
                 runtimeLoadNormalFrameAtMs = if (cameraEnvironmentOutputsAllowed()) observedAtElapsedRealtimeMs else null
@@ -4058,6 +4081,24 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
             override fun sample(result: AndroidDetectionResult, tier: AndroidLocalTactileTier,
                 gate: NonMetricAdvisoryGate, observedAtElapsedRealtimeMs: Long) {
                 recordCameraFallbackInferenceSample(result, tier, gate, observedAtElapsedRealtimeMs)
+                if (recognitionDisplayOpen) {
+                    val generation = recognitionDisplayGeneration
+                    val epoch = walkSessionLifecycle.snapshot().epoch
+                    val fallbackGeneration = cameraFallbackGeneration
+                    val frame = GuidanceRecognitionDisplay.Frame(observedAtElapsedRealtimeMs,
+                        result.detections.size, result.detections.take(GuidanceRecognitionDisplay.MAX_BOXES).map {
+                            GuidanceRecognitionDisplay.item(it.className, it.detectionConfidence, null, observedAtElapsedRealtimeMs)
+                        }, "카메라 대체 경로 · 거리 미지원 · 객체 목록 표시")
+                    runOnUiThread {
+                        if (recognitionDisplayOpen && recognitionDisplayGeneration == generation &&
+                            walkSessionLifecycle.snapshot().epoch == epoch && cameraFallbackRunning &&
+                            cameraFallbackGeneration == fallbackGeneration) {
+                            recognitionDisplayFrame = frame
+                            recognitionDisplayContext = null // CameraX publishes a list, no screen-mapped boxes.
+                            renderRecognitionDisplay()
+                        }
+                    }
+                }
             }
         }, nonMetricAdvisoryPolicy, primaryWorkerCompletion,
         PrimaryFallbackPresentation { action, epoch, generation, deliveryOwner ->
@@ -7589,6 +7630,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
         if (walkExitConfirmationScreen != null) { finishWalkExitConfirmation(false); return true }
         if (nativeGuidanceConfirmationScreen != null) { finishNativeGuidanceConfirmation(false); return true }
         if (voiceHelpScreen != null) { closeVoiceHelp(true); return true }
+        if (recognitionDisplayOpen) { closeRecognitionDisplay(); return true }
         if (isInWalkInteractionArea()) {
             if (nativeUiPage == NativeUiPage.SETTINGS || nativeUiPage == NativeUiPage.VOICE_COMMAND) returnToCurrentInteractionArea()
             else showWalkExitConfirmationDialog()
@@ -7867,6 +7909,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
     }
 
     override fun onPause() {
+        closeRecognitionDisplay(restoreFocus = false)
         guidanceTouchGuardContent?.cancelHold()
         dismissNativeGuidanceConfirmation()
         dismissWalkExitConfirmation()
@@ -8675,6 +8718,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
         if (guidanceTouchGuardScreen != null || nativeUiPage != NativeUiPage.GUIDANCE ||
             (walkSessionLifecycle.snapshot().state !in
                 setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED))) return
+        closeRecognitionDisplay(restoreFocus = false)
         closeVoiceHelp(announce = false)
         val host = findViewById<ViewGroup>(android.R.id.content)
         guidanceTouchGuardCoveredViews.clear()
@@ -10287,6 +10331,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                     else startNativeDestinationGuidance()
                 },
                 onTouchGuard = ::openGuidanceTouchGuard,
+                onRecognitionDisplay = ::openRecognitionDisplay,
                 onVoiceStart = {
                     ensureVoicePermissionThenListen()
                 },
@@ -10526,10 +10571,13 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
 
         cameraScreenStatus = cameraComposer.createCameraStatus()
         cameraScreenControls = cameraComposer.createCameraControls(cameraScreenStatus, ::closeLiveCameraScreen)
+        recognitionOverlay = cameraComposer.createDebugOverlay().apply { visibility = View.GONE }
+        recognitionStatus = cameraComposer.createRecognitionStatus()
+        recognitionControls = cameraComposer.createRecognitionControls(recognitionStatus) { closeRecognitionDisplay() }
 
         return contentComposer.composeRootFrame(
             NativeContentAssembly.Layers<View>(surfaceView, cameraFallbackPreviewView, debugBboxOverlay,
-                controlsScroll, walkSafetyScroll, cameraScreenControls),
+                controlsScroll, walkSafetyScroll, cameraScreenControls, recognitionOverlay, recognitionControls),
             accessibilityStatus = ::createAccessibilityStatusView,
         )
     }
@@ -14008,9 +14056,96 @@ generation != cameraFallbackGeneration
     private fun updateLiveCameraScreenVisibility() {
         if (!::cameraScreenControls.isInitialized || !::controlsScroll.isInitialized) return
         if (!shouldShowNativeHome()) cameraScreenVisible = false
-        controlsScroll.visibility = if (cameraScreenVisible) View.GONE else View.VISIBLE
+        if (recognitionDisplayOpen && !recognitionDisplayOwnerCurrent()) closeRecognitionDisplay(restoreFocus = false)
+        controlsScroll.visibility = if (cameraScreenVisible || recognitionDisplayOpen) View.GONE else View.VISIBLE
         cameraScreenControls.visibility = if (cameraScreenVisible) View.VISIBLE else View.GONE
         debugBboxOverlay.visibility = if (cameraScreenVisible) View.VISIBLE else View.GONE
+        if (::recognitionControls.isInitialized) {
+            recognitionControls.visibility = if (recognitionDisplayOpen) View.VISIBLE else View.GONE
+            recognitionOverlay.visibility = recognitionControls.visibility
+        }
+    }
+
+    private fun recognitionDisplayOwnerCurrent(): Boolean = recognitionDisplayOpen && isActivityForeground &&
+        nativeUiPage == NativeUiPage.GUIDANCE && isInWalkInteractionArea() &&
+        recognitionDisplayOwner == (walkSessionLifecycle.snapshot().epoch to GatewaySessionProcessCoordinator.snapshot().generation)
+
+    /** UI-only: no session transition, camera binding, model load or speech command. */
+    private fun openRecognitionDisplay() {
+        if (recognitionDisplayOpen || !isActivityForeground || nativeUiPage != NativeUiPage.GUIDANCE ||
+            !isInWalkInteractionArea() || !::recognitionControls.isInitialized) return
+        recognitionDisplayOwner = walkSessionLifecycle.snapshot().epoch to GatewaySessionProcessCoordinator.snapshot().generation
+        recognitionDisplayFrame = null
+        recognitionDisplayContext = null
+        recognitionCameraAtMs = Long.MIN_VALUE
+        recognitionCameraTimestampNs = Long.MIN_VALUE
+        recognitionDisplayGeneration++
+        recognitionDisplayOpen = true
+        updateLiveCameraScreenVisibility()
+        renderRecognitionDisplay()
+        recognitionControls.getChildAt(0).requestFocus()
+    }
+
+    private fun closeRecognitionDisplay(restoreFocus: Boolean = true) {
+        if (!recognitionDisplayOpen) return
+        recognitionDisplayOpen = false
+        recognitionDisplayGeneration++
+        recognitionDisplayOwner = null
+        recognitionDisplayFrame = null
+        recognitionDisplayContext = null
+        recognitionControls.removeCallbacks(recognitionRefresh)
+        recognitionControls.visibility = View.GONE
+        recognitionOverlay.clear()
+        recognitionOverlay.visibility = View.GONE
+        controlsScroll.visibility = if (cameraScreenVisible) View.GONE else View.VISIBLE
+        if (restoreFocus) nativeScreenPresenter.guidanceBinding().guidanceRecognitionButton.requestFocus()
+    }
+
+    private fun observeRecognitionCamera(timestampNs: Long, capturedAtMs: Long) {
+        if (recognitionDisplayOpen && timestampNs > 0L && timestampNs != recognitionCameraTimestampNs) {
+            recognitionCameraTimestampNs = timestampNs
+            recognitionCameraAtMs = capturedAtMs
+        }
+    }
+
+    private fun renderRecognitionDisplay() {
+        if (!recognitionDisplayOpen) return
+        recognitionControls.removeCallbacks(recognitionRefresh)
+        if (!recognitionDisplayOwnerCurrent()) { closeRecognitionDisplay(restoreFocus = false); return }
+        val now = SystemClock.elapsedRealtime()
+        val running = isWalkSessionRuntimeActive()
+        val cameraFresh = recognitionCameraAtMs >= 0L && now - recognitionCameraAtMs in 0L..GuidanceRecognitionDisplay.MAX_AGE_MS
+        recognitionDisplayContext?.let { source ->
+            if (source.viewportWidth != surfaceWidth || source.viewportHeight != surfaceHeight ||
+                source.geometryVersion != synchronized(frameStateLock) { visualGeometryVersion }) {
+                recognitionDisplayFrame = null
+                recognitionDisplayContext = null
+            }
+        }
+        val frame = recognitionDisplayFrame.takeIf { running }
+        val visible = frame?.visibleItems(now).orEmpty().takeIf { cameraFresh }.orEmpty()
+        val unknown = if (!running || !cameraFresh) emptyList() else freshUnknownFeedbackBatches(now).flatMap { batch ->
+            batch.outputs.take(3).map { output -> GuidanceRecognitionDisplay.item(output.className,
+                output.detectionConfidence, null, batch.sourceCapturedAtElapsedRealtimeNs / 1_000_000L,
+                output, unknown = true, validUntilMs = batch.validUntilElapsedRealtimeMs) }
+        }.filter { it.current(now) }.take(3)
+        val text = GuidanceRecognitionDisplay.status(frame, now, cameraFresh, running) +
+            if (unknown.isEmpty()) "" else "\n미학습 경고 후보 ${unknown.size}개\n" + unknown.joinToString("\n") { it.label(now) }
+        if (recognitionStatus.text.toString() != text) recognitionStatus.text = text
+        // Conceal a frozen camera texture on pause/loss without pausing or clearing the camera itself.
+        recognitionOverlay.setBackgroundColor(if (running && cameraFresh) android.graphics.Color.TRANSPARENT else android.graphics.Color.BLACK)
+        val boxes = visible.mapIndexedNotNull { index, item -> item.rect?.let { rect ->
+            DebugBboxOverlayView.DebugOverlayBox(android.graphics.RectF(rect.x, rect.y, rect.x + rect.width, rect.y + rect.height),
+                "${index + 1}. ${item.label(now)}", false, item.name)
+        } }
+        if (boxes.isEmpty()) recognitionOverlay.clear() else recognitionOverlay.updateMapped(boxes,
+            requireNotNull(frame).capturedAtMs, frame.capturedAtMs, animate = false)
+        val deadlines = (visible + unknown).flatMap { listOfNotNull(it.validUntilMs, it.distanceUntilMs) } +
+            listOfNotNull(frame?.let { it.capturedAtMs + GuidanceRecognitionDisplay.MAX_AGE_MS },
+                recognitionCameraAtMs.takeIf { it >= 0 }?.let { it + GuidanceRecognitionDisplay.MAX_AGE_MS })
+        val delay = minOf(GuidanceRecognitionDisplay.REFRESH_MS,
+            deadlines.filter { it >= now }.minOfOrNull { it - now + 1L } ?: GuidanceRecognitionDisplay.REFRESH_MS)
+        recognitionControls.postDelayed(recognitionRefresh, delay)
     }
 
     private class DeviceCompositeAttempt(
@@ -17325,7 +17460,7 @@ private fun performWalkSessionSafetyStopCleanup(
             ::walkSafetyOverlay.isInitialized &&
             ::walkSafetyScroll.isInitialized
         ) {
-            controlsScroll.visibility = if (cameraScreenVisible) View.GONE else View.VISIBLE
+            controlsScroll.visibility = if (cameraScreenVisible || recognitionDisplayOpen) View.GONE else View.VISIBLE
             walkSafetyOverlay.visibility = View.GONE
             walkSafetyScroll.visibility = View.GONE
             if (walkSessionScreenVisible && nativeUiPublication.isPublished(NativeUiPublication.Target.FIRST_RUN_ONBOARDING_CONTROLS)) {

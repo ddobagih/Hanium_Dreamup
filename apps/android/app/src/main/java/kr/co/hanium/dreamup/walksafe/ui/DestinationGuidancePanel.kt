@@ -40,6 +40,7 @@ internal class DestinationGuidancePanel(
         val onEndDeviation: () -> Unit,
         val onPause: () -> Unit = {},
         val onTouchGuard: () -> Unit = {},
+        val onRecognitionDisplay: () -> Unit = {},
     )
 
     val voiceReportButton = Button(context).apply {
@@ -221,6 +222,7 @@ internal class DestinationGuidancePanel(
     val nativeGuidanceVoiceButton = style.accessiblePriorityUserButton("음성 명령", emphasis = true, onClick = actions.onVoiceStart)
     val nativeGuidancePauseButton = style.accessiblePriorityUserButton("일시정지", onClick = actions.onPause)
     val guidanceTouchGuardButton = style.accessiblePriorityUserButton("터치 오작동 방지", onClick = actions.onTouchGuard)
+    val guidanceRecognitionButton = style.accessiblePriorityUserButton("인식 현황 보기", onClick = actions.onRecognitionDisplay)
 
     init {
         listOf(nativeGuidanceVoiceButton, nativeGuidancePauseButton, nativeGuidanceCancelButton,
@@ -232,6 +234,9 @@ internal class DestinationGuidancePanel(
         nativeGuidancePauseButton.accessibilityTraversalAfter = nativeGuidanceVoiceButton.id
         nativeGuidanceCancelButton.accessibilityTraversalAfter = nativeGuidancePauseButton.id
         guidanceTouchGuardButton.accessibilityTraversalAfter = nativeGuidanceCancelButton.id
+        guidanceRecognitionButton.id = View.generateViewId()
+        guidanceRecognitionButton.accessibilityTraversalAfter = guidanceTouchGuardButton.id
+        guidanceRecognitionButton.contentDescription = "인식 현황 보기. 현재 카메라와 인식 결과를 화면에 표시합니다."
     }
 
     val nativeGuidanceControls = style.walkSection(
@@ -240,6 +245,7 @@ internal class DestinationGuidancePanel(
         nativeGuidancePauseButton,
         nativeGuidanceCancelButton,
         guidanceTouchGuardButton,
+        guidanceRecognitionButton,
         nativeGuidanceDestinationText,
         nativeGuidanceStatusText,
         nativeGuidanceMeasurementText,

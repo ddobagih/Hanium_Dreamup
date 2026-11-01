@@ -63,6 +63,16 @@ internal class FramePipelineController<L : Any, Q, S, R>(
         val tracking = native.camera.trackingState == TrackingState.TRACKING
         if (!runtime.visualOutputAllowsWork(lease, native.timestamp, tracking)) {
             recording.acquisitionFailures(source.resources.provider, source.capturedElapsedMs)
+            val observed = synthesis.detectionSnapshot
+            presentation().showRecognition(FramePresentationScope(source.frameGeneration, epoch, lease,
+                source.resources.generation, source.capturedElapsedMs, native.timestamp, tracking)) {
+                val at = observed.capturedAtElapsedRealtimeMs
+                val fresh = at != null && source.capturedElapsedMs - at in 0L..MAX_OVERLAY_AGE_MS
+                geometry.recognitionFrame(native, if (fresh) observed.detections else emptyList(), emptyList(),
+                    observed.imageWidth, observed.imageHeight, at ?: source.capturedElapsedMs,
+                    source.capturedElapsedMs, observed.completedAtMs != null,
+                    "추적/깊이 확인 대기 · 거리 미확인")
+            }
             presentation().showUnavailable(source.capturedElapsedMs, source.frameGeneration, epoch, lease) {
                 val observed = synthesis.detectionSnapshot
                 val sourceAt = observed.capturedAtElapsedRealtimeMs
@@ -177,6 +187,11 @@ internal class FramePipelineController<L : Any, Q, S, R>(
             geometry.buildDebugOverlayBoxes(native, overlays, overlayOutput, q.gray?.sourceWidth, q.gray?.sourceHeight,
                 q.gray?.key?.capturedAtElapsedRealtimeMs)
         } ?: return null
+        presentation().showRecognition(uiScope) {
+            geometry.recognitionFrame(native, overlays, outputs, q.gray?.sourceWidth, q.gray?.sourceHeight,
+                detection.capturedAtElapsedRealtimeMs ?: source.capturedElapsedMs, source.capturedElapsedMs,
+                detection.completedAtMs != null, "기존 인식 결과 · 숫자는 위험 판단에 사용된 거리")
+        }
         // Native input is synchronous only; delayed presentation receives this SDK-free packet.
         val frozenUiScope = uiScope.copy(originalFrameTimestampNs = source.originalFrameTimestampNs)
         return FramePublicationPacket(frozenUiScope, source.resources.provider, source.timestampMs, source.wallClockMs,

@@ -13,6 +13,7 @@ import kr.co.hanium.dreamup.walksafe.depth.RectNorm
 import kr.co.hanium.dreamup.walksafe.depth.TrackedObjectDepth
 import kr.co.hanium.dreamup.walksafe.navigation.FrozenImageToDepthTransform
 import kr.co.hanium.dreamup.walksafe.DebugBboxOverlayView
+import kr.co.hanium.dreamup.walksafe.ui.GuidanceRecognitionDisplay
 
 internal class ArFrameGeometryFreezer(private val elapsedRealtimeMs: () -> Long,
     private val viewportSize: () -> ImageSize,
@@ -144,6 +145,37 @@ internal class ArFrameGeometryFreezer(private val elapsedRealtimeMs: () -> Long,
             mappedDetectionBoxes.filterNot { it.className == bestBox.className && it.rectPx == bestBox.rectPx }
         return boxes
     }
+    /** Map already computed outputs on the owning GL callback; no extra inference or depth sampling. */
+    fun recognitionFrame(frame: Frame, detections: List<DetectionCandidate>, outputs: List<TrackedObjectDepth>,
+        imageWidth: Int?, imageHeight: Int?, capturedAtMs: Long, depthCapturedAtMs: Long,
+        completed: Boolean, note: String,
+    ): GuidanceRecognitionDisplay.Frame {
+        val items = mutableListOf<GuidanceRecognitionDisplay.Item>()
+        fun mapped(rect: RectNorm): RectNorm? {
+            val width = imageWidth ?: return null
+            val height = imageHeight ?: return null
+            val view = rect.toViewRect(frame, width, height) ?: return null
+            return RectNorm(view.left, view.top, view.width(), view.height())
+        }
+        // Every distance uses its own output geometry. Never attach a distance by class name alone.
+        val current = outputs.filter { it.frameId == frame.timestamp }.take(GuidanceRecognitionDisplay.MAX_BOXES)
+        current.forEach { output ->
+            val item = GuidanceRecognitionDisplay.item(output.className, output.detectionConfidence,
+                mapped(output.bboxNorm), depthCapturedAtMs, output,
+                validUntilMs = minOf(capturedAtMs, depthCapturedAtMs) + GuidanceRecognitionDisplay.MAX_AGE_MS)
+            items += item
+        }
+        detections.asSequence().filter { detection ->
+            current.none { it.className == detection.className && it.bboxNorm == detection.bboxNorm }
+        }.sortedByDescending { it.detectionConfidence }.take(GuidanceRecognitionDisplay.MAX_BOXES - items.size)
+            .forEach { detection ->
+                items += GuidanceRecognitionDisplay.item(detection.className, detection.detectionConfidence,
+                    mapped(detection.bboxNorm), capturedAtMs)
+            }
+        return GuidanceRecognitionDisplay.Frame(capturedAtMs, if (completed) detections.size else null,
+            items.toList(), note)
+    }
+
     private companion object { const val MAX_OVERLAY_DETECTION_BOXES = 5 }
 }
 

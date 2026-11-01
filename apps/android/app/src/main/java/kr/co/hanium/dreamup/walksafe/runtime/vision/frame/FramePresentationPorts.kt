@@ -79,6 +79,7 @@ internal interface FramePresentationSource<L : Any> {
 
 internal interface FramePresentationContext {
     val cameraVisible: Boolean
+    val recognitionDisplayGeneration: Long? get() = null
     val surfaceWidth: Int
     val surfaceHeight: Int
     val statusOwner: Any
@@ -105,6 +106,7 @@ internal interface FramePresentationView {
     fun postCameraStatus(delayMs: Long, action: () -> Unit)
     fun postStatus(delayMs: Long, action: () -> Unit)
     fun updateDebugUploadButton()
+    fun updateRecognition(frame: kr.co.hanium.dreamup.walksafe.ui.GuidanceRecognitionDisplay.Frame, context: FrameStatusUiContext) {}
 }
 
 internal data class FrameStatusDiagnosticParts(
