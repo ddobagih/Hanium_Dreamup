@@ -17,7 +17,7 @@ class CameraRuntimePreparationContractTest {
 
     @Test fun devicePreparationRunsOffUiAndKeepsTheLoadingStatePending() {
         assertTrue(body(main, "private fun loadDetectorForCurrentProcess()").contains("primaryDetectorLifecycleController.loadForCurrentProcess()"))
-        val load = body(primary, "fun loadForCurrentProcess(allowComparison: Boolean = false)")
+        val load = body(primary, "fun loadForCurrentProcess(allowComparison: Boolean = false,")
         assertTrue(load.indexOf("val loadTask = Runnable loadTask@{") < load.indexOf("platform.select("))
         assertTrue(load.indexOf("platform.select(") < load.indexOf("detector.tuningLane.execute(loadTask)"))
         assertTrue(load.contains("detector.nativeLane.execute retire@{"))
@@ -97,8 +97,10 @@ class CameraRuntimePreparationContractTest {
         assertTrue(main.contains("override fun prepareDetectorRetry() { primaryDetectorLifecycleController.allowLoadRetryIfUnavailable() }"))
         val recheck = body(primary, "fun allowLoadRetryIfUnavailable()")
         assertTrue(recheck.contains("!detector.projection().available && !detector.projection().closing && !loadInFlight"))
-        val load = body(primary, "fun loadForCurrentProcess(allowComparison: Boolean = false)")
-        val complete = load.substringAfter("loadInFlight = false")
+        val load = body(primary, "fun loadForCurrentProcess(allowComparison: Boolean = false,")
+        // A physical-cleanup failure has a separate completion branch. Check the successful
+        // admission transaction, which must publish metadata before readiness callbacks.
+        val complete = load.substringAfter("if (!detector.admitLoadedOnMain(")
         assertTrue(complete.indexOf("loadAttempted = true") < complete.indexOf("preparation.loaded()"))
     }
     @Test fun existingDeviceCheckOwnsCompositeWorkAndSettingsHaveNoSeparateAction() {
@@ -123,17 +125,33 @@ class CameraRuntimePreparationContractTest {
         }
         assertTrue(source.contains("RuntimeCalibrationFixtures"))
         assertFalse(body(main, "private fun startDeviceCompositeCameraCheck(").contains("비춰"))
+        val attempt = main.substringAfter("private class DeviceCompositeAttempt(")
+            .substringBefore("@Volatile private var deviceCompositeAttempt")
+        assertTrue(attempt.contains("metricDepth = null"))
         val complete = body(main, "private fun completeDeviceCompositeAttempt(")
-        assertTrue(complete.contains("metricDepth = null"))
         assertFalse(complete.contains("PostLoginMetricDepthState.SUPPORTED"))
     }
 
     @Test fun unconfirmedWorkerDeathFinishesFailurePresentationWhileRetainingItsAllocationFence() {
         val failure = body(main, "private fun publishDeviceCompositeReleaseFailure(")
-        assertTrue(failure.contains("attempt.completionPublished = true"))
-        assertTrue(failure.contains("attempt.finished(PostLoginCompositeCameraCheckResult(false"))
-        assertTrue(failure.contains("releaseConfirmed = false"))
+        assertTrue(failure.contains("attempt.state.fail(reason)"))
+        assertTrue(failure.contains("requestDeviceCompositeNativeCleanup(attempt)"))
+        val state = File("src/main/java/kr/co/hanium/dreamup/walksafe/device/postlogin/DeviceCompositeAttemptState.kt").readText()
+        assertTrue(state.contains("onCompletion(Completion(false, false, reason))"))
         assertFalse(failure.contains("deviceCompositeAttempt = null"))
+    }
+
+    @Test fun explicitChoiceIsAppliedAndVerifiedBeforeTheOnlyDurableSavePath() {
+        val start = body(main, "private fun startDeviceCompositeCameraCheck(")
+        assertTrue(start.contains("choiceOverride = choice"))
+        assertFalse(start.contains(".save("))
+        val applied = body(main, "private fun finishDeviceCompositeApplicationIfReady()")
+        assertTrue(applied.indexOf("RunningDetectorVerificationState.VERIFIED") < applied.indexOf("persistVerified("))
+        assertTrue(applied.contains("retireIfCurrent(it)"))
+        val cleanup = body(main, "private fun requestDeviceCompositeNativeCleanup(")
+        assertTrue(cleanup.indexOf("cancelPendingLoadAfterDrain") < cleanup.indexOf("releaseForCompositeCheck(authority)"))
+        assertTrue(cleanup.contains("primaryDetectorOwner.closedFuture()"))
+        assertTrue(start.contains("CameraRuntimeHandoff.begin()"))
     }
 
     @Test fun samplePerformanceWorkerIsPrivateAndSeparateFromMainAndVoice() {

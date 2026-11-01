@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.runtime.vision.primary
 
 import kr.co.hanium.dreamup.walksafe.inference.*
+import kr.co.hanium.dreamup.walksafe.inference.composite.ValidatedJointRuntimeChoice
 import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
 
 internal data class PrimaryLifecycleMetadata(
@@ -26,6 +27,9 @@ internal interface PrimaryLifecyclePlatform {
     fun loadDefault(): AndroidDetectorLoadResult
     fun select(config: TwoModelRuntimeConfig, allowComparison: Boolean, current: () -> Boolean,
         progress: (String) -> Unit): AndroidDetectorLoadResult
+    fun prepareMeasuredChoice(config: TwoModelRuntimeConfig, choice: ValidatedJointRuntimeChoice,
+        current: () -> Boolean): AndroidDetectorLoadResult =
+        throw UnsupportedOperationException("Explicit measured-choice preparation is unavailable")
     fun logPreparationFailure(error: Throwable)
     fun close(detector: TfliteAndroidFrameDetector)
     fun firstSuccessfulDelegate(detector: TfliteAndroidFrameDetector): String?

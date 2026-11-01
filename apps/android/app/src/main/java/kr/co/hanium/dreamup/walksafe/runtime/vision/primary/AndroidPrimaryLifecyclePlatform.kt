@@ -4,6 +4,7 @@ import android.content.Context
 import kr.co.hanium.dreamup.walksafe.inference.*
 import kr.co.hanium.dreamup.walksafe.inference.composite.AndroidJointRuntimeLoader
 import kr.co.hanium.dreamup.walksafe.inference.composite.JointRuntimeReleaseFence
+import kr.co.hanium.dreamup.walksafe.inference.composite.ValidatedJointRuntimeChoice
 import java.util.WeakHashMap
 
 /** SDK operations at their original native/tuning call sites; obtaining Context remains lazy. */
@@ -13,6 +14,8 @@ internal class AndroidPrimaryLifecyclePlatform(
     private val createCpu: (TwoModelRuntimeConfig?, ModelRuntimeOptions) -> AndroidDetectorLoadResult,
     private val processorCount: () -> Int,
     private val releaseFence: JointRuntimeReleaseFence = AndroidJointRuntimeLoader.releaseFence,
+    private val prepareJoint: (TwoModelRuntimeConfig, ValidatedJointRuntimeChoice, () -> Boolean) -> AndroidJointRuntimeLoader.Prepared =
+        { config, choice, current -> AndroidJointRuntimeLoader.prepare(context(), config, choice, current) },
 ) : PrimaryLifecyclePlatform {
     constructor(context: () -> Context) : this(context,
         { config, current -> AndroidJointRuntimeLoader.restore(context(), config, current) },
@@ -56,6 +59,19 @@ internal class AndroidPrimaryLifecyclePlatform(
         load.detector?.let { synchronized(prepared) { prepared[it] = PreparedSetting(candidate, null) } }
         return if (load.detectorAvailable && load.configLoaded && !load.fallbackUsed)
             load.copy(reason = SAFE_CPU_PREPARATION_REASON) else load
+    }
+
+    override fun prepareMeasuredChoice(config: TwoModelRuntimeConfig, choice: ValidatedJointRuntimeChoice,
+        current: () -> Boolean): AndroidDetectorLoadResult {
+        releaseFence.ensureConfirmed()
+        if (!current()) throw java.util.concurrent.CancellationException("Measured preparation retired")
+        val result = try { prepareJoint(config, choice, current) }
+        catch (error: DetectorNativeCleanupFailure) { releaseFence.retain(error); throw error }
+        releaseFence.requireCleanResult(result.load)
+        result.load.detector?.let { synchronized(prepared) {
+            prepared[it] = PreparedSetting(choice.candidate.primary, choice.candidate.primaryIntervalMs)
+        } }
+        return result.load
     }
     override fun logPreparationFailure(error: Throwable) {
         android.util.Log.w("WalkSafeRuntimeChoice", "Model preparation failed", error)

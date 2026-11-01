@@ -5,6 +5,7 @@ import java.util.concurrent.CancellationException
 import java.util.concurrent.RejectedExecutionException
 import kr.co.hanium.dreamup.walksafe.device.RunningDetectorReadiness
 import kr.co.hanium.dreamup.walksafe.inference.*
+import kr.co.hanium.dreamup.walksafe.inference.composite.ValidatedJointRuntimeChoice
 import kr.co.hanium.dreamup.walksafe.runtime.vision.frame.FrameSynthesisController
 import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
 
@@ -39,6 +40,7 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
     private var comparisonRequested = false
     @Volatile private var statusText = "detector=load_pending_after_camera_gate"
     private var fixedFixtureRunning = false
+    private var choiceOverrideRequestId: String? = null
     @Volatile private var compositeLoadDrainPending = false
     private var failedRetiredLoad: TfliteAndroidFrameDetector? = null
 
@@ -77,14 +79,16 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
         } catch (_: RejectedExecutionException) { presentation.onUi { onReleased(false) } }
     }
 
-    fun finishCompositeCheck(reload: Boolean) {
+    fun finishCompositeCheck(reload: Boolean, choiceOverride: ValidatedJointRuntimeChoice? = null) {
         synchronized(frameStateLock) {
+            if (choiceOverride != null && choiceOverrideRequestId == choiceOverride.measurementId &&
+                (loadInFlight || loadAttempted)) return
             loadInFlight = false
             loadAttempted = false
             configLoaded = false
             comparisonAttempted = false
         }
-        if (reload) loadForCurrentProcess()
+        if (reload) loadForCurrentProcess(choiceOverride = choiceOverride)
     }
     fun measuredProfileStatus(profile: RuntimeTuningProfile) {
         statusText = "detector=measured_profile runtime=${profile.candidate.backend} threads=${profile.candidate.numThreads}"
@@ -129,6 +133,7 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
         try { platform.close(instance) }
         catch (error: Throwable) {
             failedRetiredLoad = instance
+            detector.recordReleaseFailure(error)
             detector.fenceForClose()
             throw error
         }
@@ -141,7 +146,8 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
         calibration.projection().session == null && !calibration.projection().oldDetectorReleasePending &&
         !auxiliary.calibrationPresent()
 
-    fun loadForCurrentProcess(allowComparison: Boolean = false) {
+    fun loadForCurrentProcess(allowComparison: Boolean = false, choiceOverride: ValidatedJointRuntimeChoice? = null) {
+        require(choiceOverride == null || !allowComparison) { "An explicit choice must not start comparison" }
         val metricDistanceWasEnabled: Boolean
         var loadGeneration: Long
         val requestGeneration: Long
@@ -164,12 +170,17 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
             loadRequestGeneration += 1L
             requestGeneration = loadRequestGeneration
             loadGeneration = detector.projection().loadGeneration
+            choiceOverrideRequestId = choiceOverride?.measurementId
         }
         val loadTask = Runnable loadTask@{
             if (requestGeneration != loadRequestGeneration) return@loadTask
             val load = try {
                 val config = configuration.loadOrCurrent()
-                if (config == null) platform.loadDefault()
+                if (choiceOverride != null) {
+                    if (!loadIsCurrent(requestGeneration, loadGeneration)) throw CancellationException("Measured preparation retired")
+                    platform.prepareMeasuredChoice(requireNotNull(config) { "Explicit choice requires its model configuration" },
+                        choiceOverride, current = { loadIsCurrent(requestGeneration, loadGeneration) })
+                } else if (config == null) platform.loadDefault()
                 else platform.select(config, allowComparison = allowComparison,
                     current = { loadIsCurrent(requestGeneration, loadGeneration) },
                     progress = { message -> presentation.onUi {
@@ -179,6 +190,27 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
                         }
                     } })
             } catch (error: Throwable) {
+                if (error is DetectorNativeCleanupFailure) {
+                    detector.recordReleaseFailure(error)
+                    val ownsRequest = synchronized(frameStateLock) {
+                        // Physical release failure outlives logical cancellation. Even an obsolete
+                        // request must fence allocations, without publishing obsolete metadata.
+                        detector.fenceForClose()
+                        (requestGeneration == loadRequestGeneration).also { owns -> if (owns) {
+                            loadInFlight = false
+                            configLoaded = false
+                            loadReason = error.javaClass.simpleName
+                            statusText = "detector=$loadReason"
+                        } }
+                    }
+                    platform.logPreparationFailure(error)
+                    if (ownsRequest) presentation.onUi {
+                        if (requestGeneration != loadRequestGeneration) return@onUi
+                        if (preparation.featureGatePassed()) preparation.modelUnavailable(metricDistanceWasEnabled)
+                        preparation.loaded()
+                    }
+                    return@loadTask
+                }
                 if (error is CancellationException) {
                     synchronized(frameStateLock) {
                         if (requestGeneration == loadRequestGeneration) cancelPendingLoad()
@@ -326,7 +358,8 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
         }
         if (!disabled) return
         if (calibration.projection().session != null || auxiliary.calibrationPresent()) auxiliary.cancelCalibration("detector_verification_failed")
-        try { detector.nativeLane.execute { platform.close(instance) } } catch (_: RejectedExecutionException) { }
+        try { detector.nativeLane.execute { closeRetiredLoad(instance) } }
+        catch (error: RejectedExecutionException) { detector.recordReleaseFailure(error) }
         if (preparation.featureGatePassed()) preparation.disableUnverifiedCapabilities()
         val walking = preparation.activeOrPausedWalk()
         if (walking) failureEffects.enterSafetyStop()

@@ -46,6 +46,15 @@ adb install -r apps/android/app/build/outputs/apk/debug/app-debug.apk
 - 샘플 검사 실패는 실행 실패로 유지하며 기본 모델을 잠시 해제했다는 이유로 성공한 제한 결과로 낮추지 않습니다. 실제 worker 해제가 미확인되면 실패 안내와 재할당 차단을 함께 유지합니다. 거리 지원은 기존 `runtime/metric/AndroidRuntimeMetricPreflight`의 API support-only 검사에 맡깁니다.
 - 관련 자동 회귀는 `inference/composite`의 policy/store/IPC·감독 시험, `AndroidPrimaryInitialPreparationTest`, `AndroidPostLoginDeviceProbesTest`, `PostLoginDeviceCheckControllerTest`, `CameraRuntimePreparationContractTest`입니다. 실제 기기 시험과 구분합니다.
 
+### 점검의 실패·취소·재시도 처리
+
+- `device/postlogin/DeviceCompositeAttemptState`는 기존 모델 퇴역 → 샘플 측정 → 명시한 메모리 선택 적용·검증 → 설정 저장 → 최종 결과 통지를 소유합니다. 적용 전에는 새 선택을 저장하지 않으므로, 그 사이 프로세스가 종료돼도 이전 통과 결과에 미적용 선택이 결합되지 않습니다.
+- `AndroidJointRuntimeLoader.prepare`는 전달받은 선택을 저장소를 거치지 않고 검증·준비합니다. `restore`만 저장된 선택을 읽고 자신의 기록을 CAS로 무효화합니다. 취소된 저장의 `retireIfCurrent`는 이미 없거나 다른 측정으로 교체된 기록을 그대로 두며, 실제 삭제 실패와 구분합니다.
+- `FixtureRuntimeConnectionLease`는 START 전송 허가 이전의 실패와 실제 모델 작업의 종료 미확인을 구분합니다. 전자는 큐에 남은 START 허가를 취소하고 실패한 연결도 정리합니다. 후자는 실제 작업 프로세스의 종료 확인을 요구합니다. 연결 실패 자체를 후보의 성능 실패로 해석하지 않습니다.
+- 활성 점검은 기존 `CameraRuntimeHandoff`의 프로세스 범위 자원 인계에 참여합니다. 취소 시 적용된 모델의 실제 close와 저장 정리를 함께 기다리며, 화면 재생성 시 이전 작업과 새 모델 준비가 겹치지 않게 합니다. 기본 모델 소유자의 `closedFuture`는 생성 작업과 뒤늦은 채택·종료 작업까지 배출한 뒤 완료됩니다.
+- 실패 결과 통지와 물리적 해제 확인은 별개입니다. 시간 초과나 정리 실패는 즉시 실패 결과를 통지하되, 실제 종료가 불확실하면 재할당을 막습니다. 늦은 해제 확인은 원래 시도의 자원만 풀며 실패를 성공으로 바꾸지 않습니다. 최종 결과 전달 전에는 임시 모델 퇴역을 지원 불가로 오인해 LIMITED로 통과시키지 않습니다.
+- 시험 worker와 달리 실제 적용 모델은 기존 앱 프로세스의 소유자에서 실행됩니다. GPU 드라이버 내부 작업을 일반 취소나 타이머로 강제 중단할 수 있다고 보장하지 않습니다. 이 경우 실패 안내와 자원 차단을 유지하며 실제 정리 확인 또는 앱의 완전한 재시작이 필요합니다.
+
 ## 변경 시 확인
 
 - `network`, `report`, `navigation` 변경은 Gateway route·OpenAPI와 Backend consumer까지 확인합니다.

@@ -85,6 +85,8 @@ internal data class PostLoginDeviceCheckProbeSignals(
     val wakePhrase: PostLoginDeviceCheckSignal,
     val metricDepth: PostLoginMetricDepthState,
     val compositeRuntimeFailed: Boolean = false,
+    /** Remains true until the queued completion is consumed, including retirement. */
+    val compositeRuntimeActive: Boolean = false,
 )
 
 internal interface PostLoginDeviceCheckProbeSuite {

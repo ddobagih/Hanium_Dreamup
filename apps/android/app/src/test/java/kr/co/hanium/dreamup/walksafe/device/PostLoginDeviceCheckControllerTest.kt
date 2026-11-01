@@ -88,6 +88,46 @@ class PostLoginDeviceCheckControllerTest {
         assertFalse(f.controller.passesFeatureGate())
     }
 
+    @Test fun queuedCompositeFailureCannotBecomeLimitedDuringTheTemporaryDetectorRetirement() {
+        val f = Fixture().running()
+        f.ready()
+        f.reader.hardware = f.reader.hardware.copy(detector = PostLoginDeviceCheckDetectorFacts(
+            true, false, false, false, PostLoginDeviceCheckSignal.UNAVAILABLE))
+        f.probes.value = f.probes.value.copy(cameraPipeline = PostLoginDeviceCheckSignal.PENDING,
+            compositeRuntimeActive = true)
+        val binding = f.controller.snapshot.bindingOrNull!!
+        // A resource callback arrives after native retirement but before the result dispatcher.
+        f.controller.maybeContinue(binding)
+        f.controller.evaluate(binding)
+        assertEquals(PostLoginDeviceCheckState.RUNNING, f.controller.snapshot.state)
+        assertEquals(PostLoginDeviceCheckSignal.PENDING, f.controller.observation().detector)
+        assertFalse(PostLoginDeviceCheckFeature.OBSTACLE_DETECTION in f.controller.observation().unsupportedFeatures)
+        assertEquals(0, f.store.saves)
+        assertEquals(0, f.effects.passes)
+
+        f.probes.value = f.probes.value.copy(cameraPipeline = PostLoginDeviceCheckSignal.UNAVAILABLE,
+            compositeRuntimeActive = false, compositeRuntimeFailed = true)
+        f.controller.maybeContinue(binding)
+        assertEquals(PostLoginDeviceCheckState.FAIL, f.controller.snapshot.state)
+        assertEquals(PostLoginDeviceCheckFailure.CAMERA_PIPELINE_UNAVAILABLE, f.controller.snapshot.failure)
+        assertEquals(0, f.store.saves)
+    }
+
+    @Test fun activeCompositeCannotPassEvenIfAnOlderCameraSignalIsReady() {
+        val f = Fixture().running()
+        f.ready()
+        f.probes.value = f.probes.value.copy(compositeRuntimeActive = true)
+        val binding = f.controller.snapshot.bindingOrNull!!
+        f.controller.maybeContinue(binding)
+        assertEquals(PostLoginDeviceCheckState.RUNNING, f.controller.snapshot.state)
+        assertEquals(PostLoginDeviceCheckSignal.PENDING, f.controller.observation().cameraPipeline)
+        assertEquals(0, f.store.saves)
+        f.probes.value = f.probes.value.copy(compositeRuntimeActive = false)
+        f.controller.maybeContinue(binding)
+        assertEquals(PostLoginDeviceCheckState.FULL, f.controller.snapshot.state)
+        assertEquals(1, f.store.saves)
+    }
+
     @Test fun fixtureFailureAfterPrimaryRetirementCannotDowngradeIntoAPassedLimitedResult() {
         val f = Fixture().running()
         f.ready()

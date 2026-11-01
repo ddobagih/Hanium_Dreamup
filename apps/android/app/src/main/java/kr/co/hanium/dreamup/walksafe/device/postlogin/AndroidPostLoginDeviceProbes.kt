@@ -183,7 +183,8 @@ internal class AndroidPostLoginDeviceProbes(
     private var wakeSignal = PostLoginDeviceCheckSignal.PENDING
     private var metricDepth = PostLoginMetricDepthState.PENDING
     override val signals get() = PostLoginDeviceCheckProbeSignals(cameraSignal, locationSignal, wakeSignal, metricDepth,
-        compositeRuntimeFailed = cameraFailure == PostLoginCameraPipelineFailure.COMPOSITE_RUNTIME_UNAVAILABLE)
+        compositeRuntimeFailed = cameraFailure == PostLoginCameraPipelineFailure.COMPOSITE_RUNTIME_UNAVAILABLE,
+        compositeRuntimeActive = compositeCameraRun != null)
     override var metricPreflightStarted = false
         private set
     override val capabilityProbeStarted get() = support.capabilityProbeStarted

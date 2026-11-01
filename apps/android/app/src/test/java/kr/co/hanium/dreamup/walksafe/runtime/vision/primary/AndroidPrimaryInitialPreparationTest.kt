@@ -7,6 +7,7 @@ import kr.co.hanium.dreamup.walksafe.inference.composite.JointRuntimeTestFixture
 import kr.co.hanium.dreamup.walksafe.inference.composite.JointRuntimeReleaseFence
 import org.junit.Assert.*
 import org.junit.Test
+import sun.misc.Unsafe
 
 class AndroidPrimaryInitialPreparationTest {
     private val config = JointRuntimeTestFixtures.config
@@ -117,5 +118,38 @@ class AndroidPrimaryInitialPreparationTest {
         assertEquals("cpu", requested.single().delegate)
         assertEquals(1, requested.single().numThreads)
         assertFalse(requested.single().fallbackToCpu)
+    }
+
+    @Test fun explicitMemoryChoiceBypassesSavedRestoreAndAnyCpuPreparation() {
+        val choice = JointRuntimeTestFixtures.choice(JointRuntimeTestFixtures.candidate.copy(
+            primary = RuntimeCandidate(RuntimeBackend.GPU, 3), primaryIntervalMs = 400L))
+        val unsafe = Unsafe::class.java.getDeclaredField("theUnsafe").apply { isAccessible = true }.get(null) as Unsafe
+        val instance = unsafe.allocateInstance(TfliteAndroidFrameDetector::class.java) as TfliteAndroidFrameDetector
+        val native = initialLoad().copy(detector = instance, reason = "DeviceCheckJointRuntimeChoice")
+        var calls = 0
+        val platform = AndroidPrimaryLifecyclePlatform({ error("SDK access must stay injected") },
+            { _, _ -> error("Memory preparation must not read the previous saved choice") },
+            { _, _ -> error("An explicit measured choice must not fall back to initial CPU") }, { 8 },
+            prepareJoint = { selectedConfig, selectedChoice, current ->
+                calls++; assertSame(config, selectedConfig); assertSame(choice, selectedChoice); assertTrue(current())
+                AndroidJointRuntimeLoader.Prepared(native, selectedChoice)
+            })
+        assertSame(native, platform.prepareMeasuredChoice(config, choice) { true })
+        assertEquals(1, calls)
+        assertEquals(choice.candidate.primary, platform.observedCandidate(instance))
+        assertEquals(400L, platform.measuredPrimaryIntervalMs(instance))
+    }
+
+    @Test fun failedOrCancelledExplicitChoiceCannotFallBackToThePreviouslySavedChoice() {
+        val choice = JointRuntimeTestFixtures.choice()
+        var creates = 0
+        val failure = IllegalStateException("measured runtime mismatch")
+        val platform = AndroidPrimaryLifecyclePlatform({ error("SDK access must stay injected") },
+            { _, _ -> error("Must not restore another saved choice") },
+            { _, _ -> error("Must not create an unmeasured CPU choice") }, { 8 },
+            prepareJoint = { _, _, _ -> creates++; throw failure })
+        assertSame(failure, runCatching { platform.prepareMeasuredChoice(config, choice) { true } }.exceptionOrNull())
+        assertTrue(runCatching { platform.prepareMeasuredChoice(config, choice) { false } }.exceptionOrNull() is CancellationException)
+        assertEquals(1, creates)
     }
 }

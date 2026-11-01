@@ -238,8 +238,38 @@ class AndroidJointRuntimeChoiceStoreTest {
         assertFalse(store.save(f.config, original))
         assertFalse(store.invalidate())
         assertFalse(store.invalidateIfMatches(original))
+        assertFalse(store.retireIfCurrent(original))
         assertNotNull(store.load(f.config))
         assertEquals(1, prefs.commits)
+    }
+
+    @Test fun cleanupOfAbsentOrObsoleteChoiceSucceedsWithoutRetiringANewerRecord() {
+        val prefs = Prefs(); val store = store(prefs); val old = f.choice(); val newer = f.choice()
+        assertTrue(store.retireIfCurrent(old)); assertEquals(0, prefs.commits)
+        assertTrue(store.save(f.config, newer))
+        assertTrue(store.retireIfCurrent(old))
+        assertFalse(store.invalidateIfMatches(old)) // The existing CAS result contract stays unchanged.
+        assertEquals(newer, store.load(f.config)); assertEquals(1, prefs.commits)
+        assertTrue(store.retireIfCurrent(newer))
+        assertNull(store.load(f.config)); assertEquals(2, prefs.commits)
+        assertTrue(store.retireIfCurrent(newer)); assertEquals(2, prefs.commits)
+    }
+
+    @Test fun cleanupCommitFailureRemainsFencedUntilTheSameRemovalReallyCommits() {
+        val prefs = Prefs(); val store = store(prefs); val choice = f.choice()
+        assertTrue(store.save(f.config, choice))
+        prefs.commitResult = false
+        assertFalse(store.retireIfCurrent(choice))
+        assertNull(store(prefs).load(f.config))
+        assertFalse(store.save(f.config, choice)) // An idempotent retry cannot resurrect a retired ID.
+        prefs.commitResult = true
+        assertTrue(store(prefs).retireIfCurrent(choice))
+        assertEquals(3, prefs.commits); assertNull(store.load(f.config))
+        val newer = f.choice()
+        assertTrue(store.save(f.config, newer))
+        assertTrue(store.retireIfCurrent(choice)); assertEquals(newer, store.load(f.config))
+        assertFalse(store.retireIfCurrent(newer.copy(measurementId = "invalid")))
+        assertEquals(4, prefs.commits)
     }
 
     @Test fun readersDuringSaveSeeThePreviousAcceptedChoice() {

@@ -10,6 +10,10 @@ import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.TimeUnit
 import kr.co.hanium.dreamup.walksafe.device.AndroidFixedFixtureRuntimeSelector
 import kr.co.hanium.dreamup.walksafe.inference.*
+import kr.co.hanium.dreamup.walksafe.inference.composite.JointRuntimeTestFixtures
+import kr.co.hanium.dreamup.walksafe.inference.composite.ValidatedJointRuntimeChoice
+import kr.co.hanium.dreamup.walksafe.inference.composite.AndroidJointRuntimeLoader
+import kr.co.hanium.dreamup.walksafe.inference.composite.JointRuntimeReleaseFence
 import kr.co.hanium.dreamup.walksafe.inference.tracking.*
 import kr.co.hanium.dreamup.walksafe.runtime.vision.frame.*
 import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
@@ -293,8 +297,11 @@ class PrimaryDetectorLifecycleControllerTest {
         val f = Fixture(); f.install(f.nativeDetector()); f.lifecycle.closeAsync()
         assertEquals(listOf("release-loading", "aux-calibration", "close-aux"), f.events)
         assertTrue(f.execution.projection().closing); assertEquals(1, f.execution.projection().loadGeneration)
-        assertEquals(1, f.native.pending); f.native.next(); assertTrue(f.execution.projection().detector is NoopAndroidFrameDetector)
+        assertEquals(0, f.native.pending); assertEquals(1, f.tuning.pending)
+        f.tuning.next(); assertEquals(1, f.native.pending)
+        f.native.next(); assertTrue(f.execution.projection().detector is NoopAndroidFrameDetector)
         assertEquals("native-close", f.events.last())
+        assertTrue(f.execution.closedFuture().isDone)
     }
 
     @Test fun cancelledLoadImmediatelyClosesCurrentnessAndPreservesMetadataForRetry() {
@@ -530,6 +537,112 @@ class PrimaryDetectorLifecycleControllerTest {
         assertEquals(listOf(f.instance), f.closed)
     }
 
+    @Test fun explicitUnsavedChoiceAppliesOnceAndWaitsForVerificationBeforeOutputAdmission() {
+        val f = Fixture()
+        val choice = JointRuntimeTestFixtures.choice(JointRuntimeTestFixtures.candidate.copy(
+            primary = RuntimeCandidate(RuntimeBackend.GPU, 3), primaryIntervalMs = 400L))
+        f.observedCandidate = choice.candidate.primary; f.measuredIntervalMs = choice.candidate.primaryIntervalMs
+        f.sample = f.sample.copy(timing = f.sample.timing.copy(modelRuntime = AndroidDetectorRuntime("gpu", "gpu", 3)))
+        f.measuredWork = { config, selected, current ->
+            assertSame(f.config, config); assertSame(choice, selected); assertTrue(current())
+            AndroidDetectorLoadResult(f.instance, true, true, "unified_walksafe", false, "DeviceCheckJointRuntimeChoice")
+        }
+        f.lifecycle.finishCompositeCheck(reload = true, choiceOverride = choice)
+        f.lifecycle.finishCompositeCheck(reload = true, choiceOverride = choice)
+        assertEquals(1, f.tuning.pending)
+        f.tuning.next(); assertFalse(f.events.any { it.startsWith("select:") || it == "default" })
+        f.native.next(); f.ui.next()
+        assertEquals(choice.candidate.primary, f.calibration.projection().activeCandidate)
+        assertEquals(400L, f.execution.pacingSnapshot().targetIntervalMs)
+        assertEquals(RunningDetectorVerificationState.PENDING, f.lifecycle.verificationState(f.instance))
+        assertFalse(f.lifecycle.verifiedForOutput())
+        f.native.next(); f.ui.next(); assertTrue(f.lifecycle.verifiedForOutput())
+        f.lifecycle.finishCompositeCheck(reload = true, choiceOverride = choice)
+        assertEquals(0, f.tuning.pending); assertEquals(0, f.native.pending)
+        assertEquals(1, f.events.count { it == "prepare-measured" })
+    }
+
+    @Test fun explicitChoiceWithoutItsConfigCannotFallBackToDefaultOrStoredSelection() {
+        val f = Fixture(); f.config = null
+        f.lifecycle.finishCompositeCheck(reload = true, choiceOverride = JointRuntimeTestFixtures.choice())
+        f.tuning.next(); f.native.next(); f.ui.next()
+        assertFalse(f.events.any { it.startsWith("select:") || it == "default" || it == "prepare-measured" })
+        assertFalse(f.execution.projection().available); assertFalse(f.lifecycle.verifiedForOutput())
+        assertFalse(f.lifecycle.metadata().configLoaded)
+    }
+
+    @Test fun cancelledMemoryChoiceCannotAdoptItsLateAllocationOrStartAnotherSelection() {
+        val f = Fixture(); val choice = JointRuntimeTestFixtures.choice()
+        f.measuredWork = { _, selected, _ ->
+            assertSame(choice, selected); f.lifecycle.cancelPendingLoad()
+            AndroidDetectorLoadResult(f.instance, true, true, "unified_walksafe", false, "DeviceCheckJointRuntimeChoice")
+        }
+        f.lifecycle.finishCompositeCheck(reload = true, choiceOverride = choice)
+        f.tuning.next(); f.native.next()
+        assertEquals(listOf(f.instance), f.closed)
+        assertSame(f.original, f.execution.projection().detector)
+        assertFalse(f.lifecycle.verifiedForOutput()); assertFalse(f.lifecycle.metadata().configLoaded)
+        assertEquals(0, f.ui.pending); assertEquals(0, f.tuning.pending)
+        assertFalse(f.events.any { it.startsWith("select:") || it == "default" })
+    }
+
+    @Test fun cancelledAllocationWithFailedCloseStillBlocksTheLaterNativeDrainBarrier() {
+        val f = Fixture(); val choice = JointRuntimeTestFixtures.choice(); val drained = mutableListOf<Boolean>()
+        val fence = JointRuntimeReleaseFence()
+        f.measuredWork = { _, selected, current ->
+            AndroidJointRuntimeLoader.prepare(JointRuntimeTestFixtures.config, selected, current,
+                selected.bindingHash, 8, true,
+                create = { _, _ ->
+                    f.lifecycle.cancelPendingLoad()
+                    AndroidDetectorLoadResult(f.instance, true, true, "unified_walksafe", false, "late allocation")
+                }, sample = { error("Cancelled allocation must not be sampled") },
+                close = { f.closed += it; throw IllegalStateException("late native close") }, fence = fence).load
+        }
+        f.lifecycle.finishCompositeCheck(reload = true, choiceOverride = choice)
+        f.tuning.next()
+        assertTrue(f.execution.projection().closing)
+        assertEquals(listOf(f.instance), f.closed)
+        assertNull(f.lifecycle.metadata().loadReason) // The retired request cannot replace current metadata.
+        assertTrue(runCatching { fence.ensureConfirmed() }.exceptionOrNull() is DetectorNativeCleanupFailure)
+        f.lifecycle.cancelPendingLoadAfterDrain { drained += it }
+        f.tuning.next(); f.native.next(); f.ui.next()
+        assertEquals(listOf(false), drained)
+        f.lifecycle.allowLoadRetryIfUnavailable(); f.lifecycle.loadForCurrentProcess()
+        assertEquals(0, f.tuning.pending); assertEquals(0, f.native.pending)
+        f.lifecycle.closeAsync(); f.tuning.next(); f.native.next()
+        assertTrue(f.execution.closedFuture().isCompletedExceptionally)
+    }
+
+    @Test fun destroyWaitsForAcceptedCreationAndLateRetiredCloseBeforeTerminalAcknowledgement() {
+        val f = Fixture(); f.lifecycle.loadForCurrentProcess()
+        f.destroyed = true; f.execution.fenceForClose(); f.lifecycle.closeAsync()
+        assertEquals(2, f.tuning.pending)
+        assertFalse(f.execution.closedFuture().isDone)
+        f.tuning.next() // Already accepted creation returns only after destruction.
+        assertEquals(1, f.native.pending); assertFalse(f.execution.closedFuture().isDone)
+        f.tuning.next() // Queue terminal close after that creation's native adoption/retirement.
+        assertEquals(2, f.native.pending)
+        f.native.next()
+        assertEquals(listOf(f.instance), f.closed); assertFalse(f.execution.closedFuture().isDone)
+        f.native.next()
+        assertTrue(f.execution.closedFuture().isDone)
+        assertFalse(f.execution.closedFuture().isCompletedExceptionally)
+        assertEquals(0, f.ui.pending); assertFalse(f.lifecycle.verifiedForOutput())
+    }
+
+    @Test fun failedRetiredCloseAfterDestroyCannotBeOverwrittenBySuccessfulTerminalNoopClose() {
+        val f = Fixture(); f.lifecycle.loadForCurrentProcess(); f.tuning.next()
+        val failure = IllegalStateException("retired native close")
+        f.closeFailure = failure; f.destroyed = true; f.lifecycle.closeAsync(); f.tuning.next()
+        assertSame(failure, runCatching { f.native.next() }.exceptionOrNull())
+        assertFalse(f.execution.closedFuture().isDone)
+        f.native.next()
+        assertTrue(f.execution.closedFuture().isCompletedExceptionally)
+        assertSame(failure, runCatching { f.execution.closedFuture().join() }.exceptionOrNull()!!.cause)
+        assertEquals(listOf(f.instance), f.closed)
+        assertEquals(0, f.ui.pending); assertEquals(0, f.tuning.pending)
+    }
+
     private class Lane : AbstractExecutorService() {
         val tasks = ArrayDeque<Runnable>(); var reject = false; var closed = false
         val pending get() = tasks.size
@@ -567,6 +680,7 @@ class PrimaryDetectorLifecycleControllerTest {
         var loadFailure: Throwable? = null; var logFailure: Throwable? = null
         var progress: ((String) -> Unit)? = null; var selectorCurrent: (() -> Boolean)? = null
         var selectWork: ((() -> Boolean) -> AndroidDetectorLoadResult)? = null
+        var measuredWork: ((TwoModelRuntimeConfig, ValidatedJointRuntimeChoice, () -> Boolean) -> AndroidDetectorLoadResult)? = null
         val closed = mutableListOf<TfliteAndroidFrameDetector>(); val statuses = mutableListOf<Pair<String, String>>()
         val timers = mutableListOf<Pair<Runnable, Long>>()
         var sample = AndroidDetectionResult(emptyList(), AndroidDetectorTiming(modelRuntime = AndroidDetectorRuntime("gpu", "gpu", 2)))
@@ -588,6 +702,12 @@ class PrimaryDetectorLifecycleControllerTest {
                 override fun loadDefault(): AndroidDetectorLoadResult { events += "default"; return load() }
                 override fun select(config: TwoModelRuntimeConfig, allowComparison: Boolean, current: () -> Boolean, progress: (String) -> Unit): AndroidDetectorLoadResult {
                     events += "select:$allowComparison"; selectorCurrent = current; this@Fixture.progress = progress; return selectWork?.invoke(current) ?: load()
+                }
+                override fun prepareMeasuredChoice(config: TwoModelRuntimeConfig, choice: ValidatedJointRuntimeChoice,
+                    current: () -> Boolean): AndroidDetectorLoadResult {
+                    events += "prepare-measured"
+                    val work = requireNotNull(measuredWork) { "Unexpected measured preparation" }
+                    return work(config, choice, current)
                 }
                 override fun logPreparationFailure(error: Throwable) { events += "log:${error.javaClass.simpleName}"; logFailure?.let { throw it } }
                 override fun close(detector: TfliteAndroidFrameDetector) { events += "close"; closed += detector; closeHook?.invoke(); closeFailure?.let { throw it } }

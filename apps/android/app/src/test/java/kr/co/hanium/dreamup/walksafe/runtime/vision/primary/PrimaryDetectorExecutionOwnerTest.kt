@@ -19,8 +19,9 @@ import org.junit.Test
 class PrimaryDetectorExecutionOwnerTest {
     @Test fun defaultNativeExecutorRunsDeadlineWorkOneStepAboveNormalAndStillDrainsOnClose() {
         val caller = Thread.currentThread()
+        val tuning = Lane()
         val owner = PrimaryDetectorExecutionOwner(
-            stateLock = Any(), tuningExecutor = Lane(),
+            stateLock = Any(), tuningExecutor = tuning,
             elapsedRealtimeMs = { error("priority observation must not read the clock") },
             nativeScheduler = Scheduler(), rejectBlockedWork = { false },
             auxiliaryCopyInFlight = { false }, onDueButInFlightDrop = {},
@@ -37,6 +38,7 @@ class PrimaryDetectorExecutionOwnerTest {
             assertEquals(Thread.NORM_PRIORITY + 1, priority)
         } finally {
             owner.closeAfterCalibrationDrains()
+            tuning.runNext()
             val terminated = lane.awaitTermination(5, TimeUnit.SECONDS)
             if (!terminated) lane.shutdownNow()
             assertTrue("Default native executor must drain queued close", terminated)
@@ -125,6 +127,10 @@ class PrimaryDetectorExecutionOwnerTest {
         assertTrue(f.owner.projection().closing); assertFalse(f.owner.projection().available)
         assertNull(f.owner.retireLoadedForReloadOnNativeLane(f.owner.beginLoad(), { true }) { error("no release retry") })
         assertFalse(f.owner.adoptLoadedOnNativeLane(f.owner.beginLoad(), PrimaryLoadedDetector(Detector(), true)) { false })
+        assertEquals(1, previous.closes)
+        f.owner.closeAfterCalibrationDrains(); f.tuning.runNext(); f.lane.runNext()
+        assertTrue(f.owner.closedFuture().isCompletedExceptionally)
+        assertSame(failure, runCatching { f.owner.closedFuture().join() }.exceptionOrNull()!!.cause)
         assertEquals(1, previous.closes)
     }
     @Test fun terminalCloseDuringReloadReleaseIsNeverReopenedByTheReleaseAcknowledgement() {
@@ -280,14 +286,19 @@ class PrimaryDetectorExecutionOwnerTest {
         f.lane.execute { f.events += "invoke" }
         f.owner.closeAfterCalibrationDrains()
         assertEquals(0, detector.closes)
-        assertTrue(f.lane.isShutdown)
+        assertFalse(f.lane.isShutdown)
         assertTrue(f.tuning.isShutdown)
         f.lane.runNext()
         assertEquals(listOf("invoke"), f.events)
         assertEquals(0, detector.closes)
+        assertFalse(f.owner.closedFuture().isDone)
+        f.tuning.runNext()
+        assertTrue(f.lane.isShutdown)
         f.lane.runNext()
         assertEquals(1, detector.closes)
         assertTrue(f.owner.observe().detector is NoopAndroidFrameDetector)
+        assertTrue(f.owner.closedFuture().isDone)
+        assertFalse(f.owner.closedFuture().isCompletedExceptionally)
     }
 
     @Test fun rejectedTeardownDoesNotFallBackToInlineNativeClose() {
@@ -296,9 +307,77 @@ class PrimaryDetectorExecutionOwnerTest {
         f.owner.adoptLoadedOnNativeLane(f.owner.beginLoad(), PrimaryLoadedDetector(detector, true)) { false }
         f.lane.reject = true
         f.owner.closeAfterCalibrationDrains()
+        f.tuning.runNext()
         assertEquals(0, detector.closes)
         assertSame(detector, f.owner.observe().detector)
         assertTrue(f.owner.observe().closing)
+        assertTrue(f.owner.closedFuture().isCompletedExceptionally)
+    }
+
+    @Test fun terminalShutdownWaitsForLateNativeCleanupQueuedByAcceptedCreation() {
+        val f = Fixture(); val late = Detector(); val order = mutableListOf<String>()
+        f.tuning.execute {
+            order += "creation completed"
+            f.owner.nativeLane.execute { late.close(); order += "late allocation closed" }
+        }
+        f.owner.closeAfterCalibrationDrains()
+        assertFalse(f.lane.isShutdown); assertFalse(f.owner.closedFuture().isDone)
+        f.tuning.runNext()
+        assertEquals(1, f.lane.queue.size); assertFalse(f.owner.closedFuture().isDone)
+        f.tuning.runNext()
+        assertTrue(f.lane.isShutdown); assertEquals(2, f.lane.queue.size)
+        assertTrue(runCatching { f.owner.nativeLane.execute { error("Late work was accepted") } }.exceptionOrNull() is RejectedExecutionException)
+        f.lane.runNext()
+        assertEquals(listOf("creation completed", "late allocation closed"), order)
+        assertEquals(1, late.closes); assertFalse(f.owner.closedFuture().isDone)
+        f.lane.runNext()
+        assertEquals(Unit, f.owner.closedFuture().getNow(null))
+    }
+
+    @Test fun repeatedShutdownKeepsOneFutureAndOneTerminalClose() {
+        val f = Fixture(); val detector = Detector()
+        f.owner.adoptLoadedOnNativeLane(f.owner.beginLoad(), PrimaryLoadedDetector(detector, true)) { false }
+        val future = f.owner.closedFuture()
+        assertFalse(future.isDone)
+        f.owner.closeAfterCalibrationDrains(); f.owner.closeAfterCalibrationDrains()
+        assertSame(future, f.owner.closedFuture()); assertEquals(1, f.tuning.queue.size)
+        f.tuning.runNext(); assertEquals(1, f.lane.queue.size)
+        f.owner.closeAfterCalibrationDrains(); f.lane.runNext()
+        assertEquals(1, detector.closes); assertEquals(Unit, future.getNow(null))
+        assertTrue(f.tuning.queue.isEmpty()); assertTrue(f.lane.queue.isEmpty())
+    }
+
+    @Test fun terminalNativeCloseFailureIsExceptionalAndRetainsTheFailedOwner() {
+        val f = Fixture(); val failure = IllegalStateException("native close")
+        val detector = Detector().also { it.closeFailure = failure }
+        f.owner.adoptLoadedOnNativeLane(f.owner.beginLoad(), PrimaryLoadedDetector(detector, true)) { false }
+        f.owner.closeAfterCalibrationDrains(); f.tuning.runNext(); f.lane.runNext()
+        assertTrue(f.owner.closedFuture().isCompletedExceptionally)
+        assertSame(failure, runCatching { f.owner.closedFuture().join() }.exceptionOrNull()!!.cause)
+        assertSame(detector, f.owner.projection().detector)
+        assertTrue(f.owner.projection().closing); assertFalse(f.owner.projection().available)
+        f.owner.closeAfterCalibrationDrains(); assertEquals(1, detector.closes)
+    }
+
+    @Test fun rejectedTuningBarrierCannotAcknowledgeOrCloseInline() {
+        val f = Fixture(); val detector = Detector()
+        f.owner.adoptLoadedOnNativeLane(f.owner.beginLoad(), PrimaryLoadedDetector(detector, true)) { false }
+        f.tuning.reject = true
+        f.owner.closeAfterCalibrationDrains()
+        assertTrue(f.owner.closedFuture().isCompletedExceptionally)
+        assertEquals(0, detector.closes); assertTrue(f.lane.queue.isEmpty())
+        assertFalse(f.lane.isShutdown)
+    }
+
+    @Test fun earlierUnconfirmedCloseCannotBecomeSuccessAfterALaterNoThrowClose() {
+        val f = Fixture(); val failure = IllegalStateException("first release")
+        val detector = Detector().also { it.closeFailure = failure }
+        f.owner.adoptLoadedOnNativeLane(f.owner.beginLoad(), PrimaryLoadedDetector(detector, true)) { false }
+        assertSame(failure, runCatching { f.owner.disableFailedIfCurrent({ true }, {}, {}) }.exceptionOrNull())
+        detector.closeFailure = null
+        f.owner.closeAfterCalibrationDrains(); f.tuning.runNext(); f.lane.runNext()
+        assertTrue(f.owner.closedFuture().isCompletedExceptionally)
+        assertSame(failure, runCatching { f.owner.closedFuture().join() }.exceptionOrNull()!!.cause)
     }
 
     @Test fun originalUiMetadataCommitPrecedesAvailabilityWithoutANewFrameTransaction() {

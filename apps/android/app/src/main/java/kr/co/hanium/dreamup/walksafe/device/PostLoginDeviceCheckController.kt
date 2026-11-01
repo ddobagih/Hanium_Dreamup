@@ -326,10 +326,17 @@ internal class PostLoginDeviceCheckController(
         val speechRecognitionAvailable = hardware.speechRecognitionOverride ?: startup.onDeviceSpeechRecognitionAvailable
         val koreanTextToSpeechAvailable = hardware.koreanSpeechOverride ?: startup.offlineKoreanTextToSpeechAvailable
         val coreSignals = listOf(startup.cameraAvailable, startup.gpsAvailable, startup.microphoneAvailable)
-        val detectorUnavailable = detector.loadAttempted && !detector.loadInFlight && (!detector.configLoaded || !detector.available)
-        val cameraPipeline = if (startup.cameraAvailable == false || !hardware.cameraPermission || detectorUnavailable) {
-            PostLoginDeviceCheckSignal.UNAVAILABLE
-        } else probeSignals.cameraPipeline
+        // The sample check temporarily retires the production detector. Its result is delivered
+        // on a queued callback; another readiness callback must not convert that gap to LIMITED.
+        val compositeActive = probeSignals.compositeRuntimeActive
+        val detectorUnavailable = !compositeActive && detector.loadAttempted && !detector.loadInFlight &&
+            (!detector.configLoaded || !detector.available)
+        val cameraPipeline = when {
+            compositeActive -> PostLoginDeviceCheckSignal.PENDING
+            startup.cameraAvailable == false || !hardware.cameraPermission || detectorUnavailable ->
+                PostLoginDeviceCheckSignal.UNAVAILABLE
+            else -> probeSignals.cameraPipeline
+        }
         val metricDepth = when {
             !hardware.cameraPermission || startup.cameraAvailable == false -> PostLoginMetricDepthState.UNKNOWN
             startup.metricDistanceAvailable == false -> PostLoginMetricDepthState.EXPLICITLY_UNSUPPORTED
@@ -362,6 +369,7 @@ internal class PostLoginDeviceCheckController(
                 WalkSessionReadinessStatus.UNAVAILABLE -> PostLoginDeviceCheckSignal.UNAVAILABLE
             },
             detector = when {
+                compositeActive -> PostLoginDeviceCheckSignal.PENDING
                 !detector.loadAttempted || detector.loadInFlight -> PostLoginDeviceCheckSignal.PENDING
                 detector.configLoaded && detector.available -> detector.readiness
                 else -> PostLoginDeviceCheckSignal.UNAVAILABLE

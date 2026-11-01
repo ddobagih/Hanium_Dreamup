@@ -2,6 +2,7 @@ package kr.co.hanium.dreamup.walksafe.runtime.vision.primary
 
 import java.io.Closeable
 import java.util.concurrent.Executor
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
@@ -63,6 +64,9 @@ internal class PrimaryDetectorExecutionOwner(
     @Volatile private var loadGeneration = 0L
     private var closing = false
     private var reloadReleasePending: AndroidFrameDetector? = null
+    private var shutdownStarted = false
+    private var releaseFailure: Throwable? = null
+    private val shutdownRelease = CompletableFuture<Unit>()
     @Volatile private var available = false
     private val workInFlight = AtomicBoolean(false)
     private val pacing = AdaptiveInferencePacingPolicy(sourceAgeMs)
@@ -77,6 +81,16 @@ internal class PrimaryDetectorExecutionOwner(
 
     val nativeLane: Executor get() = detectorExecutor
     val tuningLane: Executor get() = tuningExecutor
+
+    /** No timer/unbind/rejected callback is a release receipt; this future follows both lanes. */
+    fun closedFuture(): CompletableFuture<Unit> = shutdownRelease
+
+    fun recordReleaseFailure(error: Throwable) = synchronized(stateLock) {
+        if (releaseFailure == null) releaseFailure = error
+        else if (releaseFailure !== error) releaseFailure?.addSuppressed(error)
+        closing = true
+        available = false
+    }
 
     fun beginLoad(): PrimaryDetectorLoadClaim = synchronized(stateLock) { PrimaryDetectorLoadClaim(loadGeneration) }
 
@@ -98,7 +112,8 @@ internal class PrimaryDetectorExecutionOwner(
         }
         // Native destruction can be slow; never hold the UI/frame lock across it. A failed
         // release retains its owner and fence, without authorizing an automatic retry.
-        close(release.first)
+        try { close(release.first) }
+        catch (error: Throwable) { recordReleaseFailure(error); throw error }
         return synchronized(stateLock) {
             reloadReleasePending = null
             if (loadGeneration != release.second.generation) return@synchronized null
@@ -245,7 +260,8 @@ internal class PrimaryDetectorExecutionOwner(
     fun disableFailedIfCurrent(isCurrent: () -> Boolean, resetVisualState: () -> Unit,
         afterUnavailable: () -> Unit): Int? = synchronized(stateLock) {
         if (!isCurrent()) return@synchronized null
-        (detector as? Closeable)?.close()
+        try { (detector as? Closeable)?.close() }
+        catch (error: Throwable) { recordReleaseFailure(error); throw error }
         detector = NoopAndroidFrameDetector()
         frameGeneration += 1
         resetVisualState()
@@ -277,15 +293,42 @@ internal class PrimaryDetectorExecutionOwner(
         true
     }
 
-    /** Enqueue-only: never close on the caller if the native executor already owns teardown. */
+    /** Enqueue-only: finish accepted creation before closing the native admission lane. */
     fun closeAfterCalibrationDrains() {
-        fenceForClose()
-        val detachAndClose = Runnable {
-            val owned = synchronized(stateLock) { detector.also { detector = NoopAndroidFrameDetector() } }
-            (owned as? Closeable)?.close()
+        synchronized(stateLock) {
+            if (shutdownStarted) return
+            shutdownStarted = true
+            fenceForClose()
         }
-        try { detectorExecutor.execute(detachAndClose) } catch (_: RejectedExecutionException) { }
-        detectorExecutor.shutdown()
-        tuningExecutor.shutdown()
+        val detachAndClose = Runnable {
+            val owned = synchronized(stateLock) { detector }
+            try {
+                (owned as? Closeable)?.close()
+                val failure = synchronized(stateLock) {
+                    if (detector === owned) detector = NoopAndroidFrameDetector()
+                    available = false
+                    if (reloadReleasePending != null && releaseFailure == null)
+                        releaseFailure = IllegalStateException("Previous detector release remains unconfirmed")
+                    releaseFailure
+                }
+                if (failure == null) shutdownRelease.complete(Unit)
+                else shutdownRelease.completeExceptionally(failure)
+            } catch (error: Throwable) {
+                recordReleaseFailure(error)
+                shutdownRelease.completeExceptionally(error)
+            }
+        }
+        try {
+            tuningExecutor.execute {
+                try { detectorExecutor.execute(detachAndClose) }
+                catch (error: RejectedExecutionException) {
+                    recordReleaseFailure(error)
+                    shutdownRelease.completeExceptionally(error)
+                } finally { detectorExecutor.shutdown() }
+            }
+        } catch (error: RejectedExecutionException) {
+            recordReleaseFailure(error)
+            shutdownRelease.completeExceptionally(error)
+        } finally { tuningExecutor.shutdown() }
     }
 }

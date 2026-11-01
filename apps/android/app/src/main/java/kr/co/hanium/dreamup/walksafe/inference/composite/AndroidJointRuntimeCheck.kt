@@ -77,20 +77,30 @@ class AndroidJointRuntimeCheck(
 
     fun start(): Boolean {
         if (deadlineMs - now() !in 1L..300_000L || !isCurrent() || cancelled.get() ||
-            !started.compareAndSet(false, true) || !FixtureRuntimeSupervisor.acquire(owner)) return false
+            !started.compareAndSet(false, true)) {
+            if (!started.get()) closeExecutors()
+            return false
+        }
         running = true
-        watch = watchdog.schedule({
+        val launch = FixtureRuntimeStartup.launch(owner, schedule = {
+            watch = watchdog.schedule({
+                cancelled.set(true)
+                remote?.cancel()
+                report(null, "fixture_total_deadline", completion.releaseConfirmed)
+            }, (deadlineMs - now()).coerceAtLeast(0L), TimeUnit.MILLISECONDS)
+        }, execute = { worker.execute(::run) }, abort = ::closeExecutors)
+        if (!launch.admitted) { running = false; closeExecutors(); return false }
+        if (launch.failure != null) {
             cancelled.set(true)
-            remote?.cancel()
-            report(null, "fixture_total_deadline", completion.releaseConfirmed)
-        }, (deadlineMs - now()).coerceAtLeast(0L), TimeUnit.MILLISECONDS)
-        worker.execute(::run)
+            report(null, "fixture_check_launch_failed", true)
+        }
         return true
     }
 
     fun cancel(reason: String) {
         this.reason = reason
         cancelled.set(true)
+        if (!started.get()) { closeExecutors(); running = false; draining = false; return }
         draining = running
         remote?.cancel()
     }
@@ -105,9 +115,7 @@ class AndroidJointRuntimeCheck(
             for (candidate in candidates(processors)) {
                 if (!current() || workDeadlineMs - now() < 35_000L) break
                 val trialToken = Any()
-                if (!completion.acquireResource(trialToken)) break
                 emit("내장 시험 자료로 두 인식 모델의 실행 조합을 점검하고 있습니다.")
-                released = false
                 lateinit var client: RemoteFixtureRuntime
                 client = RemoteFixtureRuntime(app, candidate, binding, workDeadlineMs, ::current, progress = { stage ->
                     Log.i(TAG, "candidate=$candidate stage=$stage")
@@ -118,12 +126,20 @@ class AndroidJointRuntimeCheck(
                         else -> "인식 모델의 실행 환경을 준비하고 있습니다."
                     })
                 }, onReleased = { acknowledgeRelease(trialToken) })
+                // Construction has no binding/native side effects. Mark ownership only when the
+                // client is ready to run, so constructor failures cannot strand an empty trial.
+                if (!completion.acquireResource(trialToken)) break
+                released = false
                 remote = client
                 val outcome = client.run()
                 released = outcome.releaseConfirmed
                 if (released) { acknowledgeRelease(trialToken); remote = null }
-                Log.i(TAG, "candidate=$candidate released=$released reason=${outcome.reason}")
+                Log.i(TAG, "candidate=$candidate released=$released proof=${outcome.releaseProof} reason=${outcome.reason}")
                 if (!released) { finalReason = "fixture_worker_death_unconfirmed"; break }
+                if (outcome.releaseProof == FixtureRuntimeReleaseProof.NO_NATIVE_START) {
+                    finalReason = "fixture_worker_start_failed:${outcome.reason}".take(160)
+                    break // Connection failure is not evidence against this candidate's performance.
+                }
                 val evidence = outcome.evidence
                 val choice = evidence?.let { JointRuntimeChoicePolicy.evaluate(binding, candidate, it, processors) }
                 if (choice != null) choices += choice
@@ -172,9 +188,14 @@ class AndroidJointRuntimeCheck(
         if (completion.acknowledgeRelease(trialToken)) {
             running = false; draining = false
             FixtureRuntimeSupervisor.release(owner, true)
-            Log.i(TAG, "late_fixture_worker_death_confirmed")
+            Log.i(TAG, "late_fixture_runtime_release_confirmed")
             main.post { onReleaseConfirmed() }
         }
+    }
+    private fun closeExecutors() {
+        watch?.cancel(false)
+        watchdog.shutdown()
+        worker.shutdown()
     }
     private fun emit(value: String) = main.post { if (current()) onProgress(value) }
     private fun current() = !cancelled.get() && isCurrent() && now() < deadlineMs && FixtureRuntimeSupervisor.owns(owner)

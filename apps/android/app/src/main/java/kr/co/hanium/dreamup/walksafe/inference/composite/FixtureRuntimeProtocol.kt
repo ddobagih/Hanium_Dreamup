@@ -55,7 +55,7 @@ internal enum class FixtureRuntimeStage(val token: String, val budgetMs: Long) {
     companion object { fun parse(value: String?) = entries.firstOrNull { it.token == value } }
 }
 
-/** Process-wide ownership survives Activity/check replacement and is released only after death ACK. */
+/** Process-wide native ownership; release needs revoked pre-START authority or confirmed cleanup/death. */
 internal object FixtureRuntimeSupervisor {
     private var owner: Any? = null
     @Synchronized fun acquire(value: Any): Boolean = if (owner == null) { owner = value; true } else false

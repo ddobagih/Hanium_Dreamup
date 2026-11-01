@@ -17,3 +17,5 @@
 `composite/`는 내장 테스트 이미지4장으로 기본 객체 인식과 FastSAM의 CPU/GPU·처리 간격 조합을 측정합니다. 사용자 카메라나 ARCore 세션을 만들지 않습니다. native 준비가 반환하지 않는 경우를 앱 본체에서 분리하기 위해 별도 `:fixture_runtime` Service를 사용하며, 새 후보는 이전 worker의 실제 종료 확인 후 시작합니다.
 
 `JointFixtureRuntimeEvidence`는 샘플 RGB 제출부터 전처리·추론·후처리까지의 관측이며 카메라·거리·UI 실측 증거가 아닙니다. 선택 기록은 schema2의 `SAMPLE_IMAGES_TWO_MODEL`로 저장합니다. `AndroidJointRuntimeLoader`는 선택된 실제 실행값과 예제 추론을 확인하고, native 정리 실패가 예외 또는 결과 reason으로 반환되면 초기 CPU 준비도 함께 차단합니다. 실제 카메라·보행의 source/geometry/fresh depth gate는 각 runtime 소유자에 남습니다.
+
+선택은 `prepare`로 메모리에서 실제 적용·검증한 뒤 저장합니다. `restore`는 이전에 저장된 선택의 복원만 담당합니다. 시작 전 연결 실패는 START 전송 허가를 취소하고 재시도할 수 있도록 정리하며, START 허가 후에는 실제 worker death 확인 없이 자원을 반환하지 않습니다. 실패·취소된 저장의 정리는 해당 측정의 기록에만 적용합니다. 전체 실패·취소·종료 순서와 앱 본체 GPU 작업의 회수 한계는 [Android 코드 지도](../../../../../../../../../../../../docs/guides/code/android-user.md)의 점검 절을 참고합니다.

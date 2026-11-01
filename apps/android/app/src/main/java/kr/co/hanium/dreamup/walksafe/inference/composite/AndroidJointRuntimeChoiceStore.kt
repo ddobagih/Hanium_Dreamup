@@ -89,6 +89,16 @@ class AndroidJointRuntimeChoiceStore internal constructor(
         }
     }
 
+    /** Cleanup succeeds when this measurement is already obsolete, or its removal was committed. */
+    fun retireIfCurrent(choice: ValidatedJointRuntimeChoice): Boolean {
+        if (isMainThread()) return false
+        return synchronized(state) {
+            val expected = JointRuntimeChoiceCodec.encode(choice) ?: return false
+            if (read() != expected) return true
+            invalidate()
+        }
+    }
+
     private fun read(): String? {
         if (!state.loaded) {
             state.text = runCatching { preferences.getString(RECORD_KEY, null) }.getOrNull()
