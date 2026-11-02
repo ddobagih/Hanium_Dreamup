@@ -4564,8 +4564,46 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
         } else primaryDetectorLifecycleController.cancelPendingLoadAfterDrain { drained ->
             if (!drained) { failed("old_primary_drain_unconfirmed"); return@cancelPendingLoadAfterDrain }
             primaryDetectorLifecycleController.releaseForCompositeCheck({ runtimeLeasePreparation === preparation }) { released ->
-                if (released) auxiliaryAfterPrimary() else failed("old_primary_release_unconfirmed")
+                if (released) auxiliaryAfterPrimary() else {
+                    // The cancelled creation queue has drained. Keep failure publication separate
+                    // from the late, captured physical cleanup that can unblock a fresh user retry.
+                    if (primaryDetectorOwner.projection().closing) {
+                        val captured = oldOwner?.let { client?.retirementSnapshot(it) } ?: knownRetirement
+                        if (captured != null) observeFailedRuntimeLeaseCleanup(preparation, captured,
+                            hostDrained, oldRuntime?.consumerDrained, oldRegistryReleased)
+                    }
+                    failed("old_primary_release_unconfirmed")
+                }
             }
+        }
+    }
+
+    /** Finishes only the failed claim; a later explicit attempt must obtain its own authority. */
+    private fun observeFailedRuntimeLeaseCleanup(preparation: RuntimeLeasePreparation,
+        captured: kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRetirementSnapshot,
+        hostDrained: CompletableFuture<Unit>, consumerDrained: CompletableFuture<Unit>?,
+        consumerReleased: java.util.concurrent.CompletionStage<*>?) {
+        pendingRuntimeRetirement = captured
+        // EXIT cannot depend on a proof whose completion itself requires the child to exit.
+        runCatching { RemoteVisionClient.forMainProcess(applicationContext)
+            .requestExit(captured.lease, "failed_device_check_lease_cleanup") }
+        val primary = if (isDestroyed || isFinishing) primaryDetectorOwner.closedFuture() else try {
+            primaryDetectorLifecycleController.quiesceForRuntimeError(captured)
+            primaryDetectorLifecycleController.quiescedReleaseConfirmed(captured)
+        } catch (error: Throwable) { CompletableFuture<Unit>().also { it.completeExceptionally(error) } }
+        val auxiliary = if (unknownServiceOwnerLazy.isInitialized()) unknownServiceOwner.releaseBeforePrimaryCalibrationAsync()
+            else CompletableFuture.completedFuture(true)
+        val settled = DeviceRuntimeLeaseFailureCleanup.afterRelease(primary, auxiliary,
+            captured.actualReleased, captured.allocationAvailable, hostDrained, consumerDrained, consumerReleased)
+        val budget = preparation.budget
+        observeRuntimeCompletion(settled, onOwnerGone = { error -> if (error == null) budget.complete() }) { error ->
+            if (error != null) return@observeRuntimeCompletion
+            if (runtimeLeasePreparation === preparation) {
+                primaryDetectorLifecycleController.finishCompositeCheck(reload = false)
+                runtimeLeasePreparation = null
+                // Keep pendingRuntimeRetirement for the new attempt's explicit quiesced resume.
+            }
+            budget.complete()
         }
     }
 
@@ -11349,20 +11387,45 @@ private fun observeWalkRuntimeResourceSafety(
         RemoteVisionClient.recheckPendingRelease()
     }
 
-    private fun startPostLoginDeviceCheckFromPrimaryAction() {
+    private var explicitDeviceCheckReadPending: Any? = null
+
+    /** A user action retries an initial read, without reviving an older actor's attempt. */
+    private fun withExplicitDeviceCheckAuthority(action: () -> Unit) {
         recheckPendingDeviceRuntimeCleanup()
+        if (!isActivityForeground || isDestroyed || isFinishing || explicitDeviceCheckReadPending != null) return
+        val session = postLoginDeviceCheckController.currentSessionBinding() ?: return
+        val snapshot = postLoginDeviceCheckSnapshot
+        val result = currentPostLoginDeviceCheckResultBinding(session.actorId) ?: return
+        val authorityBinding = deviceAuthorityBinding(result) ?: return
+        val token = Any()
+        explicitDeviceCheckReadPending = token
+        val stage = authorityDeviceCheckResults.prepareExplicitRetry(result)
+        // observeRuntimeCompletion keeps the action here, not in an indefinitely pending I/O future.
+        observeRuntimeCompletion(stage) { error ->
+            if (explicitDeviceCheckReadPending !== token) return@observeRuntimeCompletion
+            explicitDeviceCheckReadPending = null
+            if (error != null || !isActivityForeground || isDestroyed || isFinishing ||
+                postLoginDeviceCheckController.currentSessionBinding() != session ||
+                postLoginDeviceCheckSnapshot !== snapshot ||
+                currentPostLoginDeviceCheckResultBinding(session.actorId)?.let(::deviceAuthorityBinding) != authorityBinding)
+                return@observeRuntimeCompletion
+            if (authorityDeviceCheckResults.mayBeginAttempt()) action()
+            else updateStatus("기기 점검 대기", "저장된 점검 상태를 확인하지 못했습니다. 잠시 뒤 다시 시도해 주세요.")
+        }
+    }
+
+    private fun startPostLoginDeviceCheckFromPrimaryAction() = withExplicitDeviceCheckAuthority {
         postLoginDeviceCheckController.beginFromPrimaryAction()
     }
 
-    private fun handlePostLoginDeviceCheckPrimaryAction() {
-        recheckPendingDeviceRuntimeCleanup()
+    private fun handlePostLoginDeviceCheckPrimaryAction() = withExplicitDeviceCheckAuthority {
         postLoginDeviceCheckController.handlePrimaryAction(deferredCameraDependentChecksCanBeRetried())
     }
 
-    private fun beginPostLoginDeviceCheckFromUserAction(expectedSession: PostLoginDeviceCheckBinding) {
-        recheckPendingDeviceRuntimeCleanup()
-        postLoginDeviceCheckController.beginFromUserAction(expectedSession)
-    }
+    private fun beginPostLoginDeviceCheckFromUserAction(expectedSession: PostLoginDeviceCheckBinding) =
+        withExplicitDeviceCheckAuthority {
+            postLoginDeviceCheckController.beginFromUserAction(expectedSession)
+        }
 
     private fun completePostLoginDeviceCheckPermissionObservation(expectedBinding: PostLoginDeviceCheckBinding? = null) = postLoginDeviceCheckController.completePermissionObservation(expectedBinding)
 

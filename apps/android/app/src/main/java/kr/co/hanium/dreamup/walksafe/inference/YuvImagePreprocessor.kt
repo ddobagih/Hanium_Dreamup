@@ -213,10 +213,16 @@ data class LetterboxTransform(
 class YuvImagePreprocessor(private val bufferProvider: ((Int) -> ByteBuffer)? = null) {
     private val bilinearScratch = mutableMapOf<Int, FloatArray>()
 
+    /** Completes only the managed scratch allocation; input backing remains provider-owned. */
+    @Synchronized internal fun prepareBilinearScratch(modelSize: Int) {
+        bilinearScratch.getOrPut(modelSize) { FloatArray(modelSize * modelSize * 3) }
+    }
+
     /** Same uint8 bilinear resize and integer letterbox padding as the reference model. */
     @Synchronized fun preprocessBilinear(image: ArgbImage, modelSize: Int): PreprocessedImage {
         val buffer = reusableBuffer(modelSize)
-        val scratch = bilinearScratch.getOrPut(modelSize) { FloatArray(modelSize * modelSize * 3) }
+        prepareBilinearScratch(modelSize)
+        val scratch = requireNotNull(bilinearScratch[modelSize])
         RgbLetterboxPreprocessor.write(image.pixels, image.width, image.height, modelSize, buffer, scratch)
         val scale = min(modelSize.toDouble() / image.width, modelSize.toDouble() / image.height)
         val resizedWidth = Math.rint(image.width * scale).toInt().coerceAtLeast(1)

@@ -608,6 +608,42 @@ class PrimaryDetectorExecutionOwnerTest {
         assertEquals(Unit, f.owner.closedFuture().getNow(null))
     }
 
+    @Test fun failedOldCloseCanSettleLateWithoutAuthorizingAnAutomaticReplacement() {
+        for (destroy in listOf(false, true)) {
+            val f = Fixture()
+            val model = CompletableFuture<Unit>()
+            val native = CompletableFuture<VisionReleaseReceipt>()
+            val captured = retirement(native)
+            val detector = Detector().also { it.closeFailure = DetectorNativeCleanupFailure(
+                IllegalStateException("remote close still pending"), model) }
+            val loaded = PrimaryLoadedDetector(detector, true)
+            f.owner.retainPhysicalRelease(model, detector)
+            f.owner.adoptLoadedOnNativeLane(f.owner.beginLoad(), loaded) { false }
+            try {
+                f.owner.retireLoadedForReloadOnNativeLane(f.owner.beginLoad(), { true }) {
+                    (it as java.io.Closeable).close()
+                }
+                fail("Old close must publish failure before cleanup settles")
+            } catch (_: DetectorNativeCleanupFailure) { }
+            assertTrue(f.owner.projection().closing)
+            f.owner.quiesceForRuntimeError(captured)
+            val cleanup = f.owner.quiescedReleaseConfirmed(captured).toCompletableFuture()
+            f.tuning.runNext(); f.lane.runNext()
+            if (destroy) { f.owner.closeAfterCalibrationDrains(); f.tuning.runNext(); f.lane.runNext() }
+            native.complete(VisionReleaseReceipt(captured.lease.cohortId, 234))
+            assertFalse(cleanup.isDone) // Child death does not forgive a separate local receipt.
+            model.complete(Unit)
+            assertEquals(Unit, cleanup.getNow(null))
+            assertFalse(f.owner.consumeQuiescedRecheckAuthorization())
+            assertTrue(f.owner.projection().closing)
+            if (destroy) assertEquals(Unit, f.owner.closedFuture().getNow(null))
+            else {
+                assertTrue(f.owner.resumeQuiescedForRecheck { true })
+                assertTrue(f.owner.consumeQuiescedRecheckAuthorization())
+            }
+        }
+    }
+
     @Test fun runtimeQuiesceKeepsTheLanesButNeedsEveryReceiptAndAnExplicitRecheckGuard() {
         val f = Fixture(); val model = CompletableFuture<Unit>(); val native = CompletableFuture<VisionReleaseReceipt>()
         val snapshot = retirement(native); val detector = Detector(); val load = PrimaryLoadedDetector(detector, true)
@@ -615,6 +651,8 @@ class PrimaryDetectorExecutionOwnerTest {
         f.owner.adoptLoadedOnNativeLane(f.owner.beginLoad(), load) { false }
         f.owner.admitLoadedOnMain(f.owner.beginLoad(), load) { false }
         val drained = f.owner.quiesceForRuntimeError(snapshot)
+        val cleanup = f.owner.quiescedReleaseConfirmed(snapshot).toCompletableFuture()
+        assertFalse(cleanup.isDone)
         assertFalse(drained.toCompletableFuture().isDone); assertTrue(f.owner.projection().closing)
         f.tuning.runNext(); f.lane.runNext()
         assertEquals(Unit, drained.toCompletableFuture().getNow(null)); assertEquals(1, detector.closes)
@@ -624,6 +662,9 @@ class PrimaryDetectorExecutionOwnerTest {
         model.complete(Unit)
         assertFalse(f.owner.resumeQuiescedForRecheck { true })
         native.complete(VisionReleaseReceipt(snapshot.lease.cohortId, 234))
+        assertEquals(Unit, cleanup.getNow(null))
+        assertFalse(f.owner.consumeQuiescedRecheckAuthorization()) // Cleanup alone grants no resume.
+        assertTrue(f.owner.quiescedReleaseConfirmed(retirement(CompletableFuture())).toCompletableFuture().isCompletedExceptionally)
         assertFalse(f.owner.resumeQuiescedForRecheck { false })
         assertTrue(f.owner.resumeQuiescedForRecheck { assertFalse(Thread.holdsLock(f.lock)); true })
         assertTrue(f.owner.projection().closing)
@@ -641,8 +682,11 @@ class PrimaryDetectorExecutionOwnerTest {
         wrong.owner.retainPhysicalRelease(model, detector)
         wrong.owner.adoptLoadedOnNativeLane(wrong.owner.beginLoad(), load) { false }
         wrong.owner.admitLoadedOnMain(wrong.owner.beginLoad(), load) { false }
-        wrong.owner.quiesceForRuntimeError(retirement(native)); wrong.tuning.runNext(); wrong.lane.runNext()
+        val wrongSnapshot = retirement(native)
+        wrong.owner.quiesceForRuntimeError(wrongSnapshot); wrong.tuning.runNext(); wrong.lane.runNext()
+        val wrongCleanup = wrong.owner.quiescedReleaseConfirmed(wrongSnapshot).toCompletableFuture()
         model.complete(Unit); native.complete(VisionReleaseReceipt("different-cohort", 234))
+        assertTrue(wrongCleanup.isCompletedExceptionally)
         assertFalse(wrong.owner.resumeQuiescedForRecheck { true })
 
         val unknown = Fixture(); val failed = Detector().also { it.closeFailure = IllegalStateException("local native close unknown") }
@@ -650,6 +694,7 @@ class PrimaryDetectorExecutionOwnerTest {
         val actual = CompletableFuture<VisionReleaseReceipt>(); val captured = retirement(actual)
         unknown.owner.quiesceForRuntimeError(captured); unknown.tuning.runNext(); unknown.lane.runNext()
         actual.complete(VisionReleaseReceipt(captured.lease.cohortId, 234))
+        assertTrue(unknown.owner.quiescedReleaseConfirmed(captured).toCompletableFuture().isCompletedExceptionally)
         assertFalse(unknown.owner.resumeQuiescedForRecheck { true })
         assertFalse(unknown.owner.consumeQuiescedRecheckAuthorization())
         val retained = PrimaryDetectorExecutionOwner::class.java.getDeclaredField("reloadReleasePending").apply { isAccessible = true }

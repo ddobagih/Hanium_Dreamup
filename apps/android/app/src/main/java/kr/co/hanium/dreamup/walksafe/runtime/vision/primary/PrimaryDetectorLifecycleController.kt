@@ -110,6 +110,13 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
         return drained
     }
 
+    fun quiescedReleaseConfirmed(captured: VisionRetirementSnapshot): CompletionStage<Unit> {
+        if (synchronized(frameStateLock) { failedRetiredLoad != null }) return CompletableFuture<Unit>().also {
+            it.completeExceptionally(IllegalStateException("A retired load still owns local resources"))
+        }
+        return detector.quiescedReleaseConfirmed(captured)
+    }
+
     /** Guard must include a new AuthorityAttempt, an explicit recheck action and auxiliary drains. */
     fun resumeQuiescedForRecheck(currentGuard: () -> Boolean): Boolean =
         detector.resumeQuiescedForRecheck { !currentness.destroyed() && currentGuard() }

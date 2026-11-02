@@ -16,9 +16,14 @@ class PrimaryPreprocessorDrainTest {
         val requests = AtomicInteger()
         val processor = YuvImagePreprocessor { size -> assertEquals(2, size); requests.incrementAndGet(); backing.duplicate().order(ByteOrder.nativeOrder()) }
         val image = ArgbImage(2, 2, intArrayOf(-16777216, -1, -65536, -16711936))
+        processor.prepareBilinearScratch(2)
+        val scratch = cache(processor, "bilinearScratch")[2]
+        assertNotNull(scratch)
+        assertEquals(0, requests.get()); assertTrue(cache(processor, "reusableInputBuffers").isEmpty())
         val first = processor.preprocessBilinear(image, 2)
         val expected = floats(first.inputBuffer)
-        val scratch = cache(processor, "bilinearScratch")[2]
+        assertSame(scratch, cache(processor, "bilinearScratch")[2])
+        processor.prepareBilinearScratch(2)
         assertSame(first.inputBuffer, processor.preprocessBilinear(image, 2).inputBuffer)
         assertSame(scratch, cache(processor, "bilinearScratch")[2]); assertEquals(1, requests.get())
         processor.preprocessYuv420(2, 2, ByteBuffer.wrap(ByteArray(4) { 128.toByte() }),

@@ -292,3 +292,24 @@ internal class DeviceRuntimeCreationBoundary(private val noCreate: () -> Unit) {
         if (!entered) noCreate()
     }
 }
+
+/** Failed attempts may return their budget only after every captured cleanup proof succeeds. */
+internal object DeviceRuntimeLeaseFailureCleanup {
+    fun afterRelease(primary: java.util.concurrent.CompletionStage<Unit>,
+        auxiliary: java.util.concurrent.CompletionStage<Boolean>,
+        actualReleased: java.util.concurrent.CompletionStage<*>,
+        allocationAvailable: java.util.concurrent.CompletionStage<*>,
+        hostDrained: java.util.concurrent.CompletableFuture<Unit>,
+        consumerDrained: java.util.concurrent.CompletableFuture<Unit>?,
+        consumerReleased: java.util.concurrent.CompletionStage<*>?): java.util.concurrent.CompletableFuture<Unit> {
+        val auxiliaryProof = auxiliary.thenApply { check(it) { "Auxiliary release unconfirmed" }; Unit }
+        return java.util.concurrent.CompletableFuture.allOf(primary.toCompletableFuture(),
+            auxiliaryProof.toCompletableFuture()).thenCompose {
+            hostDrained.complete(Unit)
+            consumerDrained?.complete(Unit)
+            java.util.concurrent.CompletableFuture.allOf(actualReleased.toCompletableFuture(),
+                allocationAvailable.toCompletableFuture(),
+                consumerReleased?.toCompletableFuture() ?: java.util.concurrent.CompletableFuture.completedFuture(Unit))
+        }.thenApply { Unit }
+    }
+}

@@ -44,7 +44,7 @@ adb install -r apps/android/app/build/outputs/apk/debug/app-debug.apk
 - 잠정 성능 자료 뒤 CPU1 참조를 한 번 확보하고, `JointRuntimeCheckedSelection.Claim`이 참조와 이미지의 단독 소유권을 Main에 넘깁니다. 최종 후보는 실제 두 모델을 새로 준비해4장 raw/역할/mask를 엄격히 비교하고, 같은 PID·모델 ID로10초 이상 공동 관측한 뒤에만 `ValidatedJointRuntimeChoice`와 `JointRuntimeFinalQualification`을 발급합니다. 잠정 선택을 검증된 선택으로 위조하지 않습니다. 최종 후보가 실패하면 이번 시도는 실패합니다.
 - `JointRuntimeChoicePolicy` v3는 정확성·완료율·간격·800ms 유효시간에 더해 두 모델의 샘플 P95가600ms 이하여야 합니다. 200ms의 공학적 운영 여유이며 카메라·ARCore·화면 성능 보장은 아닙니다. REFERENCE10초·BENCHMARK2초·WARMUP15초와 호출자 절대 기한을 함께 적용하고, raw 반환 여부는 목적과 별도로 명시합니다.
 - 최종 두 실체는 기존 primary/auxiliary 소유자에 채택되어 유지됩니다. 정상 Main↔Camera 인계는 old consumer 배출 → PARK → 동일 모델 ID의 epoch+1 양도 → dormant wrapper 두 개 부착 → registry 채택 → native 확인·활성화 순서입니다. 왕복 시 Main의 host ID는 유지하되 opaque owner scope를 교체해 이전 producer의 재진입을 막습니다. 보행도 검증된 pair를 사용하며 보조 모델을 독립 생성하지 않습니다.
-- `ParentDirectBufferArena`와 `JointRuntimeMemoryLedger`는 backing을 재사용하고, 프레임·참조·이미지·mapping의 소유 한도를 검사합니다. managed heap에는 최소32MiB 또는25% 여유를 남기며 알려진 direct/shared buffer 상한을 따릅니다. GC나 null 대입을 실제 해제로 간주하지 않습니다. GPU 드라이버·native 전체 RAM을 이 원장이 측정한다고 표현하지 않습니다.
+- `ParentDirectBufferArena`와 `JointRuntimeMemoryLedger`는 backing을 재사용하고, 프레임·참조·이미지·mapping의 소유 한도를 검사합니다. managed heap에는 최소32MiB 또는25% 여유를 남기며 알려진 direct/shared buffer 상한을 따릅니다. 768 bilinear scratch는 최초 실제 할당 전 한 번 예약하고 할당 완료 즉시 pending에서 제외합니다. 후속 primary 프레임은 실제 신규128,000B만 예약하며 scratch 소유는 serial consumer 배출·캐시 정리 후 반환합니다. GC나 null 대입을 실제 해제로 간주하지 않습니다. GPU 드라이버·native 전체 RAM을 이 원장이 측정한다고 표현하지 않습니다.
 - 실제 영상에서는 기존 frame·geometry·거리 freshness gate와 측정한 cadence floor를 유지합니다. IPC·전처리·후처리·UI/Depth 지연에 따라 입력을 늦추고, primary 과부하 때 보조 admission을 보류합니다. 새로운 정상 primary 결과4회와 필요한 온도·부하 회복을 확인해야 재개합니다. CPU/GPU 사용률을 예약하거나 고정했다고 표시하지 않습니다.
 
 ### 저장·취소·복구 계약
@@ -52,6 +52,8 @@ adb install -r apps/android/app/build/outputs/apk/debug/app-debug.apk
 - `AndroidDeviceCheckAuthority`의 별도 AEAD 저장소가 시도·선택·결과·native LOAD/CLOSE journal·무효화를 같은 revision에 결속합니다. LOAD_INTENT 저장 확인 전 native OPEN을 전송하지 않습니다. 기존 계정·동의·교육 저장소와 옛 키를 삭제하거나 재사용하지 않습니다.
 - 모든 필수 결과와 실제 pair 검증을 원래5분 안에 단일 결정으로 수용하면 `SAVING`으로 넘어갑니다. 이 상태는 통과가 아닙니다. 별도15초 저장 확인에서 durable ACK·현재 actor/session/source·현재 두 모델 증명이 모두 맞아야 FULL/LIMITED를 표시합니다. 늦은 timer나 성공 callback으로 기한을 늘리지 않습니다.
 - 저장 결과는 Committed/Rejected/NotPublished/Indeterminate로 구분합니다. 대기 만료를 디스크 미갱신으로 단정하지 않으며, 미확정 I/O 정산과 새 파일 readback 전에는 자동 복원과 새 저장을 막습니다. Depth/TTS 결과 갱신도 같은 비동기 revision 계약을 사용합니다.
+- 최초 저장소 읽기 실패는 사용자 재점검 동작에서만 같은 actor/session/binding으로 비동기 재조회합니다. 같은 조회는 합류하며 완료 전에는 새 시도를 허용하지 않습니다. 명시 재조회는 자동 복원 알림을 억제하고 캡처한 동작 한 번만 이어갑니다. 미확정 writer·schema 오류·native 회수 대기는 이 경로로 우회하지 않습니다.
+- 이전 primary 종료 실패 뒤에도 정확한 cohort의 정리 증거를 관찰합니다. local release·보조 consumer·실제 child 종료·journal 정산·registry 회수가 모두 확인되면 실패한 준비의 budget만 반환합니다. 새 PASS·자동 모델 재시작은 없으며, 새 명시 시도가 별도 권한으로 quiesced host를 재개합니다. 증거 없는 local 실패는 차단을 유지합니다.
 - 과거 COMMITTED와 현재 pair 준비 증명은 별개입니다. 앱 재시작은 같은 코드·모델·기기 binding의 기록을 읽어 실제 두 모델을 새로 준비한 후 복원합니다. 화면 인계 동안 과거 기록은 보존하지만 현재 화면의 기능 gate는 닫습니다. 실제 실행 실패·미확인 회수는 명시 재점검 상태로 끝냅니다.
 - `WALKSAFE_RUNTIME_BUILD_ID`는 운영 소스·자원·모델·variant 설정·의존성 설정 내용으로 생성합니다. 같은 debug Git 표지만으로 다른 코드를 같은 점검 결과로 복원하지 않습니다. 기존 release source SHA 검증은 유지합니다.
 - 실제 native 생성·추론·종료는 비공개 `:vision_runtime`의 두 owner 스레드에서 수행합니다. 부모는 전처리·파서·mask decode·listener를 담당합니다. hard fault는 같은 cohort의 두 모델을 퇴역시키고 실제 child death·mapping/FD 회수 전 재할당을 막습니다. 타 모델이 남은 상태의 부분 CPU fallback을 허용하지 않습니다. API31 미만은 native 준비 전에 지원 조건에서 거절합니다.

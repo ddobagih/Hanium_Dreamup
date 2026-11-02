@@ -4,6 +4,60 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DevicePreparedPairAdoptionTest {
+    @Test fun failedLeaseCleanupWaitsForHostNativeJournalAndConsumerProofs() {
+        val primary = java.util.concurrent.CompletableFuture<Unit>()
+        val auxiliary = java.util.concurrent.CompletableFuture<Boolean>()
+        val actual = java.util.concurrent.CompletableFuture<Unit>()
+        val available = java.util.concurrent.CompletableFuture<Unit>()
+        val host = java.util.concurrent.CompletableFuture<Unit>()
+        val consumer = java.util.concurrent.CompletableFuture<Unit>()
+        val registry = java.util.concurrent.CompletableFuture<Unit>()
+        val done = DeviceRuntimeLeaseFailureCleanup.afterRelease(primary, auxiliary, actual, available, host, consumer, registry)
+        actual.complete(Unit)
+        assertFalse(done.isDone); assertFalse(host.isDone)
+        primary.complete(Unit)
+        assertFalse(host.isDone)
+        auxiliary.complete(true)
+        assertEquals(Unit, host.getNow(null)); assertEquals(Unit, consumer.getNow(null))
+        registry.complete(Unit)
+        assertFalse(done.isDone) // Physical death alone never forgives a pending journal ACK.
+        available.complete(Unit)
+        assertEquals(Unit, done.getNow(null))
+        available.complete(Unit); auxiliary.complete(true)
+        assertEquals(Unit, done.getNow(null))
+    }
+
+    @Test fun nativeDeathCannotForgiveFalseAuxiliaryOrUnprovenLocalCleanup() {
+        for (primaryFailed in listOf(false, true)) {
+            val primary = java.util.concurrent.CompletableFuture<Unit>()
+            val host = java.util.concurrent.CompletableFuture<Unit>()
+            val consumer = java.util.concurrent.CompletableFuture<Unit>()
+            val done = DeviceRuntimeLeaseFailureCleanup.afterRelease(primary,
+                java.util.concurrent.CompletableFuture.completedFuture(primaryFailed),
+                java.util.concurrent.CompletableFuture.completedFuture(Unit),
+                java.util.concurrent.CompletableFuture.completedFuture(Unit), host, consumer, null)
+            if (primaryFailed) primary.completeExceptionally(IllegalStateException("unproven local release"))
+            else primary.complete(Unit)
+            assertTrue(done.isCompletedExceptionally)
+            assertFalse(host.isDone); assertFalse(consumer.isDone)
+        }
+    }
+
+    @Test fun journalOrConsumerFailureCannotReturnAFailedClaimsBudget() {
+        for (journalFailed in listOf(false, true)) {
+            val journal = java.util.concurrent.CompletableFuture<Unit>()
+            val consumer = java.util.concurrent.CompletableFuture<Unit>()
+            val done = DeviceRuntimeLeaseFailureCleanup.afterRelease(
+                java.util.concurrent.CompletableFuture.completedFuture(Unit),
+                java.util.concurrent.CompletableFuture.completedFuture(true),
+                java.util.concurrent.CompletableFuture.completedFuture(Unit), journal,
+                java.util.concurrent.CompletableFuture(), null, consumer)
+            if (journalFailed) { journal.completeExceptionally(IllegalStateException("journal")); consumer.complete(Unit) }
+            else { journal.complete(Unit); consumer.completeExceptionally(IllegalStateException("consumer")) }
+            assertTrue(done.isCompletedExceptionally)
+        }
+    }
+
     @Test fun allocationWaitsForCapturedJournalAvailabilityAfterPhysicalReleaseWithoutAnOwnerLookup() {
         val host = java.util.concurrent.CompletableFuture<Unit>()
         val physical = java.util.concurrent.CompletableFuture<Unit>()

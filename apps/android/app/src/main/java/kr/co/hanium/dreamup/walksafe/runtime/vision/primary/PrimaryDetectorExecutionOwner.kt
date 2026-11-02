@@ -87,6 +87,7 @@ internal class PrimaryDetectorExecutionOwner(
     private var transferredResumeAuthorized = false
     private class RuntimeQuiesce(val captured: VisionRetirementSnapshot) {
         val hostDrain = CompletableFuture<Unit>()
+        val cleanupReleased = CompletableFuture<Unit>()
     }
     private var runtimeQuiesce: RuntimeQuiesce? = null
     private var runtimeRecheckAuthorized = false
@@ -235,6 +236,27 @@ internal class PrimaryDetectorExecutionOwner(
             }
             synchronized(stateLock) { if (detector === owned) detector = NoopAndroidFrameDetector(); available = false }
             forgetReleasedDetector(owned)
+            // Capture local ownership after the serial barrier. Physical callbacks retain only
+            // receipts, never this owner (whose presentation callbacks can retain an Activity).
+            val proofs = synchronized(stateLock) {
+                if (unprovenReleaseFailure == null && detector is NoopAndroidFrameDetector)
+                    releaseProofs.toList() else null
+            }
+            if (proofs == null) quiesce.cleanupReleased.completeExceptionally(
+                IllegalStateException("Local primary release remains unproven"))
+            else CompletableFuture.allOf(quiesce.hostDrain,
+                *proofs.map { it.toCompletableFuture() }.toTypedArray(),
+                captured.actualReleased.toCompletableFuture()).whenComplete { _, error ->
+                if (error != null) quiesce.cleanupReleased.completeExceptionally(error)
+                else {
+                    val receipt = captured.actualReleased.toCompletableFuture().getNow(null)
+                    if (receipt != null && receipt.cohortId == captured.lease.cohortId &&
+                        (receipt.releaseProof == VisionReleaseProof.CHILD_DEATH && receipt.childPid > 0 ||
+                            receipt.releaseProof == VisionReleaseProof.NO_NATIVE_START && receipt.childPid == 0))
+                        quiesce.cleanupReleased.complete(Unit)
+                    else quiesce.cleanupReleased.completeExceptionally(IllegalStateException("Wrong primary release receipt"))
+                }
+            }
             quiesce.hostDrain.complete(Unit)
         }
         try {
@@ -244,6 +266,15 @@ internal class PrimaryDetectorExecutionOwner(
             }
         } catch (error: RejectedExecutionException) { recordReleaseFailure(error); quiesce.hostDrain.completeExceptionally(error) }
         return quiesce.hostDrain
+    }
+
+    /** Cleanup proof only: observing it cannot authorize a model reservation or resume. */
+    fun quiescedReleaseConfirmed(captured: VisionRetirementSnapshot): CompletionStage<Unit> = synchronized(stateLock) {
+        val quiet = runtimeQuiesce
+        if (quiet != null && quiet.captured.lease === captured.lease &&
+            quiet.captured.actualReleased === captured.actualReleased) quiet.cleanupReleased
+        else CompletableFuture<Unit>().also { it.completeExceptionally(
+            IllegalStateException("No matching primary quiescence")) }
     }
 
     /** Guard: a fresh AuthorityAttempt, explicit user recheck, and all auxiliary host drains. */

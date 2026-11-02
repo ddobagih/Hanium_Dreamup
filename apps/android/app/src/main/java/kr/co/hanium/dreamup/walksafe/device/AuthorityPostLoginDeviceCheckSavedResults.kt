@@ -25,9 +25,15 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
         var ref: DeviceCheckAttemptRef? = null
         var cancelled: String? = null
     }
+    private class ReadRequest(val actor: String, val session: Long, val binding: DeviceCheckAuthorityBinding,
+        var notifyChanged: Boolean) {
+        val result = CompletableFuture<DeviceCheckAuthorityRead>()
+    }
     private val lock = Any()
     private var attempt: Attempt? = null
+    private var reading: ReadRequest? = null
     private var binding: DeviceCheckAuthorityBinding? = null
+    private var confirmedRead: DeviceCheckAuthorityBinding? = null
     private var resultActor: String? = null
     private var boundActor: String? = null
     private var boundSession: Long? = null
@@ -41,6 +47,7 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
         val oldAttempt = synchronized(lock) {
             if (boundActor == actorId && boundSession == sessionGeneration) return
             boundActor = actorId; boundSession = sessionGeneration; displayed = null
+            binding = null; confirmedRead = null; resultActor = null; reading = null
             attempt?.takeIf { it.binding.actorId != actorId || it.binding.sessionGeneration != sessionGeneration }
         }
         oldAttempt?.let { attemptCancelled(it.binding, "session_changed") }
@@ -53,7 +60,15 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
         return authority.registerOwner(ownerId, source, expected.sessionGeneration)
     }
 
-    fun refresh(resultBinding: PostLoginDeviceCheckResultBinding): CompletionStage<DeviceCheckAuthorityRead> {
+    fun refresh(resultBinding: PostLoginDeviceCheckResultBinding): CompletionStage<DeviceCheckAuthorityRead> =
+        requestRead(resultBinding, explicitRetry = false)
+
+    /** A user retry may recover an initial read failure, but cannot clear any publication/native fence. */
+    fun prepareExplicitRetry(resultBinding: PostLoginDeviceCheckResultBinding): CompletionStage<DeviceCheckAuthorityRead> =
+        requestRead(resultBinding, explicitRetry = true)
+
+    private fun requestRead(resultBinding: PostLoginDeviceCheckResultBinding, explicitRetry: Boolean):
+        CompletionStage<DeviceCheckAuthorityRead> {
         val session = synchronized(lock) { boundSession.takeIf { boundActor == resultBinding.actorId } }
             ?: return CompletableFuture.completedFuture(DeviceCheckAuthorityRead.Blocked("stale_session"))
         if (!sessionCurrent(resultBinding.actorId, session)) return CompletableFuture.completedFuture(
@@ -62,17 +77,58 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
             DeviceCheckAuthorityRead.Blocked("binding_unavailable"))
         if (!sessionCurrent(resultBinding.actorId, session)) return CompletableFuture.completedFuture(
             DeviceCheckAuthorityRead.Blocked("stale_session"))
-        synchronized(lock) {
+        val requested = synchronized(lock) {
             if (boundActor != resultBinding.actorId || boundSession != session)
                 return CompletableFuture.completedFuture(DeviceCheckAuthorityRead.Blocked("stale_session"))
+            if (binding != captured) confirmedRead = null
             binding = captured; resultActor = resultBinding.actorId
+            reading?.takeIf { it.actor == resultBinding.actorId && it.session == session && it.binding == captured }?.let {
+                // The captured user continuation owns this completion instead of automatic historical restoration.
+                if (explicitRetry) it.notifyChanged = false
+                return it.result
+            }
+            if (explicitRetry) {
+                val cached = authority.cachedSnapshot(captured)
+                if (cached is DeviceCheckAuthorityRead.Blocked && (cached.operationId != null ||
+                    cached.reason !in setOf("storage_read_failed", "not_loaded", "binding_not_loaded")))
+                    return CompletableFuture.completedFuture(cached)
+                if (writing.isNotEmpty() || uncertain.isNotEmpty())
+                    return CompletableFuture.completedFuture(DeviceCheckAuthorityRead.Blocked("authority_work_pending"))
+                if (cached !is DeviceCheckAuthorityRead.Blocked && confirmedRead == captured)
+                    return CompletableFuture.completedFuture(cached)
+            }
+            confirmedRead = null
+            ReadRequest(resultBinding.actorId, session, captured, notifyChanged = !explicitRetry).also { reading = it }
         }
         val owner = WeakReference(this)
-        return authority.read(captured, session).whenComplete { read, _ -> owner.get()?.let { current ->
-            if (read is DeviceCheckAuthorityRead.Blocked && read.operationId != null)
-                current.reconcile(read.operationId)
-            if (current.sessionCurrent(resultBinding.actorId, session)) current.onChanged()
-        } }
+        val future: CompletionStage<DeviceCheckAuthorityRead> = try { authority.read(captured, session) } catch (_: Throwable) {
+            CompletableFuture.completedFuture(DeviceCheckAuthorityRead.Blocked("authority_read_failed"))
+        }
+        future.whenComplete { read, error ->
+            val current = owner.get()
+            if (current == null) requested.result.complete(DeviceCheckAuthorityRead.Blocked("adapter_retired")) else {
+                val completed = when {
+                    !current.sessionCurrent(requested.actor, requested.session) -> DeviceCheckAuthorityRead.Blocked("stale_session")
+                    synchronized(current.lock) { current.binding != requested.binding } -> DeviceCheckAuthorityRead.Blocked("binding_superseded")
+                    error != null || read == null -> DeviceCheckAuthorityRead.Blocked("authority_read_failed")
+                    else -> read
+                }
+                val notify = synchronized(current.lock) {
+                    val selected = current.reading === requested
+                    if (selected) {
+                        current.reading = null
+                        if (completed is DeviceCheckAuthorityRead.Ready || completed is DeviceCheckAuthorityRead.NeedsCheck)
+                            current.confirmedRead = requested.binding
+                    }
+                    selected && requested.notifyChanged && current.boundActor == requested.actor && current.boundSession == requested.session &&
+                        current.binding == requested.binding
+                } && current.sessionCurrent(requested.actor, requested.session)
+                if (read is DeviceCheckAuthorityRead.Blocked && read.operationId != null)
+                    current.reconcile(read.operationId, notifyChanged = notify)
+                try { if (notify) current.onChanged() } finally { requested.result.complete(completed) }
+            }
+        }
+        return requested.result
     }
 
     fun sourceFor(expected: PostLoginDeviceCheckBinding): DeviceCheckAuthoritySource? {
@@ -87,11 +143,19 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
     override fun candidatePresent() = historical() != null
     override fun mayBeginAttempt(): Boolean {
         val captured = synchronized(lock) {
-            if (writing.isNotEmpty() || uncertain.isNotEmpty()) return false
-            binding
-        } ?: return true
-        val read = authority.cachedSnapshot(captured)
-        return read !is DeviceCheckAuthorityRead.Blocked || read.reason in setOf("not_loaded", "binding_not_loaded")
+            if (reading != null || writing.isNotEmpty() || uncertain.isNotEmpty()) return false
+            val selected = binding ?: return false
+            if (confirmedRead != selected) return false
+            val actor = resultActor ?: return false
+            val session = boundSession ?: return false
+            if (boundActor != actor) return false
+            Triple(selected, actor, session)
+        }
+        if (!sessionCurrent(captured.second, captured.third)) return false
+        return when (authority.cachedSnapshot(captured.first)) {
+            is DeviceCheckAuthorityRead.Ready, is DeviceCheckAuthorityRead.NeedsCheck -> true
+            is DeviceCheckAuthorityRead.Blocked -> false
+        }
     }
 
     override fun restore(binding: PostLoginDeviceCheckResultBinding): PersistedPostLoginDeviceCheckResult? {
@@ -245,7 +309,7 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
         return mapped
     }
 
-    private fun reconcile(id: String) {
+    private fun reconcile(id: String, notifyChanged: Boolean = true) {
         synchronized(lock) { uncertain += id; if (!reconciling.add(id)) return }
         val owner = WeakReference(this)
         authority.reconcileAfterSettled(id).whenComplete { read, error -> owner.get()?.let { current ->
@@ -254,7 +318,7 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
                 if (error == null && !(read is DeviceCheckAuthorityRead.Blocked && read.operationId != null))
                     current.uncertain.remove(id)
             }
-            current.onChanged()
+            if (notifyChanged) current.onChanged()
         } }
     }
     private fun rejected(reason: String): CompletionStage<DeviceCheckAuthorityOutcome<Unit>> =

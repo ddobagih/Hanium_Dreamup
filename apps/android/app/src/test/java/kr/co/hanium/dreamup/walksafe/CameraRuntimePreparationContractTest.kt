@@ -6,6 +6,14 @@ import org.junit.Test
 
 /** Production wiring: selection never runs at camera entry, nor does loading imply verified output. */
 class CameraRuntimePreparationContractTest {
+    @Test fun failedOldCloseKeepsAProofDrivenCleanupPathInsteadOfStrandingThePreparation() {
+        val lease = body(main, "private fun prepareDeviceRuntimeLease(")
+        assertTrue("A close failure needs a late cleanup observer", lease.contains("observeFailedRuntimeLeaseCleanup("))
+        val cleanup = body(main, "private fun observeFailedRuntimeLeaseCleanup(")
+        assertTrue(cleanup.contains("DeviceRuntimeLeaseFailureCleanup"))
+        assertTrue(cleanup.contains("pendingRuntimeRetirement"))
+        assertFalse(cleanup.contains("notify(true)"))
+    }
     private val main = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
     private val camera = File("src/debug/java/kr/co/hanium/dreamup/walksafe/CameraTestActivity.kt").readText()
     private val primary = File("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/vision/primary/PrimaryDetectorLifecycleController.kt").readText()
@@ -213,8 +221,17 @@ class CameraRuntimePreparationContractTest {
             "private fun handlePostLoginDeviceCheckPrimaryAction()",
             "private fun beginPostLoginDeviceCheckFromUserAction(").forEach { signature ->
             val entry = body(main, signature)
-            assertTrue(entry.indexOf("recheckPendingDeviceRuntimeCleanup()") in 0 until entry.indexOf("postLoginDeviceCheckController."))
+            val start = main.indexOf(signature)
+            assertTrue(main.substring(start, main.indexOf("postLoginDeviceCheckController.", start))
+                .contains("withExplicitDeviceCheckAuthority"))
+            assertFalse(entry.contains(".get("))
         }
+        val retry = body(main, "private fun withExplicitDeviceCheckAuthority(")
+        assertTrue(retry.indexOf("recheckPendingDeviceRuntimeCleanup()") < retry.indexOf("prepareExplicitRetry(result)"))
+        assertTrue(retry.contains("explicitDeviceCheckReadPending !== token"))
+        assertTrue(retry.contains("postLoginDeviceCheckSnapshot !== snapshot"))
+        assertTrue(retry.contains("currentSessionBinding() != session"))
+        assertTrue(retry.contains("authorityDeviceCheckResults.mayBeginAttempt()"))
         val lease = body(main, "private fun prepareDeviceRuntimeLease(")
         assertTrue(lease.contains("captured.actualReleased.toCompletableFuture()"))
         assertTrue(lease.contains("captured.allocationAvailable.toCompletableFuture()"))

@@ -194,6 +194,161 @@ class JointRuntimeSampleHostTest {
             assertEquals(0, f.ledger.snapshot().activeReservations)
         }
 
+    @Test fun warmPrimaryCacheDoesNotReserveItsAllocatedScratchAgainWhileAuxiliaryIsAdmitted() =
+        JointRuntimeSampleTestFixture("warm-scratch-overlap", bundle = JointRuntimeSampleTestFixture.sampleFixtures(768, 768)).use { f ->
+            f.heapObservation = { JointRuntimeManagedHeapSnapshot(128L * 1_048_576, 75L * 1_048_576, 0) }
+            val host = f.host()
+            host.open(gpuCpu, f.budget(JointRuntimeSearchPhase.PROVISIONAL), { f.current })
+            val entered = CountDownLatch(1); val proceed = CountDownLatch(1)
+            val pool = Executors.newSingleThreadExecutor()
+            f.onPrimarySample = { entered.countDown(); check(proceed.await(3, TimeUnit.SECONDS)) }
+            try {
+                val primary = pool.submit<JointPairPrimarySample> {
+                    host.primarySample(host.entries().first(), VisionPurpose.BENCHMARK, false)
+                }
+                assertTrue(entered.await(2, TimeUnit.SECONDS))
+                val auxiliary = runCatching { host.auxiliarySample(host.entries().first(), VisionPurpose.BENCHMARK, false) }
+                assertNull("Allocated scratch must not make a fitting auxiliary frame fail admission", auxiliary.exceptionOrNull())
+                assertEquals(128_000L, f.ledger.snapshot().pendingManagedBytes)
+                assertEquals(7_077_888L + 128_000L, f.ledger.snapshot().managedBytes)
+                proceed.countDown(); primary.get(3, TimeUnit.SECONDS)
+                assertEquals(7_077_888L, f.ledger.snapshot().managedBytes)
+            } finally { proceed.countDown(); pool.shutdownNow() }
+            host.finish(false)
+            host.actualReleasedFuture.toCompletableFuture().get(3, TimeUnit.SECONDS)
+            assertEquals(0, f.ledger.snapshot().activeReservations)
+        }
+
+    @Test fun scratchOwnershipIsReservedOnceAcrossSamplesAndNeverAccumulatesAcrossHosts() {
+        val ledger = JointRuntimeMemoryLedger()
+        repeat(3) { attempt ->
+            JointRuntimeSampleTestFixture("scratch-attempt-$attempt", ledger).use { f ->
+                val host = f.host()
+                host.open(gpuCpu, f.budget(JointRuntimeSearchPhase.PROVISIONAL), { true })
+                repeat(3) {
+                    assertEquals(7_077_888L, ledger.snapshot().managedBytes)
+                    assertEquals(0L, ledger.snapshot().pendingManagedBytes)
+                    assertEquals(1, ledger.snapshot().activeReservations)
+                    host.primarySample(host.entries().first(), VisionPurpose.BENCHMARK, false)
+                    assertEquals(1, f.primaryScratchPrepares)
+                }
+                host.finish(false)
+                host.actualReleasedFuture.toCompletableFuture().get(3, TimeUnit.SECONDS)
+                assertEquals(0L, ledger.snapshot().managedBytes)
+                assertEquals(0L, ledger.snapshot().pendingManagedBytes)
+                assertEquals(0, ledger.snapshot().activeReservations)
+            }
+        }
+    }
+
+    @Test fun initialScratchAndFrameMustBothFitBeforeTheFirstPrimaryDispatch() {
+        // The second case can fit scratch alone, but not scratch plus the new frame output.
+        for (available in listOf(6L * 1_048_576, 7_100_000L)) JointRuntimeSampleTestFixture("scratch-headroom-$available").use { f ->
+            f.heapObservation = { JointRuntimeManagedHeapSnapshot(128L * 1_048_576, 96L * 1_048_576 - available, 0) }
+            val host = f.host()
+            val failure = runCatching {
+                host.measureProvisional(gpuCpu, f.budget(JointRuntimeSearchPhase.PROVISIONAL)) { true }
+            }.exceptionOrNull()
+            assertTrue(failure is JointRuntimeSampleFailure)
+            assertEquals(JointRuntimeSearchFailureKind.RESOURCE_BUDGET, (failure as JointRuntimeSampleFailure).failure.kind)
+            assertEquals(0, f.primaryScratchPrepares)
+            assertEquals(0, f.primaryCalls.get()); assertEquals(0, f.auxiliaryFactory.invokes.get())
+            host.actualReleasedFuture.toCompletableFuture().get(3, TimeUnit.SECONDS)
+            assertEquals(0, f.ledger.snapshot().activeReservations)
+        }
+    }
+
+    @Test fun failedOrCancelledScratchPreparationCannotDispatchAndKeepsItsExactAllocationStateUntilDrain() {
+        for (cancel in listOf(false, true)) JointRuntimeSampleTestFixture("scratch-prepare-$cancel").use { f ->
+            val entered = CountDownLatch(1); val proceed = CountDownLatch(1)
+            val drainEntered = CountDownLatch(1); val drainProceed = CountDownLatch(1)
+            val marker = IllegalStateException("partial scratch preparation failed")
+            f.onPreparePrimaryScratch = {
+                entered.countDown(); check(proceed.await(3, TimeUnit.SECONDS))
+                if (!cancel) throw marker
+            }
+            f.onSamplingDrained = { drainEntered.countDown(); check(drainProceed.await(3, TimeUnit.SECONDS)) }
+            val host = f.host(); val pool = Executors.newSingleThreadExecutor()
+            try {
+                val running = pool.submit<Throwable?> {
+                    runCatching { host.measureProvisional(gpuCpu, f.budget(JointRuntimeSearchPhase.PROVISIONAL)) { true } }.exceptionOrNull()
+                }
+                assertTrue(entered.await(2, TimeUnit.SECONDS))
+                assertEquals(7_077_888L + 128_000L, f.ledger.snapshot().pendingManagedBytes)
+                if (cancel) host.cancel("cancel during scratch preparation")
+                proceed.countDown()
+                val failure = running.get(3, TimeUnit.SECONDS)
+                if (cancel) assertTrue(failure is CancellationException) else assertSame(marker, failure)
+                assertTrue(drainEntered.await(2, TimeUnit.SECONDS))
+                assertEquals(1, f.primaryScratchPrepares); assertEquals(0, f.primaryCalls.get())
+                assertEquals(2, f.ledger.snapshot().activeReservations)
+                assertEquals(if (cancel) 128_000L else 7_077_888L + 128_000L, f.ledger.snapshot().pendingManagedBytes)
+                assertFalse(host.actualReleasedFuture.toCompletableFuture().isDone)
+                drainProceed.countDown()
+                host.actualReleasedFuture.toCompletableFuture().get(3, TimeUnit.SECONDS)
+                assertEquals(0, f.ledger.snapshot().activeReservations)
+                assertEquals(0L, f.ledger.snapshot().pendingManagedBytes)
+            } finally { proceed.countDown(); drainProceed.countDown(); pool.shutdownNow() }
+        }
+    }
+
+    @Test fun failedOrCancelledPrimaryKeepsScratchOwnershipUntilTheCpuDrainThenSettlesExactlyOnce() {
+        for (cancel in listOf(false, true)) JointRuntimeSampleTestFixture("scratch-drain-$cancel").use { f ->
+            val entered = CountDownLatch(1); val proceed = CountDownLatch(1)
+            val drainEntered = CountDownLatch(1); val drainProceed = CountDownLatch(1)
+            val marker = IllegalStateException("primary failed after preparation")
+            f.onPrimarySample = {
+                entered.countDown(); check(proceed.await(3, TimeUnit.SECONDS))
+                if (!cancel) throw marker
+            }
+            f.onSamplingDrained = { drainEntered.countDown(); check(drainProceed.await(3, TimeUnit.SECONDS)) }
+            val host = f.host(); val pool = Executors.newSingleThreadExecutor()
+            try {
+                val running = pool.submit<Throwable?> {
+                    runCatching { host.measureProvisional(gpuCpu, f.budget(JointRuntimeSearchPhase.PROVISIONAL)) { true } }.exceptionOrNull()
+                }
+                assertTrue(entered.await(2, TimeUnit.SECONDS))
+                if (cancel) host.cancel("cancel during primary")
+                proceed.countDown()
+                val failure = running.get(3, TimeUnit.SECONDS)
+                if (cancel) assertTrue(failure is CancellationException) else assertSame(marker, failure)
+                assertTrue(drainEntered.await(2, TimeUnit.SECONDS))
+                assertFalse(host.actualReleasedFuture.toCompletableFuture().isDone)
+                assertEquals(2, f.ledger.snapshot().activeReservations)
+                assertEquals(7_077_888L + 128_000L, f.ledger.snapshot().managedBytes)
+                // Cancellation is observed after the successful output allocation; failure returns no output.
+                assertEquals(if (cancel) 0L else 128_000L, f.ledger.snapshot().pendingManagedBytes)
+                host.finish(false)
+                drainProceed.countDown()
+                host.actualReleasedFuture.toCompletableFuture().get(3, TimeUnit.SECONDS)
+                host.finish(false); host.cancel("duplicate close")
+                assertEquals(0, f.ledger.snapshot().activeReservations)
+                assertEquals(0L, f.ledger.snapshot().pendingManagedBytes)
+            } finally { proceed.countDown(); drainProceed.countDown(); pool.shutdownNow() }
+        }
+    }
+
+    @Test fun keptNativePairDropsScratchOnlyAfterSamplingDrainAndPreservesTheNativeFence() =
+        JointRuntimeSampleTestFixture("kept-scratch").use { f ->
+            val drainEntered = CountDownLatch(1); val drainProceed = CountDownLatch(1)
+            f.onSamplingDrained = { drainEntered.countDown(); check(drainProceed.await(3, TimeUnit.SECONDS)) }
+            val host = f.host()
+            host.open(gpuCpu, f.budget(JointRuntimeSearchPhase.FINAL), { true })
+            assertEquals(7_077_888L, f.ledger.snapshot().managedBytes)
+            try {
+                host.finish(true); host.finish(true)
+                assertTrue(drainEntered.await(2, TimeUnit.SECONDS))
+                assertEquals(7_077_888L, f.ledger.snapshot().managedBytes)
+            } finally { drainProceed.countDown() }
+            host.samplingDrainedFuture.toCompletableFuture().get(3, TimeUnit.SECONDS)
+            assertEquals(0, f.ledger.snapshot().activeReservations)
+            assertEquals(0L, f.ledger.snapshot().managedBytes)
+            assertFalse(host.actualReleasedFuture.toCompletableFuture().isDone)
+            assertFalse(f.primaryPhysical.isDone); assertFalse(f.nativePhysical.isDone)
+            assertNull(f.ledger.beginCandidate("native-pair-is-still-kept"))
+            assertEquals(0, f.primaryCloses)
+        }
+
     @Test fun postBeginBusyMarkersOrForeignExceptionReceiptsCannotAcknowledgeTheCapturedCohort() {
         for (kind in 0..2) JointRuntimeSampleTestFixture("post-begin-$kind").use { f ->
             f.holdNative = true

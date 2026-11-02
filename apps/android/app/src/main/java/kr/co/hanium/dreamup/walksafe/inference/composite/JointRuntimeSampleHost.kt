@@ -128,6 +128,7 @@ internal interface JointRuntimeSamplePorts<T> {
     fun begin(absoluteDeadlineMs: Long, isCurrent: () -> Boolean): CompletionStage<Unit> = begin(absoluteDeadlineMs)
     fun ownerBinding(): DeviceCheckAuthorityBinding
     fun createPrimary(config: TwoModelRuntimeConfig, options: ModelRuntimeOptions, deadlineMs: Long): AndroidDetectorLoadResult
+    fun preparePrimaryScratch()
     fun primarySample(model: TfliteAndroidFrameDetector, fixture: JointRuntimeSampleFixture,
         purpose: VisionPurpose, deadlineMs: Long, raw: Boolean): JointPairPrimarySample
     fun createAuxiliary(epoch: Long, options: FastSamRuntimeOptions, listener: FastSamRuntimeService.Listener<T>): FastSamRuntimeService<T>
@@ -186,6 +187,9 @@ class JointRuntimeSampleHost<T> internal constructor(
     private val frameMemory = ConcurrentHashMap<Long, JointRuntimeMemoryReservation>()
     private val frameReceipts = ConcurrentHashMap<JointRuntimeMemoryReservation, CompletableFuture<Unit>>()
     private val frameDrains = ConcurrentLinkedQueue<CompletableFuture<Unit>>()
+    private val primaryScratchLock = Any()
+    private var primaryScratchMemory: JointRuntimeMemoryReservation? = null
+    private var primaryScratchPrepared = false
     private var primaryIdentity: AndroidDetectorRuntime? = null
     private var auxiliaryIdentity: FastSamRuntimeInfo? = null
     internal val samplingDrainedFuture: CompletionStage<Unit> get() = bodyFinished
@@ -291,9 +295,11 @@ class JointRuntimeSampleHost<T> internal constructor(
         consume: (JointPairPrimarySample) -> V): V {
         admit()
         check(jointPairArgbDigest(fixture.image) == fixture.argbDigest) { "sample_fixture_input_changed" }
-        val reservation = frameReservation(JointRuntimeMemoryRole.PRIMARY, fixture)
+        val reservation = primaryFrameReservation(fixture)
         var success = false
         try {
+        preparePrimaryScratch()
+        admit()
         val output = ports.primarySample(requireNotNull(primary), fixture, purpose, budget.deadlineMs, raw)
         check(ledger.allocationCompleted(reservation))
         admit(); requirePrimary(requireNotNull(output.output.result.timing.modelRuntime))
@@ -339,13 +345,45 @@ class JointRuntimeSampleHost<T> internal constructor(
             samples.forget(token.frameId)
         }
     }
-    private fun frameReservation(role: JointRuntimeMemoryRole, fixture: JointRuntimeSampleFixture): JointRuntimeMemoryReservation {
+    private fun primaryFrameReservation(fixture: JointRuntimeSampleFixture): JointRuntimeMemoryReservation = synchronized(primaryScratchLock) {
+        val heap = freshManagedHeap()
+        val scratch = if (primaryScratchMemory == null) admitted(ledger.reserveCandidate(requireNotNull(memoryCandidate),
+            JointRuntimeMemoryBytes(managedBytes = PRIMARY_SCRATCH_BYTES), heap)).also { primaryScratchMemory = it } else null
+        try {
+            // Both new allocations are pending against the same fresh observation before either starts.
+            frameReservation(JointRuntimeMemoryRole.PRIMARY, fixture, heap)
+        } catch (error: Throwable) {
+            if (scratch != null) {
+                check(ledger.abortBeforeAllocation(scratch))
+                primaryScratchMemory = null
+            }
+            throw error
+        }
+    }
+    private fun preparePrimaryScratch() = synchronized(primaryScratchLock) {
+        if (!primaryScratchPrepared) {
+            val reservation = requireNotNull(primaryScratchMemory)
+            check(ledger.allocationStarted(reservation))
+            ports.preparePrimaryScratch()
+            check(ledger.allocationCompleted(reservation))
+            primaryScratchPrepared = true
+        }
+    }
+    private fun releasePrimaryScratchAfterDrain() = synchronized(primaryScratchLock) {
+        primaryScratchMemory?.let { reservation ->
+            check(ledger.releaseAfterDrain(reservation))
+            primaryScratchMemory = null
+            primaryScratchPrepared = false
+        }
+    }
+    private fun frameReservation(role: JointRuntimeMemoryRole, fixture: JointRuntimeSampleFixture,
+        heap: JointRuntimeManagedHeapSnapshot = freshManagedHeap()): JointRuntimeMemoryReservation {
         val pixels = fixture.image.width.toLong() * fixture.image.height
         val bytes = if (role == JointRuntimeMemoryRole.PRIMARY) JointRuntimeMemoryBytes(
-            managedBytes = 7_077_888L + 128_000L, sharedBytes = 7_077_888L + 7_200L)
+            managedBytes = 128_000L, sharedBytes = 7_077_888L + 7_200L)
         else JointRuntimeMemoryBytes(managedBytes = pixels * 4 + 6_508_800L + ((pixels + 63) / 64) * 8 * 100 + 512_000L,
             sharedBytes = pixels * 4 + 6_508_800L)
-        return admitted(ledger.beginFrame(requireNotNull(memoryCandidate), role, bytes, freshManagedHeap())).also {
+        return admitted(ledger.beginFrame(requireNotNull(memoryCandidate), role, bytes, heap)).also {
             check(ledger.allocationStarted(it))
             val drained = CompletableFuture<Unit>(); frameReceipts[it] = drained; frameDrains += drained
         }
@@ -549,7 +587,7 @@ class JointRuntimeSampleHost<T> internal constructor(
                     if (!keep) try { ownedPrimary?.let(ownedPorts::closePrimary) } catch (error: Throwable) {
                         if (!knownRemoteRelease(error)) throw error
                     }
-                    ownedPorts.samplingDrained(); ownedBorrow?.close(); finished.complete(Unit)
+                    ownedPorts.samplingDrained(); releasePrimaryScratchAfterDrain(); ownedBorrow?.close(); finished.complete(Unit)
                 } catch (error: Throwable) { finished.completeExceptionally(error) }
             }
         } catch (error: RejectedExecutionException) { finished.completeExceptionally(error) }
@@ -572,6 +610,7 @@ class JointRuntimeSampleHost<T> internal constructor(
     }
 
     companion object {
+        private const val PRIMARY_SCRATCH_BYTES = 7_077_888L
         fun <T> create(context: Context, config: TwoModelRuntimeConfig, authority: DeviceCheckAuthority,
             fixtures: JointRuntimeSampleFixtures, auxiliaryEpoch: Long, listener: FastSamRuntimeService.Listener<T>): JointRuntimeSampleHost<T> {
             check(Looper.myLooper() != Looper.getMainLooper()) { "Sample host creation requires a worker" }
@@ -645,6 +684,7 @@ private class AndroidJointRuntimeSamplePorts<T>(context: Context, private val ow
     override fun ownerBinding() = owner.source.binding
     override fun createPrimary(config: TwoModelRuntimeConfig, options: ModelRuntimeOptions, deadlineMs: Long) =
         TfliteAndroidFrameDetector.createWithStatus(context, config, options, YuvPreprocessingStrategy.FUSED_YUV_TO_TENSOR, deadlineMs)
+    override fun preparePrimaryScratch() = preprocessor.prepareBilinearScratch(FastSamModelContract.INPUT_SIZE)
     override fun primarySample(model: TfliteAndroidFrameDetector, fixture: JointRuntimeSampleFixture,
         purpose: VisionPurpose, deadlineMs: Long, raw: Boolean): JointPairPrimarySample {
         val start = SystemClock.elapsedRealtime(); val prepared = preprocessor.preprocessBilinear(fixture.image, 768)

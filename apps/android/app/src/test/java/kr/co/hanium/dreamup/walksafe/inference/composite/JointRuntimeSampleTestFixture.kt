@@ -31,6 +31,7 @@ internal class JointRuntimeSampleTestFixture(val name: String,
     val primaryCalls = AtomicInteger()
     var primaryCreates = 0
     var primaryCloses = 0
+    var primaryScratchPrepares = 0
     var begins = 0
     var exits = 0
     var nativeCurrent = true
@@ -47,6 +48,8 @@ internal class JointRuntimeSampleTestFixture(val name: String,
     var inputDigest = "b".repeat(64)
     var corruptFixture: String? = null
     var onPrimarySample: (() -> Unit)? = null
+    var onPreparePrimaryScratch: (() -> Unit)? = null
+    var onSamplingDrained: (() -> Unit)? = null
     val primaryRequests = CopyOnWriteArrayList<Pair<VisionPurpose, Long>>()
     var auxiliary: FastSamRuntimeService<Unit>? = null
     private val hosts = mutableListOf<JointRuntimeSampleHost<Unit>>()
@@ -73,6 +76,7 @@ internal class JointRuntimeSampleTestFixture(val name: String,
     fun primaryRuntime() = AndroidDetectorRuntime(optionsPrimary.delegate, optionsPrimary.delegate, optionsPrimary.numThreads,
         gpuPrecisionLossAllowed = false, modelOwnerPid = 321, modelOwnerThreadId = 41,
         modelInstanceId = if (primaryMismatch) "unexpected-primary" else primaryId, cohortId = lease.cohortId)
+    override fun preparePrimaryScratch() { primaryScratchPrepares++; onPreparePrimaryScratch?.invoke() }
     override fun primarySample(model: TfliteAndroidFrameDetector, fixture: JointRuntimeSampleFixture,
         purpose: VisionPurpose, deadlineMs: Long, raw: Boolean): JointPairPrimarySample {
         assertSame(detector, model); primaryCalls.incrementAndGet(); primaryRequests += purpose to deadlineMs
@@ -91,7 +95,7 @@ internal class JointRuntimeSampleTestFixture(val name: String,
         assertSame(detector, model); primaryCloses++; if (!holdPrimary) primaryPhysical.complete(Unit)
     }
     override fun retire(reason: String) { exits++; nativeCurrent = false; if (!holdNative) nativePhysical.complete(Unit) }
-    override fun samplingDrained() {}
+    override fun samplingDrained() { onSamplingDrained?.invoke() }
     override fun thermal() = 0
     private fun runtimeJson(primary: Boolean): String {
         val delegate = if (primary) optionsPrimary.delegate else requireNotNull(optionsAuxiliary).requestedBackend.name.lowercase()
@@ -141,10 +145,10 @@ internal class JointRuntimeSampleTestFixture(val name: String,
     companion object {
         private val unsafe = Unsafe::class.java.getDeclaredField("theUnsafe").apply { isAccessible = true }.get(null) as Unsafe
         private fun hash(value: String) = MessageDigest.getInstance("SHA-256").digest(value.toByteArray()).joinToString("") { "%02x".format(it) }
-        fun sampleFixtures(): JointRuntimeSampleFixtures = JointRuntimeSampleFixtures.forTest(JointRuntimeChoicePolicy.REQUIRED_FIXTURE_IDS.map { id ->
-            val image = ArgbImage(2, 2, IntArray(4) { -16777216 })
+        fun sampleFixtures(width: Int = 2, height: Int = 2): JointRuntimeSampleFixtures = JointRuntimeSampleFixtures.forTest(JointRuntimeChoicePolicy.REQUIRED_FIXTURE_IDS.map { id ->
+            val image = ArgbImage(width, height, IntArray(width * height) { -16777216 })
             JointRuntimeSampleFixture(RuntimeCalibrationFixture(id, RuntimeCalibrationFixtureKind.SOLID_BLACK, null,
-                2, 2, "a".repeat(64), true, setOf(RuntimeCalibrationFixtureRole.EMPTY), emptyList()), image, jointPairArgbDigest(image))
+                width, height, "a".repeat(64), true, setOf(RuntimeCalibrationFixtureRole.EMPTY), emptyList()), image, jointPairArgbDigest(image))
         })
     }
 }
