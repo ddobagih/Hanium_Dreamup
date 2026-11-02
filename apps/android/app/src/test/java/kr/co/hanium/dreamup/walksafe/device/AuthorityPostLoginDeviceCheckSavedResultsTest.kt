@@ -143,6 +143,186 @@ class AuthorityPostLoginDeviceCheckSavedResultsTest {
         }
     }
 
+    @Test fun aLateCanonicalHandoffCannotResurrectAnAlreadySettledSuccessor() {
+        CanonicalHandoffFixture().use { h ->
+            val observed = CompletableFuture<DeviceCheckAuthorityRead>()
+            val deliver = CompletableFuture<Unit>()
+            var first = true
+            h.f.reconcileDelivery = { _, response ->
+                if (first) {
+                    first = false
+                    response.thenCompose { value -> observed.complete(value); deliver.thenApply { value } }
+                } else response
+            }
+            val (_, successor) = h.handoff(releaseSecond = false)
+            assertEquals(DeviceCheckAuthorityRead.Blocked("publication_unconfirmed", successor), observed.get(2, TimeUnit.SECONDS))
+            assertEquals(DeviceCheckAuthorityRead.Blocked("publication_unconfirmed", successor),
+                h.f.saved.refresh(h.f.resultBinding()).toCompletableFuture().get(2, TimeUnit.SECONDS))
+            h.second.release.countDown()
+            h.f.drain(); h.f.drain()
+            assertNull(h.f.core.unsettledOperation())
+            assertEquals(2, h.f.reconcileCalls.get())
+            assertFalse(h.f.saved.mayBeginAttempt()) // A's delivered outcome is still pending.
+            deliver.complete(Unit)
+            assertTrue(h.f.saved.refresh(h.f.resultBinding()).toCompletableFuture()
+                .get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+            assertTrue(h.f.saved.mayBeginAttempt())
+            assertEquals(2, h.f.reconcileCalls.get()) // A's stale R cannot create another reconciliation.
+            assertEquals(0, h.f.io.writes.get())
+            assertTrue(h.f.saved.beginAttemptAsync(h.f.checkBinding(), h.f.resultBinding(), 1000, 301000)
+                .toCompletableFuture().get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityOutcome.Committed)
+            assertEquals(1, h.f.io.writes.get())
+        }
+    }
+
+    @Test fun anExplicitPredecessorContinuationUsesItsOwnFreshReadAfterTheSuccessorSettles() {
+        DelayedSettledHandoff().use { h ->
+            val retry = h.f.saved.prepareExplicitRetry(h.f.resultBinding()).toCompletableFuture()
+            assertFalse(retry.isDone)
+            assertSame(retry, h.f.saved.prepareExplicitRetry(h.f.resultBinding()))
+            h.deliverPredecessor()
+            assertTrue(retry.get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+            assertTrue(h.f.saved.mayBeginAttempt())
+            assertEquals(3, h.f.readCalls.get())
+            assertEquals(2, h.f.reconcileCalls.get())
+            val predecessorFlow = h.events.first { it.stage == DeviceCheckTraceStage.AUTHORITY_RECONCILE &&
+                it.outcome == DeviceCheckTraceOutcome.STARTED }.flowId
+            assertTrue(h.events.any { it.flowId == predecessorFlow && it.stage == DeviceCheckTraceStage.AUTHORITY_RECONCILE &&
+                it.outcome == DeviceCheckTraceOutcome.STALE && it.reason == DeviceCheckTraceReason.SUPERSEDED })
+            val trace = h.events.joinToString("\n", transform = ::formatDeviceCheckTrace)
+            assertFalse(trace.contains(h.predecessor)); assertFalse(trace.contains(h.successor))
+            assertEquals(0, h.f.io.writes.get())
+            assertTrue(h.f.saved.beginAttemptAsync(h.f.checkBinding(), h.f.resultBinding(), 1000, 301000)
+                .toCompletableFuture().get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityOutcome.Committed)
+            assertEquals(1, h.f.io.writes.get())
+        }
+    }
+
+    @Test fun aRefencedSuccessorOverridesThePredecessorsOldPositiveReceipt() {
+        DelayedSettledHandoff().use { h ->
+            h.f.authority.publicationUnconfirmed(h.successor)
+            h.deliverPredecessor()
+            assertEquals(DeviceCheckAuthorityRead.Blocked("publication_unconfirmed", h.successor),
+                h.f.authority.cachedSnapshot(h.f.baseBinding))
+            assertFalse(h.f.saved.mayBeginAttempt())
+            assertTrue(h.f.saved.prepareExplicitRetry(h.f.resultBinding()).toCompletableFuture()
+                .get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+            assertTrue(h.f.saved.mayBeginAttempt())
+            assertEquals(3, h.f.reconcileCalls.get())
+            assertEquals(0, h.f.io.writes.get())
+        }
+    }
+
+    @Test fun aRefencedPredecessorOverridesItsSuccessorsOldPositiveReceipt() {
+        for (receiptFirst in listOf(true, false)) DelayedSettledHandoff(delaySuccessor = !receiptFirst).use { h ->
+            h.f.authority.publicationUnconfirmed(h.predecessor)
+            h.deliverPredecessor()
+            h.deliverSuccessor() // The false case delivered A without any observed R receipt.
+            assertEquals(h.predecessor, h.f.core.unsettledOperation())
+            assertFalse(h.f.saved.mayBeginAttempt())
+            assertTrue(h.f.saved.prepareExplicitRetry(h.f.resultBinding()).toCompletableFuture()
+                .get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+            assertTrue(h.f.saved.mayBeginAttempt())
+            assertNull(h.f.core.unsettledOperation())
+            assertEquals(3, h.f.reconcileCalls.get())
+            assertEquals(3, h.f.readCalls.get())
+            assertEquals(0, h.f.io.writes.get())
+            assertTrue(h.f.saved.beginAttemptAsync(h.f.checkBinding(), h.f.resultBinding(), 1000, 301000)
+                .toCompletableFuture().get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityOutcome.Committed)
+            assertEquals(1, h.f.io.writes.get())
+        }
+    }
+
+    @Test fun aDelayedPositiveResponseCannotEraseItsOperationsNewFence() {
+        DelayedSettledHandoff(delaySuccessor = true).use { h ->
+            h.f.authority.publicationUnconfirmed(h.successor)
+            h.deliverSuccessor()
+            val gate = h.f.io.holdNextRead()
+            val retry = h.f.saved.prepareExplicitRetry(h.f.resultBinding()).toCompletableFuture()
+            assertTrue(gate.entered.await(2, TimeUnit.SECONDS))
+            assertFalse(retry.isDone)
+            assertFalse(h.f.saved.mayBeginAttempt())
+            gate.release.countDown()
+            assertTrue(retry.get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+            assertFalse(h.f.saved.mayBeginAttempt()) // A still owns its undelivered storage response.
+            h.deliverPredecessor()
+            assertTrue(h.f.saved.mayBeginAttempt())
+            assertEquals(3, h.f.reconcileCalls.get())
+            assertEquals(0, h.f.io.writes.get())
+        }
+    }
+
+    @Test fun aSettledSuccessorReceiptCannotClearAnotherUnknownCurrentOperation() {
+        for (delayPositive in listOf(false, true)) DelayedSettledHandoff(delayPositive).use { h ->
+            val current = UUID.randomUUID().toString()
+            h.f.authority.publicationUnconfirmed(current)
+            h.deliverSuccessor()
+            h.deliverPredecessor()
+            assertEquals(DeviceCheckAuthorityRead.Blocked("publication_unconfirmed", current),
+                h.f.saved.prepareExplicitRetry(h.f.resultBinding()).toCompletableFuture().get(2, TimeUnit.SECONDS))
+            assertEquals(current, h.f.core.unsettledOperation())
+            assertEquals(2, h.f.readCalls.get())
+            assertFalse(h.f.saved.mayBeginAttempt())
+            assertTrue(h.f.authority.reconcileAfterSettled(current).toCompletableFuture()
+                .get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+            assertTrue(h.f.saved.refresh(h.f.resultBinding()).toCompletableFuture()
+                .get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+            assertTrue(h.f.saved.mayBeginAttempt())
+            assertEquals(2, h.f.reconcileCalls.get())
+            assertEquals(0, h.f.io.writes.get())
+        }
+    }
+
+    @Test fun aSettledSuccessorReceiptNeverTransfersAnOldSessionsAction() {
+        DelayedSettledHandoff().use { h ->
+            val old = h.f.saved.prepareExplicitRetry(h.f.resultBinding()).toCompletableFuture()
+            h.f.actor = "other"; h.f.session = 2L
+            h.f.saved.bindSession(h.f.actor, h.f.session)
+            h.deliverPredecessor()
+            assertEquals(DeviceCheckAuthorityRead.Blocked("stale_session"), old.get(2, TimeUnit.SECONDS))
+            assertFalse(h.f.saved.mayBeginAttempt())
+            assertEquals(2, h.f.readCalls.get())
+            assertEquals(0, h.f.io.writes.get())
+            assertTrue(h.f.saved.prepareExplicitRetry(h.f.resultBinding()).toCompletableFuture()
+                .get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+            assertTrue(h.f.saved.mayBeginAttempt())
+            assertEquals(3, h.f.readCalls.get())
+            assertEquals(2, h.f.reconcileCalls.get())
+            assertTrue(h.f.saved.beginAttemptAsync(h.f.checkBinding(), h.f.resultBinding(), 1000, 301000)
+                .toCompletableFuture().get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityOutcome.Committed)
+            assertEquals(1, h.f.io.writes.get())
+        }
+    }
+
+    @Test fun cachedNoFenceWithoutAnObservedSettlementReceiptStaysConservative() {
+        CanonicalHandoffFixture().use { h ->
+            val observed = CompletableFuture<DeviceCheckAuthorityRead>()
+            val deliver = CompletableFuture<Unit>()
+            var first = true
+            h.f.reconcileDelivery = { _, response ->
+                if (first) {
+                    first = false
+                    response.thenCompose { value -> observed.complete(value); deliver.thenApply { value } }
+                } else response
+            }
+            val (_, successor) = h.handoff(releaseSecond = false)
+            assertEquals(DeviceCheckAuthorityRead.Blocked("publication_unconfirmed", successor), observed.get(2, TimeUnit.SECONDS))
+            h.second.release.countDown()
+            h.f.drain(); h.f.drain()
+            assertTrue(h.f.authority.reconcileAfterSettled(successor).toCompletableFuture()
+                .get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+            deliver.complete(Unit) // This adapter never observed that external positive response.
+            assertTrue(h.f.saved.refresh(h.f.resultBinding()).toCompletableFuture()
+                .get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+            assertFalse(h.f.saved.mayBeginAttempt())
+            assertTrue(h.f.saved.prepareExplicitRetry(h.f.resultBinding()).toCompletableFuture()
+                .get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+            assertTrue(h.f.saved.mayBeginAttempt())
+            assertEquals(2, h.f.reconcileCalls.get())
+            assertEquals(0, h.f.io.writes.get())
+        }
+    }
+
     @Test fun canonicalHandoffDiagnosticsKeepTheirFlowWithoutExposingOperationIds() {
         CanonicalHandoffFixture().use { h ->
             val (old, successor) = h.handoff()
@@ -882,6 +1062,44 @@ class AuthorityPostLoginDeviceCheckSavedResultsTest {
         override fun close() {
             first.release.countDown(); second.release.countDown(); observer.releaseAll(); f.close()
         }
+    }
+
+    private class DelayedSettledHandoff(delaySuccessor: Boolean = false) : AutoCloseable {
+        private val h = CanonicalHandoffFixture()
+        val f get() = h.f
+        val events get() = h.events
+        val predecessor: String
+        val successor: String
+        private val predecessorDelivery = CompletableFuture<Unit>()
+        private val successorDelivery = CompletableFuture<Unit>()
+        init {
+            val predecessorResponse = CompletableFuture<DeviceCheckAuthorityRead>()
+            val successorResponse = CompletableFuture<DeviceCheckAuthorityRead>()
+            var count = 0
+            f.reconcileDelivery = { _, response ->
+                when (++count) {
+                    1 -> response.thenCompose { value -> predecessorResponse.complete(value); predecessorDelivery.thenApply { value } }
+                    2 -> response.thenCompose { value ->
+                        successorResponse.complete(value)
+                        if (delaySuccessor) successorDelivery.thenApply { value } else CompletableFuture.completedFuture(value)
+                    }
+                    else -> response
+                }
+            }
+            val ids = h.handoff(releaseSecond = false)
+            predecessor = ids.first; successor = ids.second
+            assertEquals(DeviceCheckAuthorityRead.Blocked("publication_unconfirmed", successor), predecessorResponse.get(2, TimeUnit.SECONDS))
+            assertEquals(DeviceCheckAuthorityRead.Blocked("publication_unconfirmed", successor),
+                f.saved.refresh(f.resultBinding()).toCompletableFuture().get(2, TimeUnit.SECONDS))
+            h.second.release.countDown()
+            assertTrue(successorResponse.get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+            f.drain(); f.drain()
+            assertNull(f.core.unsettledOperation())
+            assertEquals(2, f.reconcileCalls.get())
+        }
+        fun deliverPredecessor() { predecessorDelivery.complete(Unit) }
+        fun deliverSuccessor() { successorDelivery.complete(Unit) }
+        override fun close() { deliverSuccessor(); deliverPredecessor(); h.close() }
     }
 
     private class SettlementFixture(timeoutMs: Long = 5000, trace: DeviceCheckTraceSink = DeviceCheckTraceSink.NONE,

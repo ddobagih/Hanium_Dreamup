@@ -18,7 +18,6 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledThreadPoolExecutor
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
 
 /** One process-shared writer and uncertainty fence per canonical storage namespace. */
 class AndroidDeviceCheckAuthority internal constructor(
@@ -26,13 +25,14 @@ class AndroidDeviceCheckAuthority internal constructor(
     private val diagnostic: Boolean,
     private val timeoutMs: Long = 15_000L,
     private val worker: ExecutorService = Executors.newSingleThreadExecutor { Thread(it, "DeviceCheckAuthorityIo").apply { isDaemon = true } },
+    private val watch: ScheduledThreadPoolExecutor = ScheduledThreadPoolExecutor(1) { Thread(it, "DeviceCheckAuthorityDeadline").apply { isDaemon = true } }.apply {
+        removeOnCancelPolicy = true
+    },
 ) : DeviceCheckAuthority {
     private val lock = Any()
-    private val watch = ScheduledThreadPoolExecutor(1) { Thread(it, "DeviceCheckAuthorityDeadline").apply { isDaemon = true } }.apply {
-        removeOnCancelPolicy = true
-    }
+    private enum class Phase { QUEUED, RUNNING, UNCONFIRMED, DONE }
     private class Ticket(val fingerprint: String) {
-        val phase = AtomicInteger(0) // queued/running/unconfirmed/done
+        var phase = Phase.QUEUED // guarded by this ticket; callbacks always run outside its monitor
         val settled = CompletableFuture<Unit>()
         val future = CompletableFuture<DeviceCheckAuthorityOutcome<Any?>>()
     }
@@ -203,12 +203,28 @@ class AndroidDeviceCheckAuthority internal constructor(
             core.updateResult(bundle, commandId, expectedResult, updatedResult)
         }
     override fun publicationUnconfirmed(commandId: String) {
-        core.publicationUnconfirmed(commandId)
-        synchronized(lock) { tickets[commandId] }?.let { ticket ->
-            val previous = ticket.phase.getAndSet(2)
-            if (previous == 0) ticket.settled.complete(Unit) // It can never enter I/O after losing queue authority.
-            ticket.future.complete(DeviceCheckAuthorityOutcome.Indeterminate(core.unsettledOperation() ?: commandId))
+        val ticket = synchronized(lock) { tickets[commandId] }
+        // External journal/consumer failures may intentionally fence even a completed operation,
+        // or carry a synthetic marker without a local ticket. They are not deadline callbacks.
+        if (ticket == null) core.publicationUnconfirmed(commandId)
+        else markUnconfirmed(commandId, ticket, explicit = true)
+    }
+
+    private fun markUnconfirmed(id: String, ticket: Ticket, explicit: Boolean = false) {
+        val queued: Boolean
+        val outcome = synchronized(ticket) {
+            val pending = ticket.phase == Phase.QUEUED || ticket.phase == Phase.RUNNING
+            if (!pending && !explicit) return
+            // Install the fence before either public uncertainty or actual settlement is visible.
+            // The writer's terminal decision joins this monitor before completing settled.
+            core.publicationUnconfirmed(id)
+            if (!pending) return // Explicit signals never revive a terminal ticket.
+            queued = ticket.phase == Phase.QUEUED
+            ticket.phase = Phase.UNCONFIRMED
+            DeviceCheckAuthorityOutcome.Indeterminate(core.unsettledOperation() ?: id)
         }
+        if (queued) ticket.settled.complete(Unit) // The queued worker has permanently lost I/O admission.
+        ticket.future.complete(outcome)
     }
     override fun reconcileAfterSettled(operationId: String): CompletionStage<DeviceCheckAuthorityRead> {
         val unsettled = synchronized(lock) { tickets.values.filter { !it.settled.isDone }.map { it.settled } }
@@ -286,13 +302,16 @@ class AndroidDeviceCheckAuthority internal constructor(
                 }
             }
         }
-        val timer = try { watch.schedule({ publicationUnconfirmed(id) }, timeoutMs, TimeUnit.MILLISECONDS) }
+        val timer = try { watch.schedule({ markUnconfirmed(id, ticket) }, timeoutMs, TimeUnit.MILLISECONDS) }
         catch (_: Throwable) {
-            publicationUnconfirmed(id); ticket.settled.complete(Unit)
+            markUnconfirmed(id, ticket)
             return ticket.future as CompletionStage<DeviceCheckAuthorityOutcome<T>>
         }
         try { worker.execute {
-            if (!ticket.phase.compareAndSet(0, 1)) { ticket.settled.complete(Unit); timer.cancel(false); return@execute }
+            val entered = synchronized(ticket) {
+                if (ticket.phase != Phase.QUEUED) false else { ticket.phase = Phase.RUNNING; true }
+            }
+            if (!entered) { timer.cancel(false); ticket.settled.complete(Unit); return@execute }
             var outcome: DeviceCheckAuthorityOutcome<T>
             if (!core.enterWork(id, recovery)) {
                 outcome = DeviceCheckAuthorityOutcome.Indeterminate(core.unsettledOperation() ?: id)
@@ -301,12 +320,20 @@ class AndroidDeviceCheckAuthority internal constructor(
                 catch (_: Throwable) { core.publicationUnconfirmed(id); outcome = DeviceCheckAuthorityOutcome.Indeterminate(id) }
                 finally { core.leaveWork(id) }
             }
-            ticket.settled.complete(Unit)
-            if (ticket.phase.compareAndSet(1, 3)) ticket.future.complete(outcome as DeviceCheckAuthorityOutcome<Any?>)
+            val completed = synchronized(ticket) {
+                if (ticket.phase != Phase.RUNNING) false else { ticket.phase = Phase.DONE; true }
+            }
+            // Cancel before any synchronous future callbacks. An already-dispatched timer is
+            // harmless because it must also win the same terminal decision.
             timer.cancel(false)
+            ticket.settled.complete(Unit)
+            if (completed) ticket.future.complete(outcome as DeviceCheckAuthorityOutcome<Any?>)
         } } catch (_: Throwable) {
-            ticket.phase.set(3); ticket.settled.complete(Unit); timer.cancel(false)
-            ticket.future.complete(DeviceCheckAuthorityOutcome.Rejected("writer_rejected_before_io"))
+            val rejected = synchronized(ticket) {
+                if (ticket.phase != Phase.QUEUED) false else { ticket.phase = Phase.DONE; true }
+            }
+            timer.cancel(false); ticket.settled.complete(Unit)
+            if (rejected) ticket.future.complete(DeviceCheckAuthorityOutcome.Rejected("writer_rejected_before_io"))
         }
         return ticket.future as CompletionStage<DeviceCheckAuthorityOutcome<T>>
     }

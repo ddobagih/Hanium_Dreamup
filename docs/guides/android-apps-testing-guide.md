@@ -70,6 +70,7 @@ adb install -r "$VISUAL_TEST_WORKSPACE/apps/android/app/build/outputs/apk/visual
 ## 모델·저장 경계 회귀
 
 - 단위 시험은 Controller/authority·store·pair preparation·selection·Host/Reference/Final·policy/ledger·consumer transfer·primary/unknown owner·pacing의 실제 상태 전이를 사용합니다. 소스 문자열 계약 시험과 실제 Android 실행 증거를 구분합니다.
+- `AndroidDeviceCheckAuthorityTest`는 취소된 timer도 이미 배출 중일 수 있는 순서를 제어하여 읽기·시작·취소·성공 저장·갱신·정산·native journal의 완료 뒤 재차단을 검사합니다. 느린 동기 callback과 재진입, queued/running 만료의 실제 종료 차이, worker/scheduler 거절, 다른 canonical fence, 명시적 외부 불확정 신호를 구분합니다. `AuthorityPostLoginDeviceCheckSavedResultsTest`는 늦은 A→R 응답보다 R 정산이 먼저 완료되는 순서와 현재 계정의 별도 읽기 조건을 검사합니다.
 - `VisionRuntimeFaultAndroidTest` (`visionRemoteFaultTests=true`)는 debug 전용 정지·늦은 명령·잘못된 길이/세대·FD·실제 사망·executor/history 상한을 확인합니다. native를 흉내 낸 fault이며 GPU 드라이버 성능 증거가 아닙니다.
 - `MetricSupportIsolationFaultDeviceTest` (`allowMetricSupportIsolationFaults=true`)는 생성·지원 조회·close 정지와 실제 child 회수를 검사합니다. 실제 ARCore 지원 성공이나 촬영/거리 측정을 시험하지 않습니다.
 - 부모 bind/unbind 정지는 같은 opt-in 시험의 Context wrapper로 주입합니다. 종료 응답과 실제 부모 작업 배출, journal 정산, 다음 조회 허용을 나눠 검사하며 운영체제·GPU 커널 전체 정지 증거로 사용하지 않습니다. `MetricParentExecutionTest`, `MetricReleaseJournalTest`, `VisionParentReleaseTrackerTest`, `DeviceCheckNativeReleaseSettlementTest`는 해당 상태·정산 계약의 단위 회귀입니다.

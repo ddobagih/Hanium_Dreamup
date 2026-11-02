@@ -31,8 +31,12 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
         val result = CompletableFuture<DeviceCheckAuthorityRead>()
         @Volatile var readIssued = false
     }
-    private class ReconcileRequest(val flowId: Long, var notifyChanged: Boolean) {
-        val result = CompletableFuture<DeviceCheckAuthorityRead>()
+    private data class Reconciled(val read: DeviceCheckAuthorityRead, val storageSettled: Boolean)
+    private class ReconcileRequest(val flowId: Long, var notifyChanged: Boolean,
+        val binding: DeviceCheckAuthorityBinding?) {
+        val result = CompletableFuture<Reconciled>()
+        // Receipts only live while this response is pending. Missing/evicted history stays conservative.
+        val settledWhilePending = linkedSetOf<String>()
     }
     private val lock = Any()
     private var attempt: Attempt? = null
@@ -130,7 +134,7 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
                 val current = owner.get()
                 when {
                     current == null -> CompletableFuture.completedFuture<DeviceCheckAuthorityRead>(DeviceCheckAuthorityRead.Blocked("adapter_retired"))
-                    settled is DeviceCheckAuthorityRead.Blocked && settled.operationId != null -> CompletableFuture.completedFuture<DeviceCheckAuthorityRead>(settled)
+                    !settled.storageSettled -> CompletableFuture.completedFuture<DeviceCheckAuthorityRead>(settled.read)
                     else -> current.readRequestStaleReason(requested)?.let { CompletableFuture.completedFuture<DeviceCheckAuthorityRead>(DeviceCheckAuthorityRead.Blocked(it)) }
                         ?: current.issueRead(requested)
                 }
@@ -399,7 +403,7 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
         return mapped
     }
 
-    private fun reconcile(id: String, notifyChanged: Boolean = true): CompletionStage<DeviceCheckAuthorityRead> {
+    private fun reconcile(id: String, notifyChanged: Boolean = true): CompletionStage<Reconciled> {
         val requested = synchronized(lock) {
             uncertain += id
             reconciling[id]?.let {
@@ -408,7 +412,7 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
                     DeviceCheckTraceReason.WRITER_PENDING, boundSession)
                 return it.result
             }
-            ReconcileRequest(operationFlow(id), notifyChanged).also { reconciling[id] = it }
+            ReconcileRequest(operationFlow(id), notifyChanged, binding).also { reconciling[id] = it }
         }
         val session = synchronized(lock) { boundSession }
         emit(requested.flowId, DeviceCheckTraceStage.AUTHORITY_RECONCILE, DeviceCheckTraceOutcome.STARTED,
@@ -423,16 +427,30 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
             if (current == null) {
                 sink.emit(DeviceCheckTraceEvent(requested.flowId, DeviceCheckTraceStage.AUTHORITY_RECONCILE,
                     DeviceCheckTraceOutcome.OWNER_GONE, DeviceCheckTraceReason.OWNER_GONE, session))
-                requested.result.complete(DeviceCheckAuthorityRead.Blocked("adapter_retired"))
+                requested.result.complete(Reconciled(DeviceCheckAuthorityRead.Blocked("adapter_retired"), false))
             } else {
                 val completed = read?.takeIf { error == null } ?: DeviceCheckAuthorityRead.Blocked("reconcile_read_failed", id)
-                val storageSettled = completed !is DeviceCheckAuthorityRead.Blocked || completed.operationId == null
+                val positiveSettlement = completed !is DeviceCheckAuthorityRead.Blocked || completed.operationId == null
                 val successor = (completed as? DeviceCheckAuthorityRead.Blocked)?.operationId?.takeIf { it != id }
-                val notify = synchronized(current.lock) {
+                var settledSuccessor = false
+                var refenced: DeviceCheckAuthorityRead.Blocked? = null
+                val (notify, storageSettled) = synchronized(current.lock) {
+                    val canonical = (current.binding ?: requested.binding)?.let(current.authority::cachedSnapshot)
+                    refenced = (canonical as? DeviceCheckAuthorityRead.Blocked)?.takeIf {
+                        it.operationId == id && (positiveSettlement || successor != null)
+                    }
+                    settledSuccessor = refenced == null && successor != null && successor in requested.settledWhilePending && canonical != null &&
+                        (canonical as? DeviceCheckAuthorityRead.Blocked)?.operationId != successor
+                    val settled = (positiveSettlement && canonical != null && refenced == null) || settledSuccessor
                     if (current.reconciling[id] === requested) current.reconciling.remove(id)
-                    if (storageSettled) {
+                    if (settled) {
                         current.uncertain.remove(id); current.knownOperations.remove(id); current.operationFlows.remove(id)
-                    } else if (successor != null) {
+                        current.reconciling.values.forEach { pending ->
+                            pending.settledWhilePending += id
+                            if (pending.settledWhilePending.size > 256)
+                                pending.settledWhilePending.remove(pending.settledWhilePending.first())
+                        }
+                    } else if (refenced == null && successor != null) {
                         // This issued reconciliation joined the original writer. Its real response
                         // names the next canonical fence; transfer pending ownership, never admit it from cache.
                         current.uncertain.remove(id); current.knownOperations.remove(id); current.operationFlows.remove(id)
@@ -440,19 +458,23 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
                         current.uncertain += successor
                         current.operationFlow(successor, requested.flowId) // Preserve an already observed successor's flow.
                     }
-                    requested.notifyChanged
+                    requested.notifyChanged to settled
                 }
                 current.emit(requested.flowId, DeviceCheckTraceStage.AUTHORITY_RECONCILE,
                     when {
+                        settledSuccessor -> DeviceCheckTraceOutcome.STALE
+                        refenced != null -> DeviceCheckTraceOutcome.RETAINED
                         storageSettled -> DeviceCheckTraceOutcome.SUCCEEDED
                         successor != null -> DeviceCheckTraceOutcome.RETAINED
                         else -> DeviceCheckTraceOutcome.FAILED
                     }, when {
+                        settledSuccessor -> DeviceCheckTraceReason.SUPERSEDED
+                        refenced != null -> DeviceCheckTraceReason.STORAGE_UNCERTAIN
                         storageSettled -> current.readReason(completed)
                         successor != null -> DeviceCheckTraceReason.SUPERSEDED
                         else -> DeviceCheckTraceReason.RECONCILE_FAILED
                     }, session)
-                try { if (notify) current.onChanged() } finally { requested.result.complete(completed) }
+                try { if (notify) current.onChanged() } finally { requested.result.complete(Reconciled(refenced ?: completed, storageSettled)) }
             }
         }
         return requested.result
