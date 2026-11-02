@@ -13,6 +13,151 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /** Real authority/cache/worker with explicit metadata-only proof fixtures; no native claim. */
 class AuthorityPostLoginDeviceCheckSavedResultsTest {
+    @Test fun aTimedOutReconciliationHandsOffItsCanonicalFenceWithoutLeavingTheOldPending() {
+        CanonicalHandoffFixture().use { h ->
+            val (_, next) = h.handoff()
+            val f = h.f
+            assertFalse(f.saved.mayBeginAttempt())
+            assertEquals(DeviceCheckAuthorityRead.Blocked("publication_unconfirmed", next), f.authority.cachedSnapshot(f.baseBinding))
+            assertTrue(f.saved.prepareExplicitRetry(f.resultBinding()).toCompletableFuture()
+                .get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+            assertTrue(f.saved.mayBeginAttempt()) // One request settles the new fence and the old pending together.
+            assertEquals(2, f.readCalls.get())
+            assertNull(f.saved.sourceFor(f.checkBinding()))
+            assertNull(f.saved.historical())
+            assertEquals(0, f.io.writes.get())
+            assertTrue(f.saved.beginAttemptAsync(f.checkBinding(), f.resultBinding(), 1000, 301000)
+                .toCompletableFuture().get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityOutcome.Committed)
+            assertEquals(1, f.io.writes.get())
+        }
+    }
+
+    @Test fun repeatedCanonicalHandoffsWaitForAnotherExplicitActionInsteadOfLooping() {
+        CanonicalHandoffFixture().use { h ->
+            val (_, second) = h.handoff()
+            val thirdObservation = h.observer.holdNext()
+            val retry = h.f.saved.prepareExplicitRetry(h.f.resultBinding()).toCompletableFuture()
+            assertTrue(thirdObservation.entered.await(2, TimeUnit.SECONDS))
+            val third = h.awaitNextFence(second)
+            assertEquals(DeviceCheckAuthorityRead.Blocked("publication_unconfirmed", third), retry.get(2, TimeUnit.SECONDS))
+            assertEquals(2, h.f.reconcileCalls.get()) // Initial ordinary settlement + one explicit settlement.
+            assertFalse(h.f.saved.mayBeginAttempt())
+            thirdObservation.release.countDown()
+            h.f.drain(); h.f.drain()
+            assertEquals(2, h.f.reconcileCalls.get()) // No automatic chain following the changed ID.
+            assertTrue(h.f.saved.prepareExplicitRetry(h.f.resultBinding()).toCompletableFuture()
+                .get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+            assertTrue(h.f.saved.mayBeginAttempt())
+            assertEquals(0, h.f.io.writes.get())
+        }
+    }
+
+    @Test fun duplicateRequestsShareTheSuccessorSettlementAndDoNotRestoreAutomatically() {
+        CanonicalHandoffFixture().use { h ->
+            h.handoff()
+            val gate = h.f.io.holdNextRead()
+            val changed = h.f.changes.get()
+            val first = h.f.saved.prepareExplicitRetry(h.f.resultBinding())
+            assertTrue(gate.entered.await(2, TimeUnit.SECONDS))
+            assertSame(first, h.f.saved.prepareExplicitRetry(h.f.resultBinding()))
+            assertFalse(h.f.saved.mayBeginAttempt())
+            gate.release.countDown()
+            assertTrue(first.toCompletableFuture().get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+            assertTrue(h.f.saved.mayBeginAttempt())
+            assertEquals(changed, h.f.changes.get())
+            assertEquals(2, h.f.reconcileCalls.get())
+        }
+    }
+
+    @Test fun aStaleSuccessorTimeoutOnlyRetainsCleanupForTheNewSessionsExplicitRead() {
+        CanonicalHandoffFixture().use { h ->
+            val (_, second) = h.handoff()
+            val gate = h.observer.holdNext()
+            val old = h.f.saved.prepareExplicitRetry(h.f.resultBinding()).toCompletableFuture()
+            assertTrue(gate.entered.await(2, TimeUnit.SECONDS))
+            h.f.actor = "other"; h.f.session = 2L
+            h.f.saved.bindSession(h.f.actor, h.f.session)
+            h.awaitNextFence(second)
+            assertEquals(DeviceCheckAuthorityRead.Blocked("stale_session"), old.get(2, TimeUnit.SECONDS))
+            assertFalse(h.f.saved.mayBeginAttempt())
+            gate.release.countDown()
+            h.f.drain(); h.f.drain()
+            assertTrue(h.f.saved.prepareExplicitRetry(h.f.resultBinding()).toCompletableFuture()
+                .get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+            assertTrue(h.f.saved.mayBeginAttempt())
+            assertEquals(0, h.f.io.writes.get())
+            assertTrue(h.f.saved.beginAttemptAsync(h.f.checkBinding(), h.f.resultBinding(), 1000, 301000)
+                .toCompletableFuture().get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityOutcome.Committed)
+            assertEquals(1, h.f.io.writes.get())
+        }
+    }
+
+    @Test fun successorSettlementPreservesSchemaAndUnknownNativeProcessGates() {
+        for (invalid in listOf(false, true)) CanonicalHandoffFixture(
+            if (invalid) DeviceCheckProcessObservation.ABSENT else DeviceCheckProcessObservation.UNKNOWN).use { h ->
+            val (_, successor) = h.handoff()
+            val original = h.f.io.text
+            if (invalid) h.f.io.text = "invalid"
+            val expected = if (invalid) DeviceCheckAuthorityRead.Blocked("reconcile_invalid_record", successor)
+                else DeviceCheckAuthorityRead.Blocked("native_recovery_required")
+            assertEquals(expected, h.f.saved.prepareExplicitRetry(h.f.resultBinding()).toCompletableFuture().get(2, TimeUnit.SECONDS))
+            assertFalse(h.f.saved.mayBeginAttempt())
+            assertNull(h.f.saved.registerRuntimeOwner(h.f.checkBinding(), "unconfirmed-successor-owner"))
+            assertEquals(0, h.f.io.writes.get())
+            if (invalid) {
+                h.f.io.text = original
+                assertTrue(h.f.saved.prepareExplicitRetry(h.f.resultBinding()).toCompletableFuture()
+                    .get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+                assertTrue(h.f.saved.mayBeginAttempt())
+            }
+        }
+    }
+
+    @Test fun aCanonicalHandoffJoinsAnAlreadyObservedSuccessorWithoutReplacingItsFlow() {
+        CanonicalHandoffFixture().use { h ->
+            val observed = CompletableFuture<DeviceCheckAuthorityRead>()
+            val deliver = CompletableFuture<Unit>()
+            var first = true
+            h.f.reconcileDelivery = { _, response ->
+                if (first) {
+                    first = false
+                    response.thenCompose { value -> observed.complete(value); deliver.thenApply { value } }
+                } else response
+            }
+            val (_, successor) = h.handoff(releaseSecond = false)
+            assertEquals(DeviceCheckAuthorityRead.Blocked("publication_unconfirmed", successor), observed.get(2, TimeUnit.SECONDS))
+            // A separately issued read really observes the new canonical fence before A delivers it.
+            assertEquals(DeviceCheckAuthorityRead.Blocked("publication_unconfirmed", successor),
+                h.f.saved.refresh(h.f.resultBinding()).toCompletableFuture().get(2, TimeUnit.SECONDS))
+            val successorFlow = h.events.last { it.stage == DeviceCheckTraceStage.AUTHORITY_RECONCILE &&
+                it.outcome == DeviceCheckTraceOutcome.STARTED }.flowId
+            deliver.complete(Unit)
+            val retry = h.f.saved.prepareExplicitRetry(h.f.resultBinding()).toCompletableFuture()
+            assertEquals(successorFlow, h.events.last { it.stage == DeviceCheckTraceStage.AUTHORITY_RECONCILE &&
+                it.outcome == DeviceCheckTraceOutcome.JOINED }.flowId)
+            assertEquals(2, h.f.reconcileCalls.get()) // A and the observed R; joining R creates no second authority request.
+            h.second.release.countDown()
+            assertTrue(retry.get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+            assertTrue(h.f.saved.mayBeginAttempt())
+            assertEquals(0, h.f.io.writes.get())
+        }
+    }
+
+    @Test fun canonicalHandoffDiagnosticsKeepTheirFlowWithoutExposingOperationIds() {
+        CanonicalHandoffFixture().use { h ->
+            val (old, successor) = h.handoff()
+            val flow = h.events.first { it.stage == DeviceCheckTraceStage.AUTHORITY_RECONCILE }.flowId
+            assertTrue(h.events.any { it.flowId == flow && it.stage == DeviceCheckTraceStage.AUTHORITY_RECONCILE &&
+                it.outcome == DeviceCheckTraceOutcome.RETAINED && it.reason == DeviceCheckTraceReason.SUPERSEDED })
+            assertTrue(h.f.saved.prepareExplicitRetry(h.f.resultBinding()).toCompletableFuture()
+                .get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+            val finished = h.events.last { it.stage == DeviceCheckTraceStage.AUTHORITY_RECONCILE && it.outcome == DeviceCheckTraceOutcome.SUCCEEDED }
+            assertEquals(flow, finished.flowId)
+            val lines = h.events.joinToString("\n", transform = ::formatDeviceCheckTrace)
+            assertFalse(lines.contains(old)); assertFalse(lines.contains(successor))
+        }
+    }
+
     @Test fun aLateCommittedBeginTracksItsCompensatingCancellationWithoutStartingAnotherAttempt() {
         for (publication in DeviceCheckPublication.entries) {
             val events = CopyOnWriteArrayList<DeviceCheckTraceEvent>()
@@ -686,8 +831,62 @@ class AuthorityPostLoginDeviceCheckSavedResultsTest {
         override fun close() = authority.shutdownForTests()
     }
 
+    private class ProcessReadObserver : DeviceCheckProcessObserver {
+        private val count = AtomicInteger()
+        private val gates = java.util.concurrent.ConcurrentHashMap<Int, SettlementIo.Gate>()
+        @Volatile var result = DeviceCheckProcessObservation.ABSENT
+        fun holdNext() = SettlementIo.Gate().also { gates[count.get() + 1] = it }
+        fun hold(ordinal: Int) = SettlementIo.Gate().also { gates[ordinal] = it }
+        override fun observe(process: DeviceCheckNativeProcess): DeviceCheckProcessObservation {
+            gates[count.incrementAndGet()]?.let {
+                it.entered.countDown(); check(it.release.await(5, TimeUnit.SECONDS))
+            }
+            return result
+        }
+        fun releaseAll() { gates.values.forEach { it.release.countDown() } }
+    }
+
+    /** Two actual facade watchdogs: initial read A, then reconcile(A) after its fence has cleared. */
+    private class CanonicalHandoffFixture(observation: DeviceCheckProcessObservation = DeviceCheckProcessObservation.ABSENT) : AutoCloseable {
+        val observer = ProcessReadObserver().also { it.result = observation }
+        private val first = observer.hold(1)
+        val second = observer.hold(2)
+        val events = CopyOnWriteArrayList<DeviceCheckTraceEvent>()
+        val f = SettlementFixture(timeoutMs = 300, trace = DeviceCheckTraceSink { events += it },
+            initialRead = false, observer = observer)
+        init {
+            val foreign = DeviceCheckAuthorityCoreTest.Fixture().also { it.pair() }
+            f.io.text = requireNotNull(foreign.io.text)
+        }
+        fun awaitNextFence(previous: String): String {
+            val until = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+            do {
+                f.core.unsettledOperation()?.takeIf { it != previous }?.let { return it }
+                Thread.sleep(5)
+            } while (System.nanoTime() < until)
+            error("The next real facade watchdog did not publish its fence")
+        }
+        fun handoff(releaseSecond: Boolean = true): Pair<String, String> {
+            val initial = f.saved.refresh(f.resultBinding()).toCompletableFuture()
+            assertTrue(first.entered.await(2, TimeUnit.SECONDS))
+            val old = (initial.get(2, TimeUnit.SECONDS) as DeviceCheckAuthorityRead.Blocked).operationId!!
+            first.release.countDown()
+            assertTrue(second.entered.await(2, TimeUnit.SECONDS))
+            val next = awaitNextFence(old)
+            if (releaseSecond) {
+                second.release.countDown()
+                f.drain(); f.drain()
+            }
+            return old to next
+        }
+        override fun close() {
+            first.release.countDown(); second.release.countDown(); observer.releaseAll(); f.close()
+        }
+    }
+
     private class SettlementFixture(timeoutMs: Long = 5000, trace: DeviceCheckTraceSink = DeviceCheckTraceSink.NONE,
-        initialRead: Boolean = true) : AutoCloseable {
+        initialRead: Boolean = true,
+        observer: DeviceCheckProcessObserver = DeviceCheckProcessObserver { DeviceCheckProcessObservation.UNKNOWN }) : AutoCloseable {
         private val models = DeviceCheckAuthorityCoreTest.Fixture()
         val io = SettlementIo()
         val baseBinding = DeviceCheckAuthorityBinding("a".repeat(64), "b".repeat(64), models.choice.bindingHash, "d".repeat(64))
@@ -697,7 +896,7 @@ class AuthorityPostLoginDeviceCheckSavedResultsTest {
         var now = 1100L
         private var issuedProof: DeviceCheckPairProof? = null
         private var runtime: DeviceCheckReadyRuntime? = null
-        val core = DeviceCheckAuthorityCore(io, DeviceCheckProcessObserver { DeviceCheckProcessObservation.UNKNOWN },
+        val core = DeviceCheckAuthorityCore(io, observer,
             { now }, { 8 }, true, verifyProofOrigin = { it === issuedProof }, requireSessionObservation = true)
         private val worker = Executors.newSingleThreadExecutor()
         val authority = AndroidDeviceCheckAuthority(core, true, timeoutMs, worker)
@@ -705,6 +904,7 @@ class AuthorityPostLoginDeviceCheckSavedResultsTest {
         val reconcileCalls = AtomicInteger()
         val changes = AtomicInteger()
         var forcedRead: DeviceCheckAuthorityRead? = null
+        var reconcileDelivery: ((String, CompletionStage<DeviceCheckAuthorityRead>) -> CompletionStage<DeviceCheckAuthorityRead>)? = null
         private val counted = object : DeviceCheckAuthority by authority {
             override fun read(binding: DeviceCheckAuthorityBinding, expectedSessionGeneration: Long?): CompletionStage<DeviceCheckAuthorityRead> {
                 readCalls.incrementAndGet()
@@ -713,7 +913,8 @@ class AuthorityPostLoginDeviceCheckSavedResultsTest {
             }
             override fun reconcileAfterSettled(operationId: String): CompletionStage<DeviceCheckAuthorityRead> {
                 reconcileCalls.incrementAndGet()
-                return authority.reconcileAfterSettled(operationId)
+                val response = authority.reconcileAfterSettled(operationId)
+                return reconcileDelivery?.invoke(operationId, response) ?: response
             }
         }
         val saved = AuthorityPostLoginDeviceCheckSavedResults(counted,

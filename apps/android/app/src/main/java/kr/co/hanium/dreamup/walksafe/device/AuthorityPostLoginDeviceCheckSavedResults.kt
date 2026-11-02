@@ -29,6 +29,7 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
     private class ReadRequest(val actor: String, val session: Long, val binding: DeviceCheckAuthorityBinding,
         var notifyChanged: Boolean, val flowId: Long, val settlementId: String? = null) {
         val result = CompletableFuture<DeviceCheckAuthorityRead>()
+        @Volatile var readIssued = false
     }
     private class ReconcileRequest(val flowId: Long, var notifyChanged: Boolean) {
         val result = CompletableFuture<DeviceCheckAuthorityRead>()
@@ -158,7 +159,7 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
                     selected && requested.notifyChanged && current.boundActor == requested.actor && current.boundSession == requested.session &&
                         current.binding == requested.binding
                 } && current.sessionCurrent(requested.actor, requested.session)
-                if (read is DeviceCheckAuthorityRead.Blocked && read.operationId != null && read.operationId != requested.settlementId) {
+                if (requested.readIssued && read is DeviceCheckAuthorityRead.Blocked && read.operationId != null) {
                     // Observed from this issued read, never promoted from a cached/guessed operation ID.
                     synchronized(current.lock) { current.knownOperations += read.operationId }
                     current.operationFlow(read.operationId, requested.flowId)
@@ -179,6 +180,7 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
 
     private fun issueRead(requested: ReadRequest): CompletionStage<DeviceCheckAuthorityRead> {
         emit(requested.flowId, DeviceCheckTraceStage.AUTHORITY_READ, DeviceCheckTraceOutcome.STARTED, session = requested.session)
+        requested.readIssued = true
         return try { authority.read(requested.binding, requested.session) } catch (_: Throwable) {
             CompletableFuture.completedFuture(DeviceCheckAuthorityRead.Blocked("authority_read_failed"))
         }
@@ -425,16 +427,31 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
             } else {
                 val completed = read?.takeIf { error == null } ?: DeviceCheckAuthorityRead.Blocked("reconcile_read_failed", id)
                 val storageSettled = completed !is DeviceCheckAuthorityRead.Blocked || completed.operationId == null
+                val successor = (completed as? DeviceCheckAuthorityRead.Blocked)?.operationId?.takeIf { it != id }
                 val notify = synchronized(current.lock) {
                     if (current.reconciling[id] === requested) current.reconciling.remove(id)
                     if (storageSettled) {
                         current.uncertain.remove(id); current.knownOperations.remove(id); current.operationFlows.remove(id)
+                    } else if (successor != null) {
+                        // This issued reconciliation joined the original writer. Its real response
+                        // names the next canonical fence; transfer pending ownership, never admit it from cache.
+                        current.uncertain.remove(id); current.knownOperations.remove(id); current.operationFlows.remove(id)
+                        current.knownOperations += successor
+                        current.uncertain += successor
+                        current.operationFlow(successor, requested.flowId) // Preserve an already observed successor's flow.
                     }
                     requested.notifyChanged
                 }
                 current.emit(requested.flowId, DeviceCheckTraceStage.AUTHORITY_RECONCILE,
-                    if (storageSettled) DeviceCheckTraceOutcome.SUCCEEDED else DeviceCheckTraceOutcome.FAILED,
-                    if (storageSettled) current.readReason(completed) else DeviceCheckTraceReason.RECONCILE_FAILED, session)
+                    when {
+                        storageSettled -> DeviceCheckTraceOutcome.SUCCEEDED
+                        successor != null -> DeviceCheckTraceOutcome.RETAINED
+                        else -> DeviceCheckTraceOutcome.FAILED
+                    }, when {
+                        storageSettled -> current.readReason(completed)
+                        successor != null -> DeviceCheckTraceReason.SUPERSEDED
+                        else -> DeviceCheckTraceReason.RECONCILE_FAILED
+                    }, session)
                 try { if (notify) current.onChanged() } finally { requested.result.complete(completed) }
             }
         }
