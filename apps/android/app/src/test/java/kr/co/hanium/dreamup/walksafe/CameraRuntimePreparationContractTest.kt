@@ -6,6 +6,27 @@ import org.junit.Test
 
 /** Production wiring: selection never runs at camera entry, nor does loading imply verified output. */
 class CameraRuntimePreparationContractTest {
+    @Test fun ownerDestructionRetiresTheOriginalPreparationIndependentlyOfUiCallbacks() {
+        val prepare = body(main, "private fun prepareDeviceRuntimeLease(")
+        assertTrue("Original claim needs an owner-independent teardown from birth",
+            prepare.contains("DeviceRuntimeLeaseTeardown.afterOwnerGone("))
+        val destroy = body(main, "override fun onDestroy()")
+        assertTrue(destroy.indexOf("retirePendingDeviceRuntimeLease()") in 0 until
+            destroy.indexOf("beginDestroyedVisionRetirement()"))
+        val retire = body(main, "private fun retirePendingDeviceRuntimeLease()")
+        assertTrue(retire.contains("ownerGone.complete("))
+        assertFalse("Destroy alone is not release evidence", retire.contains("budget.complete()"))
+    }
+
+    @Test fun quiescedEvidenceSurvivesStaleCompletionAndIsConsumedOnlyWithARealReservation() {
+        val prepare = body(main, "private fun prepareDeviceRuntimeLease(")
+        assertTrue(prepare.contains("DeviceRuntimeLeaseRecovery.retirementAfterCompletion("))
+        assertFalse(prepare.contains("if (pendingRuntimeRetirement === knownRetirement) pendingRuntimeRetirement = null"))
+        val pair = body(main, "private fun prepareMainRuntimePair(")
+        assertTrue(pair.indexOf("reservePreparedPair(current)") < pair.indexOf("retirementAfterReservation("))
+        assertTrue(pair.contains("DeviceRuntimeLeaseRecovery.retirementAfterReservation("))
+    }
+
     @Test fun failedOldCloseKeepsAProofDrivenCleanupPathInsteadOfStrandingThePreparation() {
         val lease = body(main, "private fun prepareDeviceRuntimeLease(")
         assertTrue("A close failure needs a late cleanup observer", lease.contains("observeFailedRuntimeLeaseCleanup("))

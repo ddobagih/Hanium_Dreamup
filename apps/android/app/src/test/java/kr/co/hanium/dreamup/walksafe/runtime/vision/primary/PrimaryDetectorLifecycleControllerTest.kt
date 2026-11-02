@@ -27,6 +27,64 @@ import org.junit.Test
 import sun.misc.Unsafe
 
 class PrimaryDetectorLifecycleControllerTest {
+    @Test fun destructionBeforeTheInitialDrainStillSettlesTheOriginalHandoffAfterRealHostClose() {
+        val f = Fixture()
+        val handoff = kr.co.hanium.dreamup.walksafe.CameraRuntimeHandoff.Registry()
+        val original = requireNotNull(handoff.begin())
+        val destroyed = handoff.joinRetirement()
+        val gone = CompletableFuture<java.util.concurrent.CompletionStage<Boolean>>()
+        val teardown = kr.co.hanium.dreamup.walksafe.device.postlogin.DeviceRuntimeLeaseTeardown.afterOwnerGone<Any, Any>(
+            gone, f.execution.hostDrainedFuture(), f.execution.closedFuture(), null,
+            snapshot = { error("An initial Noop has no native owner") }, knownRetirement = null,
+            actualReleased = { error("No native cohort") }, allocationAvailable = { error("No native cohort") },
+            requestExit = { error("No native cohort") }, hostDrained = CompletableFuture(),
+            consumerDrained = null, consumerReleased = null)
+        teardown.whenComplete { _, error -> if (error == null) original.complete() }
+        val oldUi = mutableListOf<Boolean>()
+        f.lifecycle.cancelPendingLoadAfterDrain { oldUi += it }
+        f.destroyed = true
+        f.execution.fenceForClose()
+        gone.complete(CompletableFuture.completedFuture(true))
+        f.execution.closeAfterCalibrationDrains()
+        destroyed.complete()
+        assertNull(handoff.begin())
+        f.tuning.next(); f.tuning.next()
+        f.native.next(); f.ui.next()
+        assertEquals(listOf(false), oldUi)
+        assertNull(handoff.begin()) // failed UI result never releases the old claim.
+        f.native.next()
+        assertEquals(Unit, teardown.getNow(null))
+        assertNotNull(handoff.begin()) // Independent teardown restores admission without an Activity.
+    }
+
+    @Test fun staleCompletionKeepsEvidenceUntilAFreshReceiverActuallyConsumesQuiescence() {
+        val f = Fixture()
+        val actual = CompletableFuture<VisionReleaseReceipt>()
+        val captured = VisionRetirementSnapshot(VisionCohortLease("e".repeat(64), "foreground", 1L), actual)
+        f.lifecycle.quiesceForRuntimeError(captured)
+        f.tuning.next(); f.native.next()
+        actual.complete(VisionReleaseReceipt(captured.lease.cohortId, 234))
+        assertTrue(f.lifecycle.resumeQuiescedForRecheck { true })
+        assertTrue(f.execution.projection().closing) // A permit has not reopened the host.
+        var pending = kr.co.hanium.dreamup.walksafe.device.postlogin.DeviceRuntimeLeaseRecovery
+            .retirementAfterCompletion(captured, captured, current = false, primaryClosing = f.execution.projection().closing)
+        assertTrue(pending === captured)
+        pending = kr.co.hanium.dreamup.walksafe.device.postlogin.DeviceRuntimeLeaseRecovery
+            .retirementAfterCompletion(pending, captured, current = true, primaryClosing = f.execution.projection().closing)
+        assertTrue(pending === captured)
+        assertNull(f.lifecycle.reservePreparedPair { false })
+        assertTrue(f.execution.projection().closing)
+        assertTrue(f.lifecycle.resumeQuiescedForRecheck { true })
+        val slot = requireNotNull(f.lifecycle.reservePreparedPair { true })
+        assertFalse(f.execution.projection().closing)
+        pending = kr.co.hanium.dreamup.walksafe.device.postlogin.DeviceRuntimeLeaseRecovery
+            .retirementAfterReservation(pending, captured, reserved = true, primaryClosing = f.execution.projection().closing)
+        assertNull(pending)
+        assertNull(f.lifecycle.reservePreparedPair { true }) // Exactly one receiver owns this reservation.
+        f.lifecycle.finishPreparedNotStarted(slot)
+        f.lifecycle.rollbackPreparedLoad(slot)
+    }
+
     @Test fun constructionAndMetadataNeverReadSdkAuthorityClockFrameOrNative() {
         val f = Fixture(); assertTrue(f.events.isEmpty()); assertEquals(0, f.clockReads)
         assertEquals("detector=load_pending_after_camera_gate", f.lifecycle.metadata().statusText)

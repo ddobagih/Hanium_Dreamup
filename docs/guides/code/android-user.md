@@ -52,8 +52,8 @@ adb install -r apps/android/app/build/outputs/apk/debug/app-debug.apk
 - `AndroidDeviceCheckAuthority`의 별도 AEAD 저장소가 시도·선택·결과·native LOAD/CLOSE journal·무효화를 같은 revision에 결속합니다. LOAD_INTENT 저장 확인 전 native OPEN을 전송하지 않습니다. 기존 계정·동의·교육 저장소와 옛 키를 삭제하거나 재사용하지 않습니다.
 - 모든 필수 결과와 실제 pair 검증을 원래5분 안에 단일 결정으로 수용하면 `SAVING`으로 넘어갑니다. 이 상태는 통과가 아닙니다. 별도15초 저장 확인에서 durable ACK·현재 actor/session/source·현재 두 모델 증명이 모두 맞아야 FULL/LIMITED를 표시합니다. 늦은 timer나 성공 callback으로 기한을 늘리지 않습니다.
 - 저장 결과는 Committed/Rejected/NotPublished/Indeterminate로 구분합니다. 대기 만료를 디스크 미갱신으로 단정하지 않으며, 미확정 I/O 정산과 새 파일 readback 전에는 자동 복원과 새 저장을 막습니다. Depth/TTS 결과 갱신도 같은 비동기 revision 계약을 사용합니다.
-- 최초 저장소 읽기 실패는 사용자 재점검 동작에서만 같은 actor/session/binding으로 비동기 재조회합니다. 같은 조회는 합류하며 완료 전에는 새 시도를 허용하지 않습니다. 명시 재조회는 자동 복원 알림을 억제하고 캡처한 동작 한 번만 이어갑니다. 미확정 writer·schema 오류·native 회수 대기는 이 경로로 우회하지 않습니다.
-- 이전 primary 종료 실패 뒤에도 정확한 cohort의 정리 증거를 관찰합니다. local release·보조 consumer·실제 child 종료·journal 정산·registry 회수가 모두 확인되면 실패한 준비의 budget만 반환합니다. 새 PASS·자동 모델 재시작은 없으며, 새 명시 시도가 별도 권한으로 quiesced host를 재개합니다. 증거 없는 local 실패는 차단을 유지합니다.
+- 최초 저장소 읽기 실패는 사용자 재점검 동작에서만 같은 actor/session/binding으로 비동기 재조회합니다. 같은 조회는 합류하며 완료 전에는 새 시도를 허용하지 않습니다. 명시 재조회는 자동 복원 알림을 억제하고 캡처한 동작 한 번만 이어갑니다. 미확정 writer·schema 오류·native 회수 대기는 이 경로로 우회하지 않습니다. 본 adapter가 발행한 명령·읽기의 실제 authority 응답으로 확인한 exact operation은 첫 정산 읽기가 실패해도 명시 동작에서 정산만 다시 시도할 수 있습니다. 실제 writer 합류와 새 읽기를 거치며, 이전 계정의 정산 성공이 현재 계정의 점검 권한이 되지는 않습니다. 정산 뒤 현재 binding의 별도 읽기가 양성이어야 새 시도를 허용합니다. 캐시에서만 관찰한 임의 operation ID를 새 정산 권한으로 사용하지 않습니다.
+- 이전 primary 종료 실패 뒤에도 정확한 cohort의 정리 증거를 관찰합니다. local release·보조 consumer·실제 child 종료·journal 정산·registry 회수가 모두 확인되면 실패한 준비의 budget만 반환합니다. 새 PASS·자동 모델 재시작은 없으며, 새 명시 시도가 별도 권한으로 quiesced host를 재개합니다. 증거 없는 local 실패는 차단을 유지합니다. `DeviceRuntimeLeaseTeardown`은 예약 직후부터 원 claim의 파괴 후 정리를 장착하고, host 배출 뒤 원 owner를 조회해 EXIT를 요청합니다. UI callback이 폐기돼도 실제 종료·정산·consumer 회수 확인이 끝나야 원 claim을 반환합니다. 이전 snapshot은 stale 완료·재개 허가만으로 지우지 않으며, 실제 `reservePreparedPair`가 quiescence를 소비한 뒤 정확한 같은 snapshot만 해제합니다.
 - 과거 COMMITTED와 현재 pair 준비 증명은 별개입니다. 앱 재시작은 같은 코드·모델·기기 binding의 기록을 읽어 실제 두 모델을 새로 준비한 후 복원합니다. 화면 인계 동안 과거 기록은 보존하지만 현재 화면의 기능 gate는 닫습니다. 실제 실행 실패·미확인 회수는 명시 재점검 상태로 끝냅니다.
 - `WALKSAFE_RUNTIME_BUILD_ID`는 운영 소스·자원·모델·variant 설정·의존성 설정 내용으로 생성합니다. 같은 debug Git 표지만으로 다른 코드를 같은 점검 결과로 복원하지 않습니다. 기존 release source SHA 검증은 유지합니다.
 - 실제 native 생성·추론·종료는 비공개 `:vision_runtime`의 두 owner 스레드에서 수행합니다. 부모는 전처리·파서·mask decode·listener를 담당합니다. hard fault는 같은 cohort의 두 모델을 퇴역시키고 실제 child death·mapping/FD 회수 전 재할당을 막습니다. 타 모델이 남은 상태의 부분 CPU fallback을 허용하지 않습니다. API31 미만은 native 준비 전에 지원 조건에서 거절합니다.
@@ -63,6 +63,21 @@ adb install -r apps/android/app/build/outputs/apk/debug/app-debug.apk
 - 정확한 owner별 완료 회수 이력은16개로 제한합니다. 과거 owner의 완료 receipt는 재점검을 위한 증거일 뿐 새 owner의 할당이나 EXIT 권한이 아닙니다. 실제 모델의 생성/종료가 멈추면 자식 종료를 요청하되 GPU/커널 전체 복구를 보장하지 않습니다.
 - 거리 지원 조회는 `:metric_support`의 Session 생성 → AUTOMATIC 지원 API → close만 사용하며 resume·촬영 프레임은 없습니다. 실제 회수와 journal 정산 뒤 모델 시험을 시작합니다. 명시적 false와 설치/권한/정지/미확인 오류를 구분합니다. TTS 합성은 실제 청취, 진동 요청은 체감 확인, GPS 지원 정보는 현재 위치 품질의 증거가 아닙니다.
 - 거리 조회의 부모 작업도 `MetricParentExecution`의 공용 실행기 4개로 제한합니다. bind/조회·unbind·EXIT와 조정을 분리하고 임시 스레드를 만들지 않습니다. `MetricReleaseJournal`은 정상·늦은 회수를 한 번 정산하며 실패한 옛 결과를 다시 발행하지 않습니다.
+
+### 원인 추적 로그와 복구 시험
+
+- debug APK의 `WalkSafeDeviceCheck` Logcat과 기존 `cache/runtime-diagnostics/events.log`, `events.previous.log`에 같은 고정 형식 메타데이터를 기록합니다. `runtime_build_id`·`source_commit`으로 코드 버전을 구분하고, 파일의 `run_id`·`elapsed_ms`·생성된 `flow_id`·session/attempt 숫자로 단계 전후를 연결합니다. Logcat은 `threadtime`의 프로세스 ID와 `elapsed_ms`로 실행을 구분합니다. actor/owner/operation 원문 ID, 이미지·음성·좌표·예외 원문은 받지 않습니다. release 수집·원격 전송은 추가하지 않습니다.
+- 로그는 `stage`·`outcome`·`reason`·`state`·`failure`를 구분합니다. `SAVING`은 저장 확인 대기이며 `PUBLISH/SUCCEEDED`와 다릅니다. `NATIVE_RELEASE` 완료 뒤 `ALLOCATION_AVAILABLE` 대기가 남으면 물리 회수 후 저장 정산 대기입니다. `HOST_RESUME/ACQUIRED`는 재개 허가만 받은 상태이고, 실제 receiver가 허가를 소비한 뒤에만 `HOST_RESUME/SUCCEEDED`를 남깁니다.
+- 기존 단일 worker·queue64·128KiB 파일2개 상한을 재사용합니다. sink 예외·파일 실패·포화는 기능을 중단시키지 않으며, 로그는 best-effort이므로 기록 누락을 성공 증거로 해석하지 않습니다. 파일 prefix의 `dropped_total`로 누락을 확인합니다.
+- `DeviceRuntimeLeaseRecoveryTest`는 파괴를 각 대기 단계에 끼워 넣어 원 claim 정산·다음 단일 획득을 검증합니다. 실제 Primary Lifecycle 회귀는 초기 drain 전 파괴와 재개 허가/예약 소비를 검증합니다. SavedResults 회귀는 실제 writer 지연, 정산 읽기 재실패, 계정·binding 변경, native/schema 차단과 실제 응답의 다른 operation ID를 검증합니다.
+
+필터한 Logcat과 로컬 파일은 다음처럼 수집할 수 있습니다. 다른 기기가 연결되어 있으면 `adb -s <대상>`으로 대상을 지정합니다. 파일은 앱 캐시라서 운영체제가 지울 수 있습니다.
+
+```bash
+adb logcat -d -v threadtime -s WalkSafeDeviceCheck:I WalkSafeJointRuntime:I '*:S' > device-check-logcat.txt
+adb exec-out run-as kr.co.hanium.dreamup.walksafe cat cache/runtime-diagnostics/events.log > device-check-events.log
+adb exec-out run-as kr.co.hanium.dreamup.walksafe cat cache/runtime-diagnostics/events.previous.log > device-check-events.previous.log
+```
 
 ## 변경 시 확인
 

@@ -16,6 +16,7 @@ internal class PostLoginDeviceCheckController(
     private val config: Config,
     private val elapsedRealtimeMs: () -> Long = { System.nanoTime() / 1_000_000L },
     private val dispatch: ((() -> Unit) -> Unit) = { it() },
+    private val trace: DeviceCheckTraceSink = DeviceCheckTraceSink.NONE,
 ) {
     data class Config(
         val overallTimeoutMs: Long = 300_000L,
@@ -25,6 +26,28 @@ internal class PostLoginDeviceCheckController(
     )
 
     @Volatile private var current = PostLoginDeviceCheckPolicy.initial()
+    private var traceFlow = DeviceCheckTraceIds.next()
+    private var traceBinding: PostLoginDeviceCheckBinding? = null
+
+    private fun recordSnapshot(snapshot: PostLoginDeviceCheckSnapshot) {
+        if (traceBinding != snapshot.bindingOrNull) {
+            traceBinding = snapshot.bindingOrNull
+            traceFlow = DeviceCheckTraceIds.next()
+        }
+        val stage = when {
+            snapshot.state == PostLoginDeviceCheckState.SAVING -> DeviceCheckTraceStage.SAVING
+            snapshot.passesFeatureGate -> DeviceCheckTraceStage.PUBLISH
+            else -> DeviceCheckTraceStage.ATTEMPT
+        }
+        val outcome = when {
+            snapshot.failure != null -> DeviceCheckTraceOutcome.FAILED
+            snapshot.passesFeatureGate -> DeviceCheckTraceOutcome.SUCCEEDED
+            else -> DeviceCheckTraceOutcome.WAITING
+        }
+        trace.emit(DeviceCheckTraceEvent(traceFlow, stage, outcome,
+            if (snapshot.failure == null) DeviceCheckTraceReason.NONE else DeviceCheckTraceReason.FAILED,
+            snapshot.sessionGeneration, snapshot.attemptGeneration, snapshot.state, snapshot.failure))
+    }
     val snapshot: PostLoginDeviceCheckSnapshot get() = current
     var cameraDependentChecksDeferred: Boolean = false
         private set
@@ -93,6 +116,8 @@ internal class PostLoginDeviceCheckController(
             if (current !== previous) return false
         }
         current = next
+        if (previous.state != next.state || previous.failure != next.failure || previous.bindingOrNull != next.bindingOrNull)
+            recordSnapshot(next)
         return true
     }
 
@@ -597,6 +622,7 @@ internal class PostLoginDeviceCheckController(
         if (decision.binding != binding || !decision.value.compareAndSet(Decision.OPEN, Decision.SUCCESS)) return
         val saving = completedSnapshot.copy(state = PostLoginDeviceCheckState.SAVING)
         current = saving // Output owners were already retired above, before the success CAS.
+        recordSnapshot(saving)
         // Detach the old timer without invoking external cancellation before request freezing.
         ++timeoutGeneration
         val oldOverallTimer = overallTimeout

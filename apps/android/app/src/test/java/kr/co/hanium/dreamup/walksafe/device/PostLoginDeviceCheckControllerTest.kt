@@ -9,6 +9,29 @@ import org.junit.Test
 import java.util.concurrent.CompletableFuture
 
 class PostLoginDeviceCheckControllerTest {
+    @Test fun phaseDiagnosticsDistinguishSavingFromPassAndNeverExposeActorText() {
+        val events = mutableListOf<DeviceCheckTraceEvent>()
+        val f = Fixture(DeviceCheckTraceSink { events += it })
+        f.running(); f.ready(); f.controller.evaluate()
+        val saving = events.indexOfFirst { it.stage == DeviceCheckTraceStage.SAVING }
+        val passed = events.indexOfFirst { it.stage == DeviceCheckTraceStage.PUBLISH && it.outcome == DeviceCheckTraceOutcome.SUCCEEDED }
+        assertTrue(saving >= 0); assertTrue(passed > saving)
+        val attemptEvents = events.filter { it.attemptGeneration == 1L }
+        assertEquals(1, attemptEvents.map { it.flowId }.distinct().size)
+        assertFalse(events.joinToString("\n", transform = ::formatDeviceCheckTrace).contains("actor"))
+        assertEquals(PostLoginDeviceCheckState.FULL, f.controller.snapshot.state)
+    }
+
+    @Test fun failingDiagnosticsDoNotChangePassOrFailurePublication() {
+        val passed = Fixture(DeviceCheckTraceSink { error("diagnostic channel failed") })
+        passed.running(); passed.ready(); passed.controller.evaluate()
+        assertEquals(PostLoginDeviceCheckState.FULL, passed.controller.snapshot.state)
+        val failed = Fixture(DeviceCheckTraceSink { error("diagnostic channel failed") })
+        failed.running(); failed.controller.enteredBackground()
+        assertEquals(PostLoginDeviceCheckState.FAIL, failed.controller.snapshot.state)
+        assertEquals(PostLoginDeviceCheckFailure.BACKGROUNDED, failed.controller.snapshot.failure)
+    }
+
     @Test fun nativeRetirementMustBeConfirmedBeforeRuntimeProbesOrReadyAcceptance() {
         val f = Fixture()
         var released: ((Boolean) -> Unit)? = null
@@ -970,7 +993,7 @@ class PostLoginDeviceCheckControllerTest {
         assertEquals(PostLoginDeviceCheckFailure.KOREAN_TTS_UNAVAILABLE, f.controller.observation().blockingFailure)
     }
 
-    private class Fixture {
+    private class Fixture(trace: DeviceCheckTraceSink = DeviceCheckTraceSink.NONE) {
         var nowMs = 100_000L
         val calls = mutableListOf<String>()
         val reader = Reader()
@@ -980,7 +1003,7 @@ class PostLoginDeviceCheckControllerTest {
         val scheduler = Scheduler()
         val effects = Effects(calls)
         val controller = PostLoginDeviceCheckController(reader, store, probes, permissions, effects, scheduler,
-            PostLoginDeviceCheckController.Config(), elapsedRealtimeMs = { nowMs })
+            PostLoginDeviceCheckController.Config(), elapsedRealtimeMs = { nowMs }, trace = trace)
         init { effects.snapshot = { controller.snapshot } }
         fun running() = apply { controller.bindSession("actor", 1L); controller.beginFromPrimaryAction() }
         fun ready() { probes.value = PostLoginDeviceCheckProbeSignals(PostLoginDeviceCheckSignal.READY, PostLoginDeviceCheckSignal.READY, PostLoginDeviceCheckSignal.READY, PostLoginMetricDepthState.SUPPORTED) }

@@ -106,11 +106,11 @@ internal class DeviceCheckAuthorityCore(
         if (activeBinding != binding) return DeviceCheckAuthorityRead.Blocked("binding_not_loaded")
         readFailure?.let { return DeviceCheckAuthorityRead.Blocked(it) }
         val current = state ?: return DeviceCheckAuthorityRead.Blocked("not_loaded")
-        if (pendingNewAttempt != null) return DeviceCheckAuthorityRead.NeedsCheck("attempt_begin_pending")
         val dirty = current.cohorts.filter { it.release == null && it.processNonce != processNonce }
         if (dirty.isNotEmpty()) return if (dirty.all { it.lease.cohortId in absentCohorts })
             DeviceCheckAuthorityRead.NeedsCheck("RECOVERED_PROCESS_ABSENT")
             else DeviceCheckAuthorityRead.Blocked("native_recovery_required")
+        if (pendingNewAttempt != null) return DeviceCheckAuthorityRead.NeedsCheck("attempt_begin_pending")
         val latest = current.latest
         val bundle = current.bundle
         if (latest?.id in cancelledAttempts) return DeviceCheckAuthorityRead.NeedsCheck("attempt_retired_in_process")

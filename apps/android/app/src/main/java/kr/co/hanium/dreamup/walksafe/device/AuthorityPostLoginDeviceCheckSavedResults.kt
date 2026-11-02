@@ -20,13 +20,17 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
     private val isIssuedProof: (DeviceCheckPairProof) -> Boolean,
     private val nowMs: () -> Long,
     private val onChanged: () -> Unit = {},
+    private val trace: DeviceCheckTraceSink = DeviceCheckTraceSink.NONE,
 ) : PostLoginDeviceCheckSavedResults {
     private class Attempt(val binding: PostLoginDeviceCheckBinding, val command: String) {
         var ref: DeviceCheckAttemptRef? = null
         var cancelled: String? = null
     }
     private class ReadRequest(val actor: String, val session: Long, val binding: DeviceCheckAuthorityBinding,
-        var notifyChanged: Boolean) {
+        var notifyChanged: Boolean, val flowId: Long, val settlementId: String? = null) {
+        val result = CompletableFuture<DeviceCheckAuthorityRead>()
+    }
+    private class ReconcileRequest(val flowId: Long, var notifyChanged: Boolean) {
         val result = CompletableFuture<DeviceCheckAuthorityRead>()
     }
     private val lock = Any()
@@ -40,7 +44,10 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
     private var displayed: DeviceCheckAuthorityRead.Ready? = null
     private val writing = linkedMapOf<String, PostLoginDeviceCheckBinding>()
     private val uncertain = linkedSetOf<String>()
-    private val reconciling = linkedSetOf<String>()
+    private val knownOperations = linkedSetOf<String>()
+    private val reconciling = linkedMapOf<String, ReconcileRequest>()
+    // Diagnostic correlation only. Eviction cannot alter operation admission or settlement.
+    private val operationFlows = linkedMapOf<String, Long>()
 
     override fun bindSession(actorId: String?, sessionGeneration: Long?) {
         authority.retireOwnersOutsideSession(sessionGeneration)
@@ -63,56 +70,84 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
     fun refresh(resultBinding: PostLoginDeviceCheckResultBinding): CompletionStage<DeviceCheckAuthorityRead> =
         requestRead(resultBinding, explicitRetry = false)
 
-    /** A user retry may recover an initial read failure, but cannot clear any publication/native fence. */
+    /** User retries settle only locally issued operations, then read again for the captured current session. */
     fun prepareExplicitRetry(resultBinding: PostLoginDeviceCheckResultBinding): CompletionStage<DeviceCheckAuthorityRead> =
         requestRead(resultBinding, explicitRetry = true)
 
     private fun requestRead(resultBinding: PostLoginDeviceCheckResultBinding, explicitRetry: Boolean):
         CompletionStage<DeviceCheckAuthorityRead> {
+        val flow = DeviceCheckTraceIds.next()
         val session = synchronized(lock) { boundSession.takeIf { boundActor == resultBinding.actorId } }
-            ?: return CompletableFuture.completedFuture(DeviceCheckAuthorityRead.Blocked("stale_session"))
-        if (!sessionCurrent(resultBinding.actorId, session)) return CompletableFuture.completedFuture(
-            DeviceCheckAuthorityRead.Blocked("stale_session"))
-        val captured = bindingFor(resultBinding) ?: return CompletableFuture.completedFuture(
-            DeviceCheckAuthorityRead.Blocked("binding_unavailable"))
-        if (!sessionCurrent(resultBinding.actorId, session)) return CompletableFuture.completedFuture(
-            DeviceCheckAuthorityRead.Blocked("stale_session"))
+            ?: return blockedRead(flow, "stale_session")
+        if (!sessionCurrent(resultBinding.actorId, session)) return blockedRead(flow, "stale_session", session)
+        val captured = bindingFor(resultBinding) ?: return blockedRead(flow, "binding_unavailable", session)
+        if (!sessionCurrent(resultBinding.actorId, session)) return blockedRead(flow, "stale_session", session)
         val requested = synchronized(lock) {
             if (boundActor != resultBinding.actorId || boundSession != session)
-                return CompletableFuture.completedFuture(DeviceCheckAuthorityRead.Blocked("stale_session"))
+                return blockedRead(flow, "stale_session", session)
             if (binding != captured) confirmedRead = null
             binding = captured; resultActor = resultBinding.actorId
             reading?.takeIf { it.actor == resultBinding.actorId && it.session == session && it.binding == captured }?.let {
                 // The captured user continuation owns this completion instead of automatic historical restoration.
                 if (explicitRetry) it.notifyChanged = false
+                emit(it.flowId, DeviceCheckTraceStage.AUTHORITY_READ, DeviceCheckTraceOutcome.JOINED,
+                    session = session)
                 return it.result
             }
+            var settlement: String? = null
             if (explicitRetry) {
                 val cached = authority.cachedSnapshot(captured)
-                if (cached is DeviceCheckAuthorityRead.Blocked && (cached.operationId != null ||
-                    cached.reason !in setOf("storage_read_failed", "not_loaded", "binding_not_loaded")))
+                val blockedOperation = (cached as? DeviceCheckAuthorityRead.Blocked)?.operationId
+                settlement = if (blockedOperation != null) blockedOperation.takeIf { it in knownOperations }
+                    else uncertain.firstOrNull { it in knownOperations }
+                if (blockedOperation != null && settlement == null) {
+                    emit(flow, DeviceCheckTraceStage.AUTHORITY_READ, DeviceCheckTraceOutcome.BLOCKED,
+                        DeviceCheckTraceReason.STORAGE_UNCERTAIN, session)
                     return CompletableFuture.completedFuture(cached)
-                if (writing.isNotEmpty() || uncertain.isNotEmpty())
-                    return CompletableFuture.completedFuture(DeviceCheckAuthorityRead.Blocked("authority_work_pending"))
-                if (cached !is DeviceCheckAuthorityRead.Blocked && confirmedRead == captured)
+                }
+                if (settlement == null && cached is DeviceCheckAuthorityRead.Blocked &&
+                    cached.reason !in setOf("storage_read_failed", "not_loaded", "binding_not_loaded")) {
+                    emit(flow, DeviceCheckTraceStage.AUTHORITY_READ, DeviceCheckTraceOutcome.BLOCKED, readReason(cached), session)
                     return CompletableFuture.completedFuture(cached)
+                }
+                if (settlement == null && (writing.isNotEmpty() || uncertain.isNotEmpty()))
+                    return blockedRead(flow, "authority_work_pending", session)
+                if (settlement == null && cached !is DeviceCheckAuthorityRead.Blocked && confirmedRead == captured) {
+                    emit(flow, DeviceCheckTraceStage.AUTHORITY_READ, DeviceCheckTraceOutcome.SUCCEEDED, session = session)
+                    return CompletableFuture.completedFuture(cached)
+                }
             }
             confirmedRead = null
-            ReadRequest(resultBinding.actorId, session, captured, notifyChanged = !explicitRetry).also { reading = it }
+            ReadRequest(resultBinding.actorId, session, captured, !explicitRetry,
+                settlement?.let { operationFlow(it) } ?: flow, settlement).also { reading = it }
         }
         val owner = WeakReference(this)
-        val future: CompletionStage<DeviceCheckAuthorityRead> = try { authority.read(captured, session) } catch (_: Throwable) {
-            CompletableFuture.completedFuture(DeviceCheckAuthorityRead.Blocked("authority_read_failed"))
+        val future: CompletionStage<DeviceCheckAuthorityRead> = if (requested.settlementId == null) issueRead(requested) else {
+            emit(requested.flowId, DeviceCheckTraceStage.AUTHORITY_READ, DeviceCheckTraceOutcome.WAITING,
+                DeviceCheckTraceReason.STORAGE_UNCERTAIN, session)
+            reconcile(requested.settlementId, notifyChanged = false).thenCompose<DeviceCheckAuthorityRead> { settled ->
+                val current = owner.get()
+                when {
+                    current == null -> CompletableFuture.completedFuture<DeviceCheckAuthorityRead>(DeviceCheckAuthorityRead.Blocked("adapter_retired"))
+                    settled is DeviceCheckAuthorityRead.Blocked && settled.operationId != null -> CompletableFuture.completedFuture<DeviceCheckAuthorityRead>(settled)
+                    else -> current.readRequestStaleReason(requested)?.let { CompletableFuture.completedFuture<DeviceCheckAuthorityRead>(DeviceCheckAuthorityRead.Blocked(it)) }
+                        ?: current.issueRead(requested)
+                }
+            }
         }
+        val sink = trace
+        val requestFlow = requested.flowId
+        val requestSession = requested.session
         future.whenComplete { read, error ->
             val current = owner.get()
-            if (current == null) requested.result.complete(DeviceCheckAuthorityRead.Blocked("adapter_retired")) else {
-                val completed = when {
-                    !current.sessionCurrent(requested.actor, requested.session) -> DeviceCheckAuthorityRead.Blocked("stale_session")
-                    synchronized(current.lock) { current.binding != requested.binding } -> DeviceCheckAuthorityRead.Blocked("binding_superseded")
-                    error != null || read == null -> DeviceCheckAuthorityRead.Blocked("authority_read_failed")
-                    else -> read
-                }
+            if (current == null) {
+                sink.emit(DeviceCheckTraceEvent(requestFlow, DeviceCheckTraceStage.AUTHORITY_READ,
+                    DeviceCheckTraceOutcome.OWNER_GONE, DeviceCheckTraceReason.OWNER_GONE, requestSession))
+                requested.result.complete(DeviceCheckAuthorityRead.Blocked("adapter_retired"))
+            } else {
+                val stale = current.readRequestStaleReason(requested)
+                val completed = stale?.let { DeviceCheckAuthorityRead.Blocked(it) }
+                    ?: read?.takeIf { error == null } ?: DeviceCheckAuthorityRead.Blocked("authority_read_failed")
                 val notify = synchronized(current.lock) {
                     val selected = current.reading === requested
                     if (selected) {
@@ -123,12 +158,36 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
                     selected && requested.notifyChanged && current.boundActor == requested.actor && current.boundSession == requested.session &&
                         current.binding == requested.binding
                 } && current.sessionCurrent(requested.actor, requested.session)
-                if (read is DeviceCheckAuthorityRead.Blocked && read.operationId != null)
+                if (read is DeviceCheckAuthorityRead.Blocked && read.operationId != null && read.operationId != requested.settlementId) {
+                    // Observed from this issued read, never promoted from a cached/guessed operation ID.
+                    synchronized(current.lock) { current.knownOperations += read.operationId }
+                    current.operationFlow(read.operationId, requested.flowId)
                     current.reconcile(read.operationId, notifyChanged = notify)
+                }
+                val reason = current.readReason(completed)
+                current.emit(requested.flowId, DeviceCheckTraceStage.AUTHORITY_READ, when {
+                    stale != null -> DeviceCheckTraceOutcome.STALE
+                    reason in setOf(DeviceCheckTraceReason.READ_FAILED, DeviceCheckTraceReason.RECONCILE_FAILED) -> DeviceCheckTraceOutcome.FAILED
+                    completed is DeviceCheckAuthorityRead.Blocked -> DeviceCheckTraceOutcome.BLOCKED
+                    else -> DeviceCheckTraceOutcome.SUCCEEDED
+                }, reason, requested.session)
                 try { if (notify) current.onChanged() } finally { requested.result.complete(completed) }
             }
         }
         return requested.result
+    }
+
+    private fun issueRead(requested: ReadRequest): CompletionStage<DeviceCheckAuthorityRead> {
+        emit(requested.flowId, DeviceCheckTraceStage.AUTHORITY_READ, DeviceCheckTraceOutcome.STARTED, session = requested.session)
+        return try { authority.read(requested.binding, requested.session) } catch (_: Throwable) {
+            CompletableFuture.completedFuture(DeviceCheckAuthorityRead.Blocked("authority_read_failed"))
+        }
+    }
+
+    private fun readRequestStaleReason(requested: ReadRequest): String? = when {
+        !sessionCurrent(requested.actor, requested.session) -> "stale_session"
+        synchronized(lock) { binding != requested.binding } -> "binding_superseded"
+        else -> null
     }
 
     fun sourceFor(expected: PostLoginDeviceCheckBinding): DeviceCheckAuthoritySource? {
@@ -209,7 +268,8 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
         val requested = Attempt(binding, UUID.randomUUID().toString())
         synchronized(lock) { this.binding = captured; resultActor = resultBinding.actorId; attempt = requested; displayed = null }
         return track(requested.command,
-            binding, authority.beginAttempt(captured, requested.command, startedAtMs, deadlineMs, binding.sessionGeneration)) { current, ref ->
+            binding, authority.beginAttempt(captured, requested.command, startedAtMs, deadlineMs, binding.sessionGeneration),
+            DeviceCheckTraceStage.JOURNAL_BEGIN) { current, ref ->
             val cancelled = synchronized(current.lock) {
                 val reason = if (current.attempt !== requested) "superseded_begin" else requested.cancelled
                 if (reason == null) requested.ref = ref
@@ -246,7 +306,8 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
         if (captured != ref.binding || !isCurrent(expected) || !validRuntime(runtime)) return rejected("stale_actual_pair")
         val id = UUID.randomUUID().toString()
         return track(id, expected, authority.commitSuccess(ref, id, acceptedAtMs,
-            persisted(snapshot, cameraDependentChecksDeferred, metricDepthState), runtime.choice, runtime.proof)) { _, _ -> true }
+            persisted(snapshot, cameraDependentChecksDeferred, metricDepthState), runtime.choice, runtime.proof),
+            DeviceCheckTraceStage.SAVING) { _, _ -> true }
     }
 
     override fun updateAsync(expected: PostLoginDeviceCheckSnapshot, snapshot: PostLoginDeviceCheckSnapshot,
@@ -260,7 +321,7 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
             return rejected("result_revision_changed")
         val id = UUID.randomUUID().toString()
         return track(id, expected.bindingOrNull!!, authority.updateResult(previous.bundleRef, id, previous.result,
-            persisted(snapshot, cameraDependentChecksDeferred, metricDepthState))) { _, _ -> true }
+            persisted(snapshot, cameraDependentChecksDeferred, metricDepthState)), DeviceCheckTraceStage.SAVING) { _, _ -> true }
     }
 
     override fun publicationUnconfirmed(binding: PostLoginDeviceCheckBinding) {
@@ -281,13 +342,21 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
         PersistedPostLoginDeviceCheckResult(snapshot.state, snapshot.disabledFeatures.toSet(), deferred, true, depth)
 
     private fun <T> track(id: String, binding: PostLoginDeviceCheckBinding, future: CompletionStage<DeviceCheckAuthorityOutcome<T>>,
+        stage: DeviceCheckTraceStage = DeviceCheckTraceStage.ATTEMPT,
         accept: (AuthorityPostLoginDeviceCheckSavedResults, T) -> Boolean): CompletionStage<DeviceCheckAuthorityOutcome<Unit>> {
-        synchronized(lock) { writing[id] = binding }
+        val flow = operationFlow(id)
+        synchronized(lock) { writing[id] = binding; knownOperations += id }
+        emit(flow, stage, DeviceCheckTraceOutcome.STARTED, session = binding.sessionGeneration, attempt = binding.attemptGeneration)
         val mapped = CompletableFuture<DeviceCheckAuthorityOutcome<Unit>>()
         val owner = WeakReference(this)
+        val sink = trace
         future.whenComplete { outcome, error ->
             val current = owner.get()
-            if (current == null) mapped.complete(DeviceCheckAuthorityOutcome.Rejected("adapter_retired")) else {
+            if (current == null) {
+                sink.emit(DeviceCheckTraceEvent(flow, stage, DeviceCheckTraceOutcome.OWNER_GONE,
+                    DeviceCheckTraceReason.OWNER_GONE, binding.sessionGeneration, binding.attemptGeneration))
+                mapped.complete(DeviceCheckAuthorityOutcome.Rejected("adapter_retired"))
+            } else {
                 synchronized(current.lock) { current.writing.remove(id) }
                 val result: DeviceCheckAuthorityOutcome<Unit> = when {
                     error != null -> DeviceCheckAuthorityOutcome.Indeterminate(id)
@@ -299,7 +368,21 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
                     outcome is DeviceCheckAuthorityOutcome.Rejected -> outcome
                     else -> DeviceCheckAuthorityOutcome.Indeterminate(id)
                 }
+                current.emit(flow, stage, when (result) {
+                    is DeviceCheckAuthorityOutcome.Committed -> DeviceCheckTraceOutcome.SUCCEEDED
+                    is DeviceCheckAuthorityOutcome.Indeterminate -> DeviceCheckTraceOutcome.WAITING
+                    is DeviceCheckAuthorityOutcome.NotPublished -> DeviceCheckTraceOutcome.FAILED
+                    is DeviceCheckAuthorityOutcome.Rejected -> DeviceCheckTraceOutcome.BLOCKED
+                }, when (result) {
+                    is DeviceCheckAuthorityOutcome.Committed -> DeviceCheckTraceReason.NONE
+                    is DeviceCheckAuthorityOutcome.Indeterminate -> DeviceCheckTraceReason.STORAGE_UNCERTAIN
+                    else -> DeviceCheckTraceReason.FAILED
+                }, binding.sessionGeneration, binding.attemptGeneration)
+                if (result !is DeviceCheckAuthorityOutcome.Indeterminate || result.operationId != id)
+                    synchronized(current.lock) { current.knownOperations.remove(id); current.operationFlows.remove(id) }
                 if (result is DeviceCheckAuthorityOutcome.Indeterminate) {
+                    synchronized(current.lock) { current.knownOperations += result.operationId }
+                    current.operationFlow(result.operationId, flow)
                     current.authority.publicationUnconfirmed(result.operationId)
                     current.reconcile(result.operationId)
                 }
@@ -309,17 +392,75 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
         return mapped
     }
 
-    private fun reconcile(id: String, notifyChanged: Boolean = true) {
-        synchronized(lock) { uncertain += id; if (!reconciling.add(id)) return }
-        val owner = WeakReference(this)
-        authority.reconcileAfterSettled(id).whenComplete { read, error -> owner.get()?.let { current ->
-            synchronized(current.lock) {
-                current.reconciling.remove(id)
-                if (error == null && !(read is DeviceCheckAuthorityRead.Blocked && read.operationId != null))
-                    current.uncertain.remove(id)
+    private fun reconcile(id: String, notifyChanged: Boolean = true): CompletionStage<DeviceCheckAuthorityRead> {
+        val requested = synchronized(lock) {
+            uncertain += id
+            reconciling[id]?.let {
+                if (!notifyChanged) it.notifyChanged = false
+                emit(it.flowId, DeviceCheckTraceStage.AUTHORITY_RECONCILE, DeviceCheckTraceOutcome.JOINED,
+                    DeviceCheckTraceReason.WRITER_PENDING, boundSession)
+                return it.result
             }
-            if (notifyChanged) current.onChanged()
-        } }
+            ReconcileRequest(operationFlow(id), notifyChanged).also { reconciling[id] = it }
+        }
+        val session = synchronized(lock) { boundSession }
+        emit(requested.flowId, DeviceCheckTraceStage.AUTHORITY_RECONCILE, DeviceCheckTraceOutcome.STARTED,
+            DeviceCheckTraceReason.STORAGE_UNCERTAIN, session)
+        val owner = WeakReference(this)
+        val sink = trace
+        val future: CompletionStage<DeviceCheckAuthorityRead> = try { authority.reconcileAfterSettled(id) } catch (_: Throwable) {
+            CompletableFuture.completedFuture(DeviceCheckAuthorityRead.Blocked("reconcile_read_failed", id))
+        }
+        future.whenComplete { read, error ->
+            val current = owner.get()
+            if (current == null) {
+                sink.emit(DeviceCheckTraceEvent(requested.flowId, DeviceCheckTraceStage.AUTHORITY_RECONCILE,
+                    DeviceCheckTraceOutcome.OWNER_GONE, DeviceCheckTraceReason.OWNER_GONE, session))
+                requested.result.complete(DeviceCheckAuthorityRead.Blocked("adapter_retired"))
+            } else {
+                val completed = read?.takeIf { error == null } ?: DeviceCheckAuthorityRead.Blocked("reconcile_read_failed", id)
+                val storageSettled = completed !is DeviceCheckAuthorityRead.Blocked || completed.operationId == null
+                val notify = synchronized(current.lock) {
+                    if (current.reconciling[id] === requested) current.reconciling.remove(id)
+                    if (storageSettled) {
+                        current.uncertain.remove(id); current.knownOperations.remove(id); current.operationFlows.remove(id)
+                    }
+                    requested.notifyChanged
+                }
+                current.emit(requested.flowId, DeviceCheckTraceStage.AUTHORITY_RECONCILE,
+                    if (storageSettled) DeviceCheckTraceOutcome.SUCCEEDED else DeviceCheckTraceOutcome.FAILED,
+                    if (storageSettled) current.readReason(completed) else DeviceCheckTraceReason.RECONCILE_FAILED, session)
+                try { if (notify) current.onChanged() } finally { requested.result.complete(completed) }
+            }
+        }
+        return requested.result
+    }
+
+    private fun operationFlow(id: String, fallback: Long? = null): Long = synchronized(lock) {
+        operationFlows[id] ?: (fallback ?: DeviceCheckTraceIds.next()).also {
+            if (operationFlows.size >= 256) operationFlows.remove(operationFlows.keys.first())
+            operationFlows[id] = it
+        }
+    }
+    private fun emit(flow: Long, stage: DeviceCheckTraceStage, outcome: DeviceCheckTraceOutcome,
+        reason: DeviceCheckTraceReason = DeviceCheckTraceReason.NONE, session: Long? = null, attempt: Long? = null) =
+        trace.emit(DeviceCheckTraceEvent(flow, stage, outcome, reason, session, attempt))
+    private fun readReason(read: DeviceCheckAuthorityRead): DeviceCheckTraceReason = when ((read as? DeviceCheckAuthorityRead.Blocked)?.reason) {
+        null -> DeviceCheckTraceReason.NONE
+        "stale_session", "binding_or_session_superseded", "binding_or_session_not_current" -> DeviceCheckTraceReason.STALE_SESSION
+        "binding_superseded" -> DeviceCheckTraceReason.STALE_BINDING
+        "storage_read_failed", "authority_read_failed" -> DeviceCheckTraceReason.READ_FAILED
+        "invalid_authority_record", "reconcile_invalid_record", "reconcile_encoding_failed", "revision_exhausted" -> DeviceCheckTraceReason.SCHEMA_BLOCKED
+        "native_recovery_required" -> DeviceCheckTraceReason.NATIVE_RELEASE_PENDING
+        "publication_unconfirmed", "recovery_publication_unconfirmed", "reconcile_cleanup_unconfirmed" -> DeviceCheckTraceReason.STORAGE_UNCERTAIN
+        "authority_work_pending" -> DeviceCheckTraceReason.JOURNAL_PENDING
+        "reconcile_read_failed" -> DeviceCheckTraceReason.RECONCILE_FAILED
+        else -> DeviceCheckTraceReason.NOT_CURRENT
+    }
+    private fun blockedRead(flow: Long, reason: String, session: Long? = null): CompletionStage<DeviceCheckAuthorityRead> {
+        val read = DeviceCheckAuthorityRead.Blocked(reason)
+        emit(flow, DeviceCheckTraceStage.AUTHORITY_READ, DeviceCheckTraceOutcome.BLOCKED, readReason(read), session)
+        return CompletableFuture.completedFuture(read)
     }
     private fun rejected(reason: String): CompletionStage<DeviceCheckAuthorityOutcome<Unit>> =
         CompletableFuture.completedFuture(DeviceCheckAuthorityOutcome.Rejected(reason))

@@ -6,6 +6,19 @@ import org.junit.Test
 import java.util.UUID
 
 class DeviceCheckAuthorityCoreTest {
+    @Test fun reconciledPendingBeginCannotHideAnUnreleasedForeignNativeCohort() {
+        val foreign = Fixture().also { it.pair() }
+        val f = Fixture()
+        val command = java.util.UUID.randomUUID().toString()
+        f.io.publication = DeviceCheckPublication.INDETERMINATE
+        val pending = f.core.beginAttempt(f.binding, command, 1000L, 301000L)
+        assertTrue(pending is DeviceCheckAuthorityOutcome.Indeterminate)
+        f.io.text = requireNotNull(foreign.io.text)
+        f.io.publication = DeviceCheckPublication.COMMITTED
+        assertEquals(DeviceCheckAuthorityRead.Blocked("native_recovery_required"), f.core.reconcile(command))
+        assertEquals(DeviceCheckAuthorityRead.Blocked("native_recovery_required"), f.core.cachedSnapshot(f.binding))
+    }
+
     @Test fun beginMustPublishBeforeItCanIssueAnyNativeOwner() {
         val f = Fixture(); f.io.publication = DeviceCheckPublication.NOT_PUBLISHED
         assertTrue(f.core.beginAttempt(f.binding, id(), 1000, 301000) is DeviceCheckAuthorityOutcome.NotPublished)

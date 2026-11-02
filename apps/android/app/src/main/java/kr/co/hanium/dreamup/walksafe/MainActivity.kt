@@ -272,6 +272,13 @@ import kr.co.hanium.dreamup.walksafe.device.PostLoginDeviceCheckBindingFacts
 import kr.co.hanium.dreamup.walksafe.device.AuthorityPostLoginDeviceCheckSavedResults
 import kr.co.hanium.dreamup.walksafe.device.AndroidDeviceCheckAuthority
 import kr.co.hanium.dreamup.walksafe.device.DeviceCheckAuthorityBinding
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckTraceEvent
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckTraceIds
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckTraceSink
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckTraceStage
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckTraceOutcome
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckTraceReason
+import kr.co.hanium.dreamup.walksafe.device.emit
 import kr.co.hanium.dreamup.walksafe.device.DeviceCheckAuthorityRead
 import kr.co.hanium.dreamup.walksafe.device.DeviceCheckOwnerRef
 import kr.co.hanium.dreamup.walksafe.device.DeviceCheckReadyRuntime
@@ -4387,6 +4394,8 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
     private val postLoginDeviceCheckController by lazy(LazyThreadSafetyMode.NONE) { createPostLoginDeviceCheckController() }
 
 
+    private val deviceCheckTrace = DeviceCheckTraceSink(BoundedRuntimeDiagnosticLog::recordDeviceCheck)
+
     private val authorityDeviceCheckResults by lazy(LazyThreadSafetyMode.NONE) {
         val activity = java.lang.ref.WeakReference(this)
         AuthorityPostLoginDeviceCheckSavedResults(deviceCheckAuthority,
@@ -4405,6 +4414,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                 } == true && !process.storageBlocked && !process.deletionRecoveryOnly
             },
             isIssuedProof = JointPairReadyProof::ownsProof, nowMs = SystemClock::elapsedRealtime,
+            trace = deviceCheckTrace,
             onChanged = { activity.get()?.runOnUiThread {
                 activity.get()?.let { current ->
                     if (!current.isDestroyed && !current.isFinishing) {
@@ -4445,8 +4455,9 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
     }
 
     private class RuntimeLeasePreparation(val source: MainRuntimeSource, val budget: CameraRuntimeHandoff.Claim,
-        val onReady: (Boolean) -> Unit) {
+        val onReady: (Boolean) -> Unit, val flowId: Long) {
         val notified = java.util.concurrent.atomic.AtomicBoolean()
+        val ownerGone = CompletableFuture<java.util.concurrent.CompletionStage<Boolean>>()
     }
     private var runtimeLeasePreparation: RuntimeLeasePreparation? = null
 
@@ -4476,13 +4487,37 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
 
     /** Ends the preceding captured owner before metric QUERY or either model can start. */
     private fun prepareDeviceRuntimeLease(binding: PostLoginDeviceCheckBinding, onReady: (Boolean) -> Unit) {
-        if (!deviceAuthorityBindingCurrent(binding) || runtimeLeasePreparation != null || mainPairPreparation != null) {
+        val flowId = DeviceCheckTraceIds.next()
+        val requested = DeviceCheckTraceEvent(flowId, DeviceCheckTraceStage.LEASE_PREPARATION,
+            DeviceCheckTraceOutcome.STARTED, sessionGeneration = binding.sessionGeneration,
+            attemptGeneration = binding.attemptGeneration)
+        deviceCheckTrace.emit(requested)
+        val admissionFailure = when {
+            !deviceAuthorityBindingCurrent(binding) -> DeviceCheckTraceReason.NOT_CURRENT
+            runtimeLeasePreparation != null || mainPairPreparation != null -> DeviceCheckTraceReason.NATIVE_RELEASE_PENDING
+            else -> null
+        }
+        if (admissionFailure != null) {
+            deviceCheckTrace.emit(requested.copy(outcome = DeviceCheckTraceOutcome.BLOCKED, reason = admissionFailure))
             onReady(false); return
         }
-        val budget = CameraRuntimeHandoff.begin() ?: run { onReady(false); return }
+        val budget = CameraRuntimeHandoff.begin() ?: run {
+            deviceCheckTrace.emit(requested.copy(stage = DeviceCheckTraceStage.LEASE_BUDGET,
+                outcome = DeviceCheckTraceOutcome.BLOCKED, reason = DeviceCheckTraceReason.NATIVE_RELEASE_PENDING))
+            onReady(false); return
+        }
+        deviceCheckTrace.emit(requested.copy(stage = DeviceCheckTraceStage.LEASE_BUDGET,
+            outcome = DeviceCheckTraceOutcome.ACQUIRED))
         val owner = authorityDeviceCheckResults.registerRuntimeOwner(binding,
             "$visionRuntimeOwnerId-${java.util.UUID.randomUUID()}")
-        if (owner == null) { budget.complete(); onReady(false); return }
+        if (owner == null) {
+            budget.complete()
+            deviceCheckTrace.emit(requested.copy(outcome = DeviceCheckTraceOutcome.BLOCKED,
+                reason = DeviceCheckTraceReason.NOT_CURRENT))
+            deviceCheckTrace.emit(requested.copy(stage = DeviceCheckTraceStage.LEASE_BUDGET,
+                outcome = DeviceCheckTraceOutcome.RELEASED))
+            onReady(false); return
+        }
         val source = MainRuntimeSource(binding, owner, VisionRuntimeContext(applicationContext, owner))
         val oldSource = mainRuntimeSource
         val oldRuntime = mainPreparedRuntime
@@ -4492,7 +4527,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
             kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRetirementSnapshot(it.runtime.lease,
                 it.nativeReleased, client?.whenAvailable(it.runtime.lease.cohortId) ?: it.nativeReleased)
         }
-        val preparation = RuntimeLeasePreparation(source, budget, onReady)
+        val preparation = RuntimeLeasePreparation(source, budget, onReady, flowId)
         runtimeLeasePreparation = preparation
         mainRuntimeSource = source
         mainPreparedRuntime = null
@@ -4500,12 +4535,39 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
         oldSource?.owner?.let(deviceCheckAuthority::retireOwner)
         val hostDrained = CompletableFuture<Unit>()
         val oldRegistryReleased = oldRuntime?.consumerLease?.consumerReleased
+        val trace = deviceCheckTrace
+        val event = DeviceCheckTraceEvent(preparation.flowId, DeviceCheckTraceStage.LEASE_PREPARATION,
+            DeviceCheckTraceOutcome.STARTED, sessionGeneration = binding.sessionGeneration,
+            attemptGeneration = binding.attemptGeneration)
+        fun log(stage: DeviceCheckTraceStage, outcome: DeviceCheckTraceOutcome,
+            reason: DeviceCheckTraceReason = DeviceCheckTraceReason.NONE) =
+            trace.emit(event.copy(stage = stage, outcome = outcome, reason = reason))
+        // These functions capture application-scoped client/old capability and futures only.
+        // The destroyed-owner path is armed before any UI continuation can disappear.
+        val teardown = DeviceRuntimeLeaseTeardown.afterOwnerGone(preparation.ownerGone,
+            primaryDetectorOwner.hostDrainedFuture(), primaryDetectorOwner.closedFuture(), oldOwner,
+            snapshot = { old -> client?.retirementSnapshot(old) }, knownRetirement = knownRetirement,
+            actualReleased = { captured -> captured.actualReleased.thenApply { receipt ->
+                check(receipt.cohortId == captured.lease.cohortId) { "Wrong old cohort receipt" }; Unit
+            } }, allocationAvailable = { captured -> captured.allocationAvailable },
+            requestExit = { captured -> client?.requestExit(captured.lease, "device_check_owner_destroyed"); Unit },
+            hostDrained = hostDrained, consumerDrained = oldRuntime?.consumerDrained,
+            consumerReleased = oldRegistryReleased, trace = trace, flowId = preparation.flowId)
+        teardown.whenComplete { _, error ->
+            if (error == null) {
+                budget.complete()
+                log(DeviceCheckTraceStage.LEASE_BUDGET, DeviceCheckTraceOutcome.RELEASED)
+            } else log(DeviceCheckTraceStage.LEASE_BUDGET, DeviceCheckTraceOutcome.RETAINED,
+                DeviceCheckTraceReason.HOST_UNPROVEN)
+        }
         oldRuntime?.consumerLease?.retire(hostDrained)
         fun notify(ready: Boolean) {
             if (preparation.notified.compareAndSet(false, true)) preparation.onReady(ready)
         }
         fun failed(reason: String) {
             // Keep the global receipt pending. A rejected operation is not host/native release.
+            log(DeviceCheckTraceStage.LEASE_PREPARATION, DeviceCheckTraceOutcome.FAILED,
+                DeviceCheckTraceReason.HOST_UNPROVEN)
             deviceCheckAuthority.retireOwner(source.owner)
             oldOwner?.let { old -> client?.retirementSnapshot(old) }?.let {
                 runCatching { client?.requestExit(it.lease, reason) }
@@ -4516,12 +4578,21 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                 "모델과 실행부의 실제 종료를 확인하지 못했습니다. 앱을 완전히 종료한 뒤 다시 실행해 주세요.")
         }
         fun finishNative() {
+            log(DeviceCheckTraceStage.NATIVE_RELEASE, DeviceCheckTraceOutcome.WAITING)
             hostDrained.complete(Unit)
             oldRuntime?.consumerDrained?.complete(Unit)
             val physical = DeviceRuntimeLeaseRetirement.afterHostDrain(oldOwner, hostDrained,
                 snapshot = { old -> client?.retirementSnapshot(old) ?: knownRetirement },
-                actualReleased = { captured -> CompletableFuture.allOf(captured.actualReleased.toCompletableFuture(),
-                    captured.allocationAvailable.toCompletableFuture()) },
+                actualReleased = { captured ->
+                    log(DeviceCheckTraceStage.ALLOCATION_AVAILABLE, DeviceCheckTraceOutcome.WAITING)
+                    captured.actualReleased.whenComplete { _, error -> log(DeviceCheckTraceStage.NATIVE_RELEASE,
+                        if (error == null) DeviceCheckTraceOutcome.SUCCEEDED else DeviceCheckTraceOutcome.FAILED) }
+                    captured.allocationAvailable.whenComplete { _, error -> log(DeviceCheckTraceStage.ALLOCATION_AVAILABLE,
+                        if (error == null) DeviceCheckTraceOutcome.SUCCEEDED else DeviceCheckTraceOutcome.FAILED,
+                        if (error == null) DeviceCheckTraceReason.NONE else DeviceCheckTraceReason.JOURNAL_PENDING) }
+                    CompletableFuture.allOf(captured.actualReleased.toCompletableFuture(),
+                        captured.allocationAvailable.toCompletableFuture())
+                },
                 requestExit = { client?.requestExit(it.lease, "device_check_lease_retired"); Unit },
                 knownRetirement = knownRetirement)
             val settled = CompletableFuture.allOf(physical,
@@ -4541,17 +4612,28 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                 }
                 primaryDetectorLifecycleController.finishCompositeCheck(reload = false)
                 runtimeLeasePreparation = null
-                if (pendingRuntimeRetirement === knownRetirement) pendingRuntimeRetirement = null
+                pendingRuntimeRetirement = DeviceRuntimeLeaseRecovery.retirementAfterCompletion(
+                    pendingRuntimeRetirement, knownRetirement, current, primaryDetectorOwner.projection().closing)
+                log(DeviceCheckTraceStage.HOST_RESUME, when {
+                    !current -> DeviceCheckTraceOutcome.STALE
+                    primaryDetectorOwner.projection().closing -> DeviceCheckTraceOutcome.ACQUIRED
+                    else -> DeviceCheckTraceOutcome.SUCCEEDED
+                }, if (current) DeviceCheckTraceReason.NONE else DeviceCheckTraceReason.NOT_CURRENT)
                 if (!current) deviceCheckAuthority.retireOwner(owner)
                 budget.complete()
+                log(DeviceCheckTraceStage.LEASE_BUDGET, DeviceCheckTraceOutcome.RELEASED)
                 notify(current)
             }
         }
         fun auxiliaryAfterPrimary() {
+            if (preparation.ownerGone.isDone) return
+            log(DeviceCheckTraceStage.AUXILIARY_DRAIN, DeviceCheckTraceOutcome.WAITING)
             val released = if (unknownServiceOwnerLazy.isInitialized()) unknownServiceOwner.releaseBeforePrimaryCalibrationAsync()
                 else CompletableFuture.completedFuture(true)
             val settled = released.thenApply { check(it) { "Old auxiliary release unconfirmed" }; Unit }
             observeRuntimeCompletion(settled) { error ->
+                log(DeviceCheckTraceStage.AUXILIARY_DRAIN,
+                    if (error == null) DeviceCheckTraceOutcome.SUCCEEDED else DeviceCheckTraceOutcome.FAILED)
                 if (error == null) finishNative() else failed("old_auxiliary_release_unconfirmed")
             }
         }
@@ -4561,21 +4643,43 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
             observeRuntimeCompletion(primaryDetectorLifecycleController.quiesceForRuntimeError(quiesced)) { error ->
                 if (error == null) auxiliaryAfterPrimary() else failed("old_primary_host_unconfirmed")
             }
-        } else primaryDetectorLifecycleController.cancelPendingLoadAfterDrain { drained ->
-            if (!drained) { failed("old_primary_drain_unconfirmed"); return@cancelPendingLoadAfterDrain }
-            primaryDetectorLifecycleController.releaseForCompositeCheck({ runtimeLeasePreparation === preparation }) { released ->
-                if (released) auxiliaryAfterPrimary() else {
-                    // The cancelled creation queue has drained. Keep failure publication separate
-                    // from the late, captured physical cleanup that can unblock a fresh user retry.
-                    if (primaryDetectorOwner.projection().closing) {
-                        val captured = oldOwner?.let { client?.retirementSnapshot(it) } ?: knownRetirement
-                        if (captured != null) observeFailedRuntimeLeaseCleanup(preparation, captured,
-                            hostDrained, oldRuntime?.consumerDrained, oldRegistryReleased)
+        } else {
+            log(DeviceCheckTraceStage.PRIMARY_DRAIN, DeviceCheckTraceOutcome.WAITING)
+            primaryDetectorLifecycleController.cancelPendingLoadAfterDrain { drained ->
+                if (preparation.ownerGone.isDone) return@cancelPendingLoadAfterDrain
+                log(DeviceCheckTraceStage.PRIMARY_DRAIN,
+                    if (drained) DeviceCheckTraceOutcome.SUCCEEDED else DeviceCheckTraceOutcome.FAILED)
+                if (!drained) { failed("old_primary_drain_unconfirmed"); return@cancelPendingLoadAfterDrain }
+                log(DeviceCheckTraceStage.PRIMARY_CLOSE, DeviceCheckTraceOutcome.WAITING)
+                primaryDetectorLifecycleController.releaseForCompositeCheck({ runtimeLeasePreparation === preparation }) { released ->
+                    if (preparation.ownerGone.isDone) return@releaseForCompositeCheck
+                    log(DeviceCheckTraceStage.PRIMARY_CLOSE,
+                        if (released) DeviceCheckTraceOutcome.SUCCEEDED else DeviceCheckTraceOutcome.FAILED)
+                    if (released) auxiliaryAfterPrimary() else {
+                        // The cancelled creation queue has drained. Keep failure publication separate
+                        // from the late, captured physical cleanup that can unblock a fresh user retry.
+                        if (primaryDetectorOwner.projection().closing) {
+                            val captured = oldOwner?.let { client?.retirementSnapshot(it) } ?: knownRetirement
+                            if (captured != null) observeFailedRuntimeLeaseCleanup(preparation, captured,
+                                hostDrained, oldRuntime?.consumerDrained, oldRegistryReleased)
+                        }
+                        failed("old_primary_release_unconfirmed")
                     }
-                    failed("old_primary_release_unconfirmed")
                 }
             }
         }
+    }
+
+    /** Destruction requests cleanup; only captured positive receipts may release the original claim. */
+    private fun retirePendingDeviceRuntimeLease() {
+        val preparation = runtimeLeasePreparation ?: return
+        primaryDetectorOwner.fenceForClose()
+        deviceCheckAuthority.retireOwner(preparation.source.owner)
+        val auxiliary = try {
+            if (unknownServiceOwnerLazy.isInitialized()) unknownServiceOwner.releaseBeforePrimaryCalibrationAsync()
+            else CompletableFuture.completedFuture(true)
+        } catch (error: Throwable) { CompletableFuture<Boolean>().also { it.completeExceptionally(error) } }
+        preparation.ownerGone.complete(auxiliary)
     }
 
     /** Finishes only the failed claim; a later explicit attempt must obtain its own authority. */
@@ -4741,6 +4845,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
             },
             elapsedRealtimeMs = SystemClock::elapsedRealtime,
             dispatch = { action -> runOnUiThread { action() } },
+            trace = deviceCheckTrace,
             config = PostLoginDeviceCheckController.Config(POST_LOGIN_DEVICE_CHECK_TIMEOUT_MS,
                 developmentQuickStartEnabled, developmentPostLoginDeviceCheckBypassed),
         )
@@ -8392,6 +8497,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
     override fun onDestroy() {
         runtimeUiCompletionsClosed = true
         runtimeUiCompletions.clear()
+        retirePendingDeviceRuntimeLease()
         cancelMetricSupportCheck()
         cameraRetirementSerial++
         cameraRetirementContinuation = null
@@ -11398,19 +11504,33 @@ private fun observeWalkRuntimeResourceSafety(
         val result = currentPostLoginDeviceCheckResultBinding(session.actorId) ?: return
         val authorityBinding = deviceAuthorityBinding(result) ?: return
         val token = Any()
+        val trace = deviceCheckTrace
+        val event = DeviceCheckTraceEvent(DeviceCheckTraceIds.next(), DeviceCheckTraceStage.UI_ACTION,
+            DeviceCheckTraceOutcome.STARTED, sessionGeneration = session.sessionGeneration,
+            attemptGeneration = session.attemptGeneration)
+        trace.emit(event)
         explicitDeviceCheckReadPending = token
         val stage = authorityDeviceCheckResults.prepareExplicitRetry(result)
         // observeRuntimeCompletion keeps the action here, not in an indefinitely pending I/O future.
-        observeRuntimeCompletion(stage) { error ->
+        observeRuntimeCompletion(stage, onOwnerGone = {
+            trace.emit(event.copy(outcome = DeviceCheckTraceOutcome.OWNER_GONE, reason = DeviceCheckTraceReason.OWNER_GONE))
+        }) { error ->
             if (explicitDeviceCheckReadPending !== token) return@observeRuntimeCompletion
             explicitDeviceCheckReadPending = null
             if (error != null || !isActivityForeground || isDestroyed || isFinishing ||
                 postLoginDeviceCheckController.currentSessionBinding() != session ||
                 postLoginDeviceCheckSnapshot !== snapshot ||
-                currentPostLoginDeviceCheckResultBinding(session.actorId)?.let(::deviceAuthorityBinding) != authorityBinding)
+                currentPostLoginDeviceCheckResultBinding(session.actorId)?.let(::deviceAuthorityBinding) != authorityBinding) {
+                trace.emit(event.copy(outcome = DeviceCheckTraceOutcome.STALE, reason = DeviceCheckTraceReason.NOT_CURRENT))
                 return@observeRuntimeCompletion
-            if (authorityDeviceCheckResults.mayBeginAttempt()) action()
-            else updateStatus("기기 점검 대기", "저장된 점검 상태를 확인하지 못했습니다. 잠시 뒤 다시 시도해 주세요.")
+            }
+            if (authorityDeviceCheckResults.mayBeginAttempt()) {
+                trace.emit(event.copy(outcome = DeviceCheckTraceOutcome.SUCCEEDED))
+                action()
+            } else {
+                trace.emit(event.copy(outcome = DeviceCheckTraceOutcome.BLOCKED))
+                updateStatus("기기 점검 대기", "저장된 점검 상태를 확인하지 못했습니다. 잠시 뒤 다시 시도해 주세요.")
+            }
         }
     }
 
@@ -14812,8 +14932,16 @@ generation != cameraFallbackGeneration
             !primaryDetectorLifecycleController.resumeTransferredHost(transferredRuntime, current)) {
             return rejectPreparation("primary_return_reservation_rejected")
         }
+        val recovery = pendingRuntimeRetirement
         val primarySlot = primaryDetectorLifecycleController.reservePreparedPair(current)
             ?: return rejectPreparation("primary_pair_receiver_unavailable")
+        pendingRuntimeRetirement = DeviceRuntimeLeaseRecovery.retirementAfterReservation(
+            pendingRuntimeRetirement, recovery, reserved = true, primaryClosing = primaryDetectorOwner.projection().closing)
+        if (recovery != null && pendingRuntimeRetirement == null) {
+            deviceCheckTrace.emit(DeviceCheckTraceEvent(DeviceCheckTraceIds.next(), DeviceCheckTraceStage.HOST_RESUME,
+                DeviceCheckTraceOutcome.SUCCEEDED, sessionGeneration = binding.sessionGeneration,
+                attemptGeneration = binding.attemptGeneration))
+        }
         if (transferredRuntime != null && unknownServiceOwner.transferredHostDrain() != null &&
             !unknownServiceOwner.resumeTransferredHost(transferredRuntime, current)) {
             primaryDetectorLifecycleController.finishPreparedNotStarted(primarySlot)
@@ -15086,6 +15214,8 @@ generation != cameraFallbackGeneration
         finished: (PostLoginCompositeCameraCheckResult) -> Unit,
     ) {
         val id = java.util.UUID.randomUUID().toString()
+        val traceFlowId = DeviceCheckTraceIds.next()
+        var finalTraceStarted = false
         val state = DeviceCompositeAttemptState<kr.co.hanium.dreamup.walksafe.inference.composite.JointRuntimeCheckedSelection> { result ->
             finished(PostLoginCompositeCameraCheckResult(result.success, metricDepth = null,
                 reason = result.reason, releaseConfirmed = result.releaseConfirmed))
@@ -15118,11 +15248,18 @@ generation != cameraFallbackGeneration
         }
         val attempt = DeviceCompositeAttempt(binding, config, deadline, budget, finished)
         deviceCompositeAttempt = attempt
+        deviceCheckTrace.emit(DeviceCheckTraceEvent(attempt.traceFlowId, DeviceCheckTraceStage.CANDIDATE_SEARCH,
+            DeviceCheckTraceOutcome.STARTED, sessionGeneration = binding.sessionGeneration,
+            attemptGeneration = binding.attemptGeneration))
         stopHandsFreeVoiceService()
         updateStatus("내장 이미지로 인식 성능 점검", "앱에 포함된 테스트 이미지로 기본 인식과 추가 인식을 함께 확인합니다. 카메라를 비출 필요가 없습니다.")
         if (!attempt.state.beginRunning()) return
         val weakOwner = java.lang.ref.WeakReference(this)
         val attemptId = attempt.id
+        val trace = deviceCheckTrace
+        val traceEvent = DeviceCheckTraceEvent(attempt.traceFlowId, DeviceCheckTraceStage.CANDIDATE_SEARCH,
+            DeviceCheckTraceOutcome.STARTED, sessionGeneration = attempt.binding.sessionGeneration,
+            attemptGeneration = attempt.binding.attemptGeneration)
         // The constructor captures this attempt's immutable source before worker dispatch.
         val runner = AndroidJointRuntimeCheck(source.context, config,
             RuntimeCandidate(kr.co.hanium.dreamup.walksafe.inference.RuntimeBackend.CPU, 1), deadline,
@@ -15133,10 +15270,17 @@ generation != cameraFallbackGeneration
                 val owner = weakOwner.get()
                 val old = owner?.deviceCompositeAttempt?.takeIf { it.id == attemptId }
                 if (owner != null && old != null) owner.acknowledgeDeviceCompositeLateRelease(old)
-                else budget.complete()
+                else {
+                    budget.complete()
+                    trace.emit(traceEvent.copy(stage = DeviceCheckTraceStage.LEASE_BUDGET,
+                        outcome = DeviceCheckTraceOutcome.RELEASED, reason = DeviceCheckTraceReason.OWNER_GONE))
+                }
             },
             onProgress = { message -> weakOwner.get()?.let { owner ->
                 owner.deviceCompositeAttempt?.takeIf { it.id == attemptId && owner.compositeAttemptCurrent(it) }?.let {
+                    owner.deviceCheckTrace.emit(DeviceCheckTraceEvent(it.traceFlowId, DeviceCheckTraceStage.CANDIDATE_SEARCH,
+                        DeviceCheckTraceOutcome.WAITING, sessionGeneration = it.binding.sessionGeneration,
+                        attemptGeneration = it.binding.attemptGeneration))
                     owner.updateStatus("내장 이미지로 인식 성능 점검", message)
                 }
             } },
@@ -15145,7 +15289,12 @@ generation != cameraFallbackGeneration
                 if (owner?.deviceCompositeAttempt?.id == attemptId) owner.receiveCompositeSelection(attemptId, result)
                 else {
                     result.selection?.discardIfUnclaimed()
-                    if (result.releaseConfirmed) budget.complete()
+                    trace.emit(traceEvent.copy(outcome = DeviceCheckTraceOutcome.STALE, reason = DeviceCheckTraceReason.OWNER_GONE))
+                    if (result.releaseConfirmed) {
+                        budget.complete()
+                        trace.emit(traceEvent.copy(stage = DeviceCheckTraceStage.LEASE_BUDGET,
+                            outcome = DeviceCheckTraceOutcome.RELEASED, reason = DeviceCheckTraceReason.OWNER_GONE))
+                    }
                 }
             })
         attempt.runner = runner
@@ -15156,6 +15305,10 @@ generation != cameraFallbackGeneration
         result: kr.co.hanium.dreamup.walksafe.inference.composite.JointRuntimeCheckResult) {
         val attempt = deviceCompositeAttempt?.takeIf { it.id == attemptId }
             ?: run { result.selection?.discardIfUnclaimed(); return }
+        deviceCheckTrace.emit(DeviceCheckTraceEvent(attempt.traceFlowId, DeviceCheckTraceStage.CANDIDATE_SEARCH,
+            if (result.releaseConfirmed && result.selection != null) DeviceCheckTraceOutcome.SUCCEEDED else DeviceCheckTraceOutcome.FAILED,
+            if (result.releaseConfirmed) DeviceCheckTraceReason.NONE else DeviceCheckTraceReason.NATIVE_UNPROVEN,
+            attempt.binding.sessionGeneration, attempt.binding.attemptGeneration))
         if (!result.releaseConfirmed) { result.selection?.discardIfUnclaimed(); publishDeviceCompositeReleaseFailure(attempt, result.reason); return }
         attempt.state.receiveReleasedCandidate(result.selection,
             isCurrent = { compositeAttemptCurrent(attempt) },
@@ -15167,6 +15320,10 @@ generation != cameraFallbackGeneration
                     selection.discardIfUnclaimed()
                     publishDeviceCompositeReleaseFailure(attempt, "final_reference_or_source_retired")
                 } else {
+                    attempt.finalTraceStarted = true
+                    deviceCheckTrace.emit(DeviceCheckTraceEvent(attempt.traceFlowId, DeviceCheckTraceStage.FINAL_PREPARATION,
+                        DeviceCheckTraceOutcome.STARTED, sessionGeneration = attempt.binding.sessionGeneration,
+                        attemptGeneration = attempt.binding.attemptGeneration))
                     val final = prepareMainRuntimePair(attempt.binding, attempt.config, null, source,
                         minOf(attempt.deadlineMs, claim.plan.budget.deadlineMs),
                         current = { compositeAttemptCurrent(attempt) },
@@ -15209,6 +15366,11 @@ generation != cameraFallbackGeneration
         }
         attempt.state.complete(accepted, reason,
             beforeNotify = {
+                deviceCheckTrace.emit(DeviceCheckTraceEvent(attempt.traceFlowId,
+                    if (attempt.finalTraceStarted) DeviceCheckTraceStage.FINAL_PREPARATION else DeviceCheckTraceStage.CANDIDATE_SEARCH,
+                    if (accepted) DeviceCheckTraceOutcome.SUCCEEDED else DeviceCheckTraceOutcome.FAILED,
+                    if (accepted) DeviceCheckTraceReason.NONE else DeviceCheckTraceReason.FAILED,
+                    attempt.binding.sessionGeneration, attempt.binding.attemptGeneration))
                 deviceCompositeAttempt = null
                 if (!accepted) primaryDetectorLifecycleController.finishCompositeCheck(reload = false)
             }, onPreviouslyPublishedRelease = { postLoginDeviceProbes.confirmCompositeRuntimeRelease(attempt.binding) },
@@ -15220,6 +15382,10 @@ generation != cameraFallbackGeneration
         attempt.runner?.cancel(reason)
         attempt.state.choice?.discardIfUnclaimed()
         val first = attempt.state.fail(reason) { requestDeviceCompositeNativeCleanup(attempt) }
+        if (first) deviceCheckTrace.emit(DeviceCheckTraceEvent(attempt.traceFlowId,
+            if (attempt.finalTraceStarted) DeviceCheckTraceStage.FINAL_PREPARATION else DeviceCheckTraceStage.CANDIDATE_SEARCH,
+            DeviceCheckTraceOutcome.FAILED, DeviceCheckTraceReason.FAILED,
+            attempt.binding.sessionGeneration, attempt.binding.attemptGeneration))
         if (deviceCompositeAttempt !== attempt) return
         if (first && isActivityForeground && !isDestroyed && !isFinishing) updateStatus("성능 점검 종료 확인 필요",
             "인식 작업의 실제 종료를 확인한 뒤 다시 점검합니다. 계속 대기하면 앱을 완전히 종료한 뒤 다시 실행해 주세요.")

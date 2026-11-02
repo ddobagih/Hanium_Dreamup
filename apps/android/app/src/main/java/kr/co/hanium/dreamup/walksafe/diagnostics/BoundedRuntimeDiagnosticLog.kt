@@ -2,6 +2,7 @@ package kr.co.hanium.dreamup.walksafe.diagnostics
 
 import android.content.Context
 import android.os.SystemClock
+import android.util.Log
 import java.io.File
 import java.security.SecureRandom
 import java.util.concurrent.ArrayBlockingQueue
@@ -9,6 +10,8 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import kr.co.hanium.dreamup.walksafe.BuildConfig
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckTraceEvent
+import kr.co.hanium.dreamup.walksafe.device.formatDeviceCheckTrace
 import kr.co.hanium.dreamup.walksafe.voice.OfflineSpeechEngine
 import kr.co.hanium.dreamup.walksafe.voice.OfflineSpeechSelection
 import kr.co.hanium.dreamup.walksafe.voice.VoiceInputDiagnosticEvent
@@ -83,6 +86,20 @@ internal object BoundedRuntimeDiagnosticLog {
         }
     }
 
+    /** Logcat remains available before cache initialization; neither channel controls the check. */
+    fun recordDeviceCheck(event: DeviceCheckTraceEvent) {
+        if (!BuildConfig.DEBUG) return
+        val metadata = "runtime_build_id=" + BuildConfig.WALKSAFE_RUNTIME_BUILD_ID +
+            " source_commit=" + BuildConfig.WALKSAFE_SOURCE_COMMIT + " " + formatDeviceCheckTrace(event)
+        val elapsed = runCatching { SystemClock.elapsedRealtime() }.getOrNull()
+        runCatching {
+            Log.i("WalkSafeDeviceCheck", "elapsed_ms=" + (elapsed?.toString() ?: "NA") + " " + metadata)
+        }
+        runCatching {
+            if (elapsed != null) writer?.enqueue(elapsed, metadata)
+        }
+    }
+
     fun recordVoiceInput(
         event: VoiceInputDiagnosticEvent,
         backend: OfflineSpeechEngine? = null,
@@ -148,7 +165,7 @@ private class RuntimeDiagnosticFileWriter(private val directory: File) {
         enqueue(elapsedMs, RUN_START_METADATA)
     }
 
-    // This raw string entry is private to this file and used only by the two typed formatters.
+    // This raw string entry is private to this file and used only by the typed formatters.
     fun enqueue(elapsedMs: Long, metadata: String) {
         try {
             executor.execute {
