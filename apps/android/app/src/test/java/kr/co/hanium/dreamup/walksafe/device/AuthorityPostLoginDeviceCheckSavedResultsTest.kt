@@ -13,6 +13,105 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /** Real authority/cache/worker with explicit metadata-only proof fixtures; no native claim. */
 class AuthorityPostLoginDeviceCheckSavedResultsTest {
+    @Test fun aLateCommittedBeginTracksItsCompensatingCancellationWithoutStartingAnotherAttempt() {
+        for (publication in DeviceCheckPublication.entries) {
+            val events = CopyOnWriteArrayList<DeviceCheckTraceEvent>()
+            SettlementFixture(trace = DeviceCheckTraceSink { events += it }).use { f ->
+                val retired = f.checkBinding()
+                f.io.afterPublication = {
+                    f.io.afterPublication = null
+                    f.saved.attemptCancelled(retired, "background")
+                    f.io.nextPublication = publication
+                }
+                assertEquals(DeviceCheckAuthorityOutcome.Rejected("attempt_retired"),
+                    f.saved.beginAttemptAsync(retired, f.resultBinding(), 1000, 301000)
+                        .toCompletableFuture().get(2, TimeUnit.SECONDS))
+                f.drain(); f.drain()
+                assertTrue(f.saved.prepareExplicitRetry(f.resultBinding()).toCompletableFuture()
+                    .get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+                assertTrue(f.saved.mayBeginAttempt())
+                assertEquals(2, f.io.writes.get()) // Begin and its cancellation; no automatic new begin.
+                assertNull(f.saved.sourceFor(retired))
+                assertNull(f.saved.registerRuntimeOwner(retired, "retired-begin-owner"))
+                assertNull(f.saved.historical())
+                assertTrue(events.any { it.stage == DeviceCheckTraceStage.ATTEMPT && it.outcome == DeviceCheckTraceOutcome.STARTED })
+                val starts = f.io.writes.get()
+                assertTrue(f.saved.beginAttemptAsync(f.checkBinding(), f.resultBinding(), 1200, 301200)
+                    .toCompletableFuture().get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityOutcome.Committed)
+                assertEquals(starts + 1, f.io.writes.get())
+            }
+        }
+    }
+
+    @Test fun failedCompensatingCancellationSettlementCanBeRetriedAndCoalescesDuplicateRequests() {
+        SettlementFixture().use { f ->
+            f.failLateBeginCancellationSettlement()
+            val beforeChanges = f.changes.get()
+            val gate = f.io.holdNextRead()
+            val retry = f.saved.prepareExplicitRetry(f.resultBinding())
+            assertTrue(gate.entered.await(2, TimeUnit.SECONDS))
+            assertSame(retry, f.saved.prepareExplicitRetry(f.resultBinding()))
+            assertFalse(f.saved.mayBeginAttempt())
+            gate.release.countDown()
+            assertTrue(retry.toCompletableFuture().get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+            assertNull(f.core.unsettledOperation())
+            assertTrue(f.saved.mayBeginAttempt())
+            assertEquals(beforeChanges, f.changes.get())
+            assertEquals(2, f.io.writes.get())
+        }
+    }
+
+    @Test fun oldCompensatingCancellationOnlySettlesStorageAfterTheActorChanges() {
+        SettlementFixture().use { f ->
+            f.failLateBeginCancellationSettlement()
+            val gate = f.io.holdNextRead()
+            val old = f.saved.prepareExplicitRetry(f.resultBinding()).toCompletableFuture()
+            assertTrue(gate.entered.await(2, TimeUnit.SECONDS))
+            f.actor = "other"; f.session = 2L
+            f.saved.bindSession(f.actor, f.session)
+            gate.release.countDown()
+            assertEquals(DeviceCheckAuthorityRead.Blocked("stale_session"), old.get(2, TimeUnit.SECONDS))
+            assertFalse(f.saved.mayBeginAttempt())
+            assertNull(f.core.unsettledOperation())
+            assertEquals(2, f.io.writes.get())
+            assertTrue(f.saved.prepareExplicitRetry(f.resultBinding()).toCompletableFuture()
+                .get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+            assertTrue(f.saved.beginAttemptAsync(f.checkBinding(), f.resultBinding(), 1200, 301200)
+                .toCompletableFuture().get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityOutcome.Committed)
+            assertEquals(3, f.io.writes.get())
+        }
+    }
+
+    @Test fun aCompensatingCancellationDeadlineDoesNotPretendItsWriterHasFinished() {
+        val unconfirmed = CountDownLatch(1)
+        SettlementFixture(timeoutMs = 100, trace = DeviceCheckTraceSink {
+            if (it.stage == DeviceCheckTraceStage.ATTEMPT && it.outcome == DeviceCheckTraceOutcome.WAITING)
+                unconfirmed.countDown()
+        }).use { f ->
+            var cancellation: SettlementIo.Gate? = null
+            f.io.afterPublication = {
+                f.io.afterPublication = null
+                f.saved.attemptCancelled(f.checkBinding(), "background")
+                f.io.nextPublication = DeviceCheckPublication.INDETERMINATE
+                cancellation = f.io.holdNextPublication()
+            }
+            assertEquals(DeviceCheckAuthorityOutcome.Rejected("attempt_retired"),
+                f.saved.beginAttemptAsync(f.checkBinding(), f.resultBinding(), 1000, 301000)
+                    .toCompletableFuture().get(2, TimeUnit.SECONDS))
+            val gate = requireNotNull(cancellation)
+            assertTrue(gate.entered.await(2, TimeUnit.SECONDS))
+            assertTrue(unconfirmed.await(2, TimeUnit.SECONDS))
+            val retry = f.saved.prepareExplicitRetry(f.resultBinding()).toCompletableFuture()
+            assertFalse(retry.isDone)
+            assertFalse(f.saved.mayBeginAttempt())
+            assertNull(f.saved.registerRuntimeOwner(f.checkBinding(), "pending-cancel-owner"))
+            gate.release.countDown()
+            assertTrue(retry.get(2, TimeUnit.SECONDS) is DeviceCheckAuthorityRead.NeedsCheck)
+            assertTrue(f.saved.mayBeginAttempt())
+            assertEquals(2, f.io.writes.get())
+        }
+    }
+
     @Test fun explicitRetryReconcilesTheKnownBeginAgainAfterItsFirstFreshReadFailed() {
         SettlementFixture().use { f ->
             f.failedBeginSettlement()
@@ -630,6 +729,21 @@ class AuthorityPostLoginDeviceCheckSavedResultsTest {
         fun resultBinding() = PostLoginDeviceCheckResultBinding(actor, "installation", "maker", "model", "device", 33,
             "fingerprint", "app", 1, "1", "source", "policy", null, null, "registry", "sha", null, null,
             emptySet(), true, true, true, true)
+        fun failLateBeginCancellationSettlement() {
+            io.afterPublication = {
+                io.afterPublication = null
+                saved.attemptCancelled(checkBinding(), "background")
+                io.nextPublication = DeviceCheckPublication.INDETERMINATE
+                io.failReads.set(1)
+            }
+            assertEquals(DeviceCheckAuthorityOutcome.Rejected("attempt_retired"),
+                saved.beginAttemptAsync(checkBinding(), resultBinding(), 1000, 301000)
+                    .toCompletableFuture().get(2, TimeUnit.SECONDS))
+            drain(); drain()
+            assertFalse(saved.mayBeginAttempt())
+            assertEquals(2, io.reads.get())
+            assertNotNull(core.unsettledOperation())
+        }
         fun failedBeginSettlement(): String {
             io.nextPublication = DeviceCheckPublication.INDETERMINATE
             io.failReads.set(1)
@@ -672,6 +786,7 @@ class AuthorityPostLoginDeviceCheckSavedResultsTest {
         @Volatile var text: String? = null
         @Volatile var nextPublication = DeviceCheckPublication.COMMITTED
         @Volatile var failOnRead: Int? = null
+        @Volatile var afterPublication: (() -> Unit)? = null
         @Volatile private var readGate: Gate? = null
         @Volatile private var publicationGate: Gate? = null
         private val gates = mutableListOf<Gate>()
@@ -696,6 +811,7 @@ class AuthorityPostLoginDeviceCheckSavedResultsTest {
             publicationGate?.also { publicationGate = null }?.let { it.entered.countDown(); check(it.release.await(4, TimeUnit.SECONDS)) }
             val publication = nextPublication.also { nextPublication = DeviceCheckPublication.COMMITTED }
             if (publication != DeviceCheckPublication.NOT_PUBLISHED) text = canonicalState
+            afterPublication?.invoke()
             return publication
         }
     }

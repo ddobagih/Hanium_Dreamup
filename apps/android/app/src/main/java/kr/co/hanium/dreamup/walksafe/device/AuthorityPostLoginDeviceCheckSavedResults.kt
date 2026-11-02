@@ -276,7 +276,7 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
                 reason
             }
             if (cancelled != null) {
-                current.authority.cancelAttempt(ref, UUID.randomUUID().toString(), cancelled)
+                current.cancelIssuedAttempt(ref, binding, cancelled)
                 false
             } else {
                 true
@@ -288,6 +288,11 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
         val ref = synchronized(lock) {
             attempt?.takeIf { it.binding == binding }?.also { it.cancelled = reason.take(160) }?.ref
         } ?: return
+        cancelIssuedAttempt(ref, binding, reason)
+    }
+
+    /** Late begin compensation owns the same uncertainty/reconciliation receipts as a normal cancel. */
+    private fun cancelIssuedAttempt(ref: DeviceCheckAttemptRef, binding: PostLoginDeviceCheckBinding, reason: String) {
         val id = UUID.randomUUID().toString()
         track(id, binding, authority.cancelAttempt(ref, id, reason.take(160))) { _, _ -> true }
     }
