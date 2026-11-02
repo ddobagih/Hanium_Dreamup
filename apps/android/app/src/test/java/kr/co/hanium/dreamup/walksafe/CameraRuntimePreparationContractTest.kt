@@ -231,6 +231,9 @@ class CameraRuntimePreparationContractTest {
         val destroy = body(main, "override fun onDestroy()")
         assertTrue(destroy.indexOf("runtimeUiCompletionsClosed = true") < destroy.indexOf("beginDestroyedVisionRetirement()"))
         assertTrue(destroy.contains("runtimeUiCompletions.clear()"))
+        val deferred = body(main, "private fun deferPrimaryForCameraRelease(")
+        assertTrue(deferred.contains("observeRuntimeCompletion(release)"))
+        assertFalse(deferred.contains("release.whenComplete"))
     }
 
     @Test fun explicitRecheckCanSettleOldStorageBeforeAnyNewAttemptAndAllocationWaitsForTheCapturedAck() {

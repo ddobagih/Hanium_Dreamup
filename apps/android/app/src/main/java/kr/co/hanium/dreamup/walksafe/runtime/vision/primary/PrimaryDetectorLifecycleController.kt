@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.runtime.vision.primary
 
 import java.io.Closeable
+import java.lang.ref.WeakReference
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.CompletableFuture
@@ -14,6 +15,7 @@ import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionCohortBusyExcep
 import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRuntimeFailures
 import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionTransferResult
 import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRetirementSnapshot
+import kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionReleaseProof
 import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
 
 /** Load/verification metadata and orchestration; the primary execution owner alone holds the native slot. */
@@ -49,7 +51,10 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
     private var fixedFixtureRunning = false
     private var choiceOverrideRequestId: String? = null
     @Volatile private var compositeLoadDrainPending = false
-    private var failedRetiredLoad: TfliteAndroidFrameDetector? = null
+    private class RetiredLoadFailure(val detector: TfliteAndroidFrameDetector,
+        val local: CompletionStage<Unit>?, val model: CompletionStage<Unit>?,
+        val captured: VisionRetirementSnapshot?)
+    private var failedRetiredLoad: RetiredLoadFailure? = null // guarded by frameStateLock
     private data class AvailabilityWindow(val startedAt: Long, val deadline: Long) {
         fun accepts(now: Long) = now >= startedAt && now < deadline
     }
@@ -61,7 +66,7 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
     private var preparedPairSlot: PrimaryPreparedPairSlot? = null
 
     fun reservePreparedPair(current: () -> Boolean): PrimaryPreparedPairSlot? = synchronized(frameStateLock) {
-        if (loadInFlight || currentness.destroyed() ||
+        if (loadInFlight || failedRetiredLoad != null || currentness.destroyed() ||
             detector.projection().detector !is NoopAndroidFrameDetector || !current()) return@synchronized null
         if (detector.projection().closing && !detector.consumeTransferredResumeAuthorization() &&
             !detector.consumeQuiescedRecheckAuthorization()) return@synchronized null
@@ -111,15 +116,44 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
     }
 
     fun quiescedReleaseConfirmed(captured: VisionRetirementSnapshot): CompletionStage<Unit> {
-        if (synchronized(frameStateLock) { failedRetiredLoad != null }) return CompletableFuture<Unit>().also {
-            it.completeExceptionally(IllegalStateException("A retired load still owns local resources"))
+        val failed = synchronized(frameStateLock) { failedRetiredLoad }
+            ?: return detector.quiescedReleaseConfirmed(captured)
+        val original = failed.captured
+        if (original == null || original.lease !== captured.lease || original.actualReleased !== captured.actualReleased ||
+            original.allocationAvailable !== captured.allocationAvailable || failed.local == null || failed.model == null) {
+            return CompletableFuture<Unit>().also { it.completeExceptionally(
+                IllegalStateException("Retired primary cleanup has no matching local/model/cohort evidence")) }
         }
-        return detector.quiescedReleaseConfirmed(captured)
+        val owner = WeakReference(this)
+        return CompletableFuture.allOf(detector.quiescedReleaseConfirmed(captured).toCompletableFuture(),
+            failed.local.toCompletableFuture(), failed.model.toCompletableFuture(),
+            captured.actualReleased.toCompletableFuture(), captured.allocationAvailable.toCompletableFuture()).thenApply {
+            val receipt = captured.actualReleased.toCompletableFuture().getNow(null)
+            check(receipt != null && receipt.cohortId == captured.lease.cohortId &&
+                (receipt.releaseProof == VisionReleaseProof.CHILD_DEATH && receipt.childPid > 0 ||
+                    receipt.releaseProof == VisionReleaseProof.NO_NATIVE_START && receipt.childPid == 0)) {
+                "Wrong retired primary cohort receipt"
+            }
+            owner.get()?.let { current -> synchronized(current.frameStateLock) {
+                check(current.failedRetiredLoad == null || current.failedRetiredLoad === failed) {
+                    "A newer primary close failure still owns its resources"
+                }
+                if (current.failedRetiredLoad === failed) current.failedRetiredLoad = null
+            } }
+            Unit // Cleanup only; neither host reopening nor a new native permit is issued here.
+        }
     }
 
     /** Guard must include a new AuthorityAttempt, an explicit recheck action and auxiliary drains. */
-    fun resumeQuiescedForRecheck(currentGuard: () -> Boolean): Boolean =
-        detector.resumeQuiescedForRecheck { !currentness.destroyed() && currentGuard() }
+    fun resumeQuiescedForRecheck(currentGuard: () -> Boolean): Boolean {
+        val failed = synchronized(frameStateLock) { failedRetiredLoad }
+        if (failed != null) {
+            val captured = failed.captured ?: return false
+            val confirmed = quiescedReleaseConfirmed(captured).toCompletableFuture()
+            if (!confirmed.isDone || confirmed.isCompletedExceptionally || confirmed.isCancelled) return false
+        }
+        return detector.resumeQuiescedForRecheck { !currentness.destroyed() && currentGuard() }
+    }
 
     private fun preparedCurrent(slot: PrimaryPreparedPairSlot) = slot.ownerKey === preparedReceiverKey &&
         preparedPairSlot === slot && slot.request == loadRequestGeneration && !currentness.destroyed() &&
@@ -230,7 +264,8 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
     }
 
     /** Exact-slot host cleanup; use slot.actualReleasedFuture for physical completion. */
-    fun rollbackPreparedLoad(slot: PrimaryPreparedPairSlot): CompletionStage<Boolean> {
+    fun rollbackPreparedLoad(slot: PrimaryPreparedPairSlot,
+        captured: VisionRetirementSnapshot? = null): CompletionStage<Boolean> {
         val closed = CompletableFuture<Boolean>()
         val instance = synchronized(frameStateLock) {
             if (slot.ownerKey !== preparedReceiverKey || slot.rollbackStarted) { closed.complete(false); return closed }
@@ -251,7 +286,7 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
         try {
             detector.nativeLane.execute {
                 detector.disableUnverified(instance) { }
-                try { closeRetiredLoad(instance); closed.complete(true) }
+                try { closeRetiredLoad(instance, captured); closed.complete(true) }
                 catch (error: Throwable) { closed.completeExceptionally(error) }
             }
         } catch (error: RejectedExecutionException) { closed.completeExceptionally(error) }
@@ -435,12 +470,33 @@ internal class PrimaryDetectorLifecycleController<S : Any>(
         } catch (_: RejectedExecutionException) { presentation.onUi { onDrained(false) } }
     }
 
-    private fun closeRetiredLoad(instance: TfliteAndroidFrameDetector) {
-        try { platform.close(instance) }
+    private fun closeRetiredLoad(instance: TfliteAndroidFrameDetector, captured: VisionRetirementSnapshot? = null) {
+        try {
+            platform.close(instance)
+            // Verification may already have closed this facade before its pair's exact rollback.
+            // A successful repeated close must not strand that earlier failure without its capture.
+            if (captured != null) {
+                val local = runCatching { instance.hostReleasedFuture() }.getOrNull()
+                val model = runCatching { instance.actualReleasedFuture() }.getOrNull()
+                synchronized(frameStateLock) {
+                    val previous = failedRetiredLoad
+                    if (previous?.detector === instance && previous.captured == null &&
+                        local != null && model != null && previous.local === local && previous.model === model)
+                        failedRetiredLoad = RetiredLoadFailure(instance, local, model, captured)
+                }
+            }
+        }
         catch (error: Throwable) {
-            failedRetiredLoad = instance
-            detector.recordDetectorReleaseFailure(instance, error)
-            detector.fenceForClose()
+            val local = runCatching { instance.hostReleasedFuture() }.getOrNull()
+            val model = runCatching { instance.actualReleasedFuture() }.getOrNull()
+            synchronized(frameStateLock) {
+                val previous = failedRetiredLoad?.takeIf {
+                    it.detector === instance && it.local === local && it.model === model
+                }
+                failedRetiredLoad = RetiredLoadFailure(instance, local, model, previous?.captured ?: captured)
+                detector.recordDetectorReleaseFailure(instance, error)
+                detector.fenceForClose()
+            }
             throw error
         } finally { detector.forgetReleasedDetector(instance) }
     }

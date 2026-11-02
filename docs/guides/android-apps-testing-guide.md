@@ -77,6 +77,8 @@ adb install -r "$VISUAL_TEST_WORKSPACE/apps/android/app/build/outputs/apk/visual
 - `VisionProductionModelsAndroidTest` (`visionProductionModelTests=true`)는 실제 내장 CPU 두 모델의 같은 child PID·서로 다른 native owner·raw 반환·양방향 동일 인스턴스 인계와 이전 scope 거절을 검사합니다.
 - `JointRuntimeSampleHostAndroidTest` (`allowJointSampleHostTests=true`)는 명시적 진단 realm에서 실제 CPU 모델과 내장4장으로 잠정 측정→참조1회→최종 strict/지속 측정의 운영 adapter를 검사합니다. 실제 출력·역할·mask·600ms gate를 완화하지 않으며 계정·권한·카메라를 만들지 않습니다.
 - `DeviceCheckAuthorityPublicationFaultDeviceTest` (`allowDeviceCheckAuthorityFaults=true`)는 별도 진단 저장소에 fsync/rename/readback 오류를 넣고 확실한 ACK와 미확정 결과를 구분합니다. 운영 저장소·계정 키를 초기화하지 않습니다.
+- `PrimaryDetectorLifecycleControllerTest`는 prepared close 실패 → 로컬/model/cohort/journal의 지연 회수 → 명시 재점검 → 다음 점검의 초기 drain까지 연결합니다. 같은 facade의 선행 검증 close와 후행 rollback no-op, 다른 lease/receipt·새 실패·파괴도 구분합니다. `RemotePrimaryTensorEngineTest`는 실제 facade에서 native 오류와 로컬 backing 오류를 분리하고, map 제거 후 arena 반환 진행 중의 조기 양성을 차단하는지 검사합니다.
+- `MainRuntimeCompletionDeviceTest` (`allowMainRuntimeCompletionTests=true`)는 에뮬레이터에서 생성자를 실행하지 않은 Main의 실제 대기 콜백을 등록하고, 파괴 시 UI map을 비운 뒤 전역 회수가 pending인 채로 화면이 GC 가능한지 확인합니다. Main의 onCreate·계정·카메라·native 모델은 시작하지 않으며 실제 OS 화면 재생성 전체를 시험한 것으로 표시하지 않습니다.
 - 별도 에뮬레이터 serial을 항상 명시합니다. APK 빌드·설치 성공을 위 시험 실행 성공으로 표시하지 않습니다. 이 시험은 실제 휴대폰/GPU 드라이버/장시간 카메라/보행의 성능 또는 안전성 검증을 대신하지 않습니다.
 - `CameraCompositionCalibrationDeviceTest` (`allowFixtureCompositionCalibration=true`)는 별도 진단 realm에서 후보 탐색과 참조 반환만 확인합니다. 반환값은 최종 검증 전 선택이며 운영 PASS/choice를 저장하지 않습니다. `CameraHomeReopenDiagnosticDeviceTest`는 별도의 실제 카메라 진단입니다. 두 시험을 현행 기기점검의 자동 실행 목록에 넣지 않으며, 실제 카메라 진입 시험은 사용자 지시대로 이번 수정 검증에서 실행하지 않습니다.
 

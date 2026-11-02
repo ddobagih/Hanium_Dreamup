@@ -36,6 +36,7 @@ class TfliteAndroidFrameDetector private constructor(
     @Volatile private var closed = false
     @Volatile private var retirementRequested = false
     @Volatile private var tensorFactory: PrimaryTensorEngineFactory? = null
+    private val hostReleased = CompletableFuture<Unit>()
 
     override fun detect(
         cameraImage: Image,
@@ -277,11 +278,25 @@ class TfliteAndroidFrameDetector private constructor(
                 if (!closed) {
                     closed = true
                     loadRecorder.record(AndroidDetectorLoadPhase.CLOSE_QUEUE, queuedNs)
+                    var modelFailure: Throwable? = null
                     try {
                         loadRecorder.measure(AndroidDetectorLoadPhase.NATIVE_CLOSE) { closeModels() }
+                    } catch (error: Throwable) {
+                        modelFailure = error
+                        throw error
                     } finally {
-                        preprocessor.clearAfterDrain()
-                        rgbScratch.clear()
+                        try {
+                            preprocessor.clearAfterDrain()
+                            rgbScratch.clear()
+                            val factory = tensorFactory
+                            if (if (factory == null) modelFailure == null else factory.hostReleaseConfirmed())
+                                hostReleased.complete(Unit)
+                            else hostReleased.completeExceptionally(modelFailure
+                                ?: IllegalStateException("Primary factory backing release remains unconfirmed"))
+                        } catch (localFailure: Throwable) {
+                            hostReleased.completeExceptionally(localFailure)
+                            throw localFailure
+                        }
                     }
                 }
             }
@@ -291,6 +306,9 @@ class TfliteAndroidFrameDetector private constructor(
 
     fun actualReleasedFuture(): CompletionStage<Unit> =
         tensorFactory?.actualReleasedFuture ?: CompletableFuture.completedFuture(Unit)
+
+    /** Positive only after accepted serial close clears parent caches and factory backing. */
+    fun hostReleasedFuture(): CompletionStage<Unit> = hostReleased
 
     /** Host drain only. The same native models stay alive under the cohort until transfer/adoption. */
     fun detachForTransfer(): PrimaryTransferredDetector {
@@ -303,6 +321,7 @@ class TfliteAndroidFrameDetector private constructor(
             detached
         }
         threadOwner?.close { }
+        hostReleased.complete(Unit)
         return token
     }
 

@@ -12,6 +12,65 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RemotePrimaryTensorEngineTest {
+    @Test fun remoteCloseFailureCanConfirmLocalDrainWhileItsNativeReceiptStillWaits() {
+        val port = Port(); val factory = factory(port); val facade = facade(factory, DetectorThreadOwner())
+        assertFalse(factory.hostReleaseConfirmed())
+        port.retired = true
+        assertTrue(runCatching { facade.close() }.exceptionOrNull() is DetectorCohortRetired)
+        assertTrue(factory.hostReleaseConfirmed())
+        assertEquals(Unit, facade.hostReleasedFuture().toCompletableFuture().join())
+        assertFalse(facade.actualReleasedFuture().toCompletableFuture().isDone)
+        port.death.complete(Unit)
+        assertEquals(Unit, facade.actualReleasedFuture().toCompletableFuture().join())
+    }
+
+    @Test fun aSuppressedLocalBackingFailureIsNotExcusedByLateNativeRelease() {
+        val port = Port()
+        val arena = ParentDirectBufferArena(kr.co.hanium.dreamup.walksafe.inference.composite.JointRuntimeMemoryLedger())
+        val factory = RemotePrimaryTensorFactory(port, { 1_000L }, 20_000L, arena = arena)
+        val facade = facade(factory, DetectorThreadOwner())
+        val buffers = RemotePrimaryTensorFactory::class.java.getDeclaredField("hostBuffers").apply { isAccessible = true }
+            .get(factory) as Map<*, *>
+        assertTrue((buffers.values.first() as ParentDirectBufferArena.Lease).releaseAfterHostDrain())
+        port.retired = true
+        val error = runCatching { facade.close() }.exceptionOrNull()
+        assertTrue(error is DetectorCohortRetired)
+        assertTrue(requireNotNull(error).suppressed.isNotEmpty())
+        port.death.complete(Unit)
+        assertEquals(Unit, facade.actualReleasedFuture().toCompletableFuture().join())
+        assertFalse(factory.hostReleaseConfirmed())
+        assertTrue(facade.hostReleasedFuture().toCompletableFuture().isCompletedExceptionally)
+        assertSame(error, runCatching { facade.close() }.exceptionOrNull())
+        // A repeated close preserves the original task failure and cannot erase its local evidence.
+        assertFalse(factory.hostReleaseConfirmed())
+    }
+
+    @Test fun backingMapRemovalDoesNotConfirmTheReturnWhileTheArenaAckIsBlocked() {
+        val port = Port()
+        val arena = ParentDirectBufferArena(kr.co.hanium.dreamup.walksafe.inference.composite.JointRuntimeMemoryLedger())
+        val factory = RemotePrimaryTensorFactory(port, { 1_000L }, 20_000L, arena = arena)
+        val facade = facade(factory, DetectorThreadOwner())
+        val field = RemotePrimaryTensorFactory::class.java.getDeclaredField("hostBuffers").apply { isAccessible = true }
+        val lock = RemotePrimaryTensorFactory::class.java.getDeclaredField("lock").apply { isAccessible = true }.get(factory)
+        val pool = Executors.newSingleThreadExecutor()
+        try {
+            val closing = synchronized(arena) {
+                val task = pool.submit { facade.close() }
+                val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+                while (synchronized(lock) { (field.get(factory) as Map<*, *>).isNotEmpty() }) {
+                    check(System.nanoTime() < deadline); Thread.yield()
+                }
+                assertFalse(factory.hostReleaseConfirmed())
+                assertFalse(facade.hostReleasedFuture().toCompletableFuture().isDone)
+                assertFalse(task.isDone)
+                task
+            }
+            closing.get(2, TimeUnit.SECONDS)
+            assertTrue(factory.hostReleaseConfirmed())
+            assertEquals(Unit, facade.hostReleasedFuture().toCompletableFuture().join())
+        } finally { pool.shutdownNow(); runCatching { facade.close() } }
+    }
+
     @Test fun productionTensorFacadeParsesTheRemoteOutputAndRetainsItsActualOwner() {
         val port = Port()
         val factory = factory(port)
@@ -235,8 +294,10 @@ class RemotePrimaryTensorEngineTest {
             }
             assertTrue(stopped.get(2, TimeUnit.SECONDS))
             assertFalse("Host close still waits for the accepted invocation", closing.isDone)
+            assertFalse(facade.hostReleasedFuture().toCompletableFuture().isDone)
             assertFalse(facade.isRuntimeAdmissionCurrent())
             allow.countDown(); invocation.get(2, TimeUnit.SECONDS); closing.get(2, TimeUnit.SECONDS)
+            assertEquals(Unit, facade.hostReleasedFuture().toCompletableFuture().join())
         } finally {
             allow.countDown()
             runCatching { facade.close() }

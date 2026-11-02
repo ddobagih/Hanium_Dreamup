@@ -22,6 +22,8 @@ internal class DetectorAttachmentInactive : IllegalStateException("primary trans
 /** The receipt exists before OPEN and survives an OPEN failure without a returned engine. */
 internal interface PrimaryTensorEngineFactory : Closeable {
     val actualReleasedFuture: CompletionStage<Unit>
+    /** Parent work and backing only; a native/model release receipt cannot substitute for this. */
+    fun hostReleaseConfirmed(): Boolean = false
     val requiresOwnerThread: Boolean get() = false
     fun canAdmit(): Boolean = true
     fun inputBuffer(modelSize: Int): ByteBuffer = ByteBuffer.allocateDirect(modelSize * modelSize * 3 * Float.SIZE_BYTES)

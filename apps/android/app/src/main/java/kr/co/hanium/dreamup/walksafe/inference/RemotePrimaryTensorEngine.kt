@@ -63,12 +63,20 @@ internal class RemotePrimaryTensorFactory(private val port: PrimaryTensorRemoteP
     private var cohortReceipt: CompletionStage<*>? = null
     private var failure: Throwable? = null
     private var closed = false
+    private var hostSealed = false
+    private var hostReturnsPending = 0
+    private var hostReturnFailed = false
     private var opening = 0
     private var inFlight = 0
     private var attachmentActivated = attachment == null
     private val attachedSlots = mutableMapOf<String, PrimaryTensorRelease.Slot>()
     private val models = mutableListOf<RemoteEngine>()
     private val hostBuffers = mutableMapOf<String, ParentDirectBufferArena.Lease>()
+
+    override fun hostReleaseConfirmed(): Boolean = synchronized(lock) {
+        closed && hostSealed && opening == 0 && inFlight == 0 && hostBuffers.isEmpty() &&
+            hostReturnsPending == 0 && !hostReturnFailed
+    }
 
     override fun inputBuffer(modelSize: Int): ByteBuffer = arenaBuffer("primary-input-$modelSize", modelSize * modelSize * 3 * 4, true)
     override fun outputBuffer(modelKey: String, bytes: Int): ByteBuffer = arenaBuffer("primary-output-$modelKey-$bytes", bytes, false)
@@ -90,9 +98,11 @@ internal class RemotePrimaryTensorFactory(private val port: PrimaryTensorRemoteP
     private fun releaseHostBuffersIfDrained() {
         val drained = synchronized(lock) {
             if (!closed || opening != 0 || inFlight != 0) emptyList()
-            else hostBuffers.values.toList().also { hostBuffers.clear() }
+            else hostBuffers.values.toList().also { hostBuffers.clear(); hostReturnsPending += it.size }
         }
-        drained.forEach { check(it.releaseAfterHostDrain()) }
+        try { drained.forEach { check(it.releaseAfterHostDrain()) } }
+        catch (error: Throwable) { synchronized(lock) { hostReturnFailed = true }; throw error }
+        finally { synchronized(lock) { hostReturnsPending -= drained.size } }
     }
 
     init {
@@ -171,6 +181,7 @@ internal class RemotePrimaryTensorFactory(private val port: PrimaryTensorRemoteP
             }
         }
         release.seal()
+        synchronized(lock) { hostSealed = true }
         releaseHostBuffersIfDrained()
         closeFailure?.let { throw it }
     }
@@ -220,6 +231,7 @@ internal class RemotePrimaryTensorFactory(private val port: PrimaryTensorRemoteP
             captured.second.forEach { model -> cohortReceipt?.let { release.follow(model.slot, it) } }
             retire(error)
             release.seal()
+            synchronized(lock) { hostSealed = true }
             releaseHostBuffersIfDrained()
             throw retired(error)
         }
@@ -231,6 +243,7 @@ internal class RemotePrimaryTensorFactory(private val port: PrimaryTensorRemoteP
         }
         captured.second.forEach { model -> cohortReceipt?.let { release.follow(model.slot, it) } }
         release.seal()
+        synchronized(lock) { hostSealed = true }
         releaseHostBuffersIfDrained()
         return token
     }

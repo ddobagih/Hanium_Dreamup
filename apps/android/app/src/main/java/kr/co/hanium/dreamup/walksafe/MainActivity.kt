@@ -4649,7 +4649,15 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                 if (preparation.ownerGone.isDone) return@cancelPendingLoadAfterDrain
                 log(DeviceCheckTraceStage.PRIMARY_DRAIN,
                     if (drained) DeviceCheckTraceOutcome.SUCCEEDED else DeviceCheckTraceOutcome.FAILED)
-                if (!drained) { failed("old_primary_drain_unconfirmed"); return@cancelPendingLoadAfterDrain }
+                if (!drained) {
+                    if (primaryDetectorOwner.projection().closing) {
+                        val captured = oldOwner?.let { client?.retirementSnapshot(it) } ?: knownRetirement
+                        if (captured != null) observeFailedRuntimeLeaseCleanup(preparation, captured,
+                            hostDrained, oldRuntime?.consumerDrained, oldRegistryReleased)
+                    }
+                    failed("old_primary_drain_unconfirmed")
+                    return@cancelPendingLoadAfterDrain
+                }
                 log(DeviceCheckTraceStage.PRIMARY_CLOSE, DeviceCheckTraceOutcome.WAITING)
                 primaryDetectorLifecycleController.releaseForCompositeCheck({ runtimeLeasePreparation === preparation }) { released ->
                     if (preparation.ownerGone.isDone) return@releaseForCompositeCheck
@@ -14471,21 +14479,21 @@ generation != cameraFallbackGeneration
         detectorComparisonAfterCameraRelease = detectorComparisonAfterCameraRelease || allowComparison
         if (awaitedCameraRuntimeRelease !== release) {
             awaitedCameraRuntimeRelease = release
-            release.whenComplete { _, error -> runOnUiThread {
-                if (isDestroyed || awaitedCameraRuntimeRelease !== release) return@runOnUiThread
+            observeRuntimeCompletion(release) { error ->
+                if (isDestroyed || awaitedCameraRuntimeRelease !== release) return@observeRuntimeCompletion
                 if (error != null) {
                     updateStatus("카메라 종료 확인 필요", "카메라 모델의 종료를 확인하지 못했습니다. 앱을 완전히 종료한 뒤 다시 실행해 주세요.")
-                    return@runOnUiThread
+                    return@observeRuntimeCompletion
                 }
                 awaitedCameraRuntimeRelease = null
-                if (!isActivityForeground || cameraEntryReleasePending) return@runOnUiThread
+                if (!isActivityForeground || cameraEntryReleasePending) return@observeRuntimeCompletion
                 restorePrimaryAfterCameraScreenIfReady()
                 val compare = detectorComparisonAfterCameraRelease
                 detectorComparisonAfterCameraRelease = false
                 if (compare && postLoginDeviceCheckSnapshot.state == PostLoginDeviceCheckState.RUNNING)
                     loadDetectorForPostLoginDeviceCheck()
                 else loadDetectorForCurrentProcess()
-            } }
+            }
         }
         return true
     }
@@ -15123,7 +15131,8 @@ generation != cameraFallbackGeneration
             if (unknownServiceOwner.currentService === preparation.auxiliary)
                 unknownServiceOwner.closeActiveForDetector()
             val primaryHost = CompletableFuture<Unit>()
-            primaryDetectorLifecycleController.rollbackPreparedLoad(preparation.primarySlot).whenComplete { _, error ->
+            val retirement = client?.retirementSnapshot(preparation.source.owner)
+            primaryDetectorLifecycleController.rollbackPreparedLoad(preparation.primarySlot, retirement).whenComplete { _, error ->
                 var cause = error
                 while (cause is java.util.concurrent.CompletionException || cause is java.util.concurrent.ExecutionException)
                     cause = cause.cause ?: break

@@ -27,6 +27,196 @@ import org.junit.Test
 import sun.misc.Unsafe
 
 class PrimaryDetectorLifecycleControllerTest {
+    @Test fun aRetiredPreparedCloseFailureCannotPoisonTheNextTwoExplicitChecksAfterActualRecovery() {
+        val f = Fixture(); val model = CompletableFuture<Unit>()
+        val actual = CompletableFuture<VisionReleaseReceipt>(); val available = CompletableFuture<VisionReleaseReceipt>()
+        val captured = VisionRetirementSnapshot(VisionCohortLease("8".repeat(64), "main", 1L), actual, available)
+        f.enablePreparedAdmission(model)
+        val old = requireNotNull(f.lifecycle.reservePreparedPair { true })
+        f.lifecycle.retainCreatedLoad(old, AndroidDetectorLoadResult(f.instance, true, true,
+            "unified_walksafe", false, "prepared", actualReleasedFuture = model))
+        f.lifecycle.finishPreparedCreation(old)
+        f.closeFailure = DetectorCohortRetired(IllegalStateException("remote close completed after retirement"), model)
+        val rollback = f.lifecycle.rollbackPreparedLoad(old, captured).toCompletableFuture()
+        f.native.next()
+        assertTrue(rollback.isCompletedExceptionally)
+        val host = f.lifecycle.quiesceForRuntimeError(captured)
+        f.tuning.next(); f.native.next()
+        assertEquals(Unit, host.toCompletableFuture().getNow(null))
+        assertFalse(f.lifecycle.resumeQuiescedForRecheck { available.isDone })
+        model.complete(Unit)
+        actual.complete(VisionReleaseReceipt(captured.lease.cohortId, 234))
+        assertFalse(f.lifecycle.resumeQuiescedForRecheck { available.isDone })
+        available.complete(actual.getNow(null))
+        assertTrue(f.lifecycle.resumeQuiescedForRecheck { available.isDone })
+        val next = requireNotNull(f.lifecycle.reservePreparedPair { true })
+        f.lifecycle.finishPreparedNotStarted(next); f.lifecycle.rollbackPreparedLoad(next)
+        f.lifecycle.finishCompositeCheck(reload = false)
+        val drain = mutableListOf<Boolean>()
+        f.lifecycle.cancelPendingLoadAfterDrain { drain += it }
+        f.tuning.next(); f.native.next(); f.ui.next()
+        assertEquals("A recovered close cannot keep rejecting later explicit checks", listOf(true), drain)
+        val following = requireNotNull(f.lifecycle.reservePreparedPair { true })
+        f.lifecycle.finishPreparedNotStarted(following); f.lifecycle.rollbackPreparedLoad(following)
+        assertEquals(1, f.closed.size)
+    }
+
+    @Test fun retiredCloseCleanupWaitsForLocalModelCohortAndJournalSeparately() {
+        for (last in 0..3) {
+            val f = Fixture(); val local = CompletableFuture<Unit>(); val model = CompletableFuture<Unit>()
+            val actual = CompletableFuture<VisionReleaseReceipt>(); val available = CompletableFuture<VisionReleaseReceipt>()
+            val captured = VisionRetirementSnapshot(VisionCohortLease("8".repeat(64), "main", 1L), actual, available)
+            failPreparedClose(f, captured, local, model)
+            val cleanup = f.lifecycle.quiescedReleaseConfirmed(captured).toCompletableFuture()
+            val complete = listOf<() -> Unit>({ local.complete(Unit) }, { model.complete(Unit) },
+                { actual.complete(VisionReleaseReceipt(captured.lease.cohortId, 234)) },
+                { available.complete(VisionReleaseReceipt(captured.lease.cohortId, 234)) })
+            complete.forEachIndexed { index, effect -> if (index != last) effect() }
+            assertFalse("Evidence $last is still absent", cleanup.isDone)
+            assertFalse(f.lifecycle.resumeQuiescedForRecheck { true })
+            assertNull(f.lifecycle.reservePreparedPair { true })
+            complete[last]()
+            assertEquals(Unit, cleanup.join())
+            assertTrue("Cleanup did not reopen the host", f.execution.projection().closing)
+            assertFalse(f.lifecycle.resumeQuiescedForRecheck { false })
+            assertTrue(f.lifecycle.resumeQuiescedForRecheck { true })
+            val next = requireNotNull(f.lifecycle.reservePreparedPair { true })
+            f.lifecycle.finishPreparedNotStarted(next); f.lifecycle.rollbackPreparedLoad(next)
+        }
+    }
+
+    @Test fun nativeProofCannotExcuseALocalCloseFailureOrAnUnexecutedClose() {
+        for (localFailed in listOf(false, true)) {
+            val f = Fixture(); val local = CompletableFuture<Unit>(); val model = CompletableFuture<Unit>()
+            val actual = CompletableFuture<VisionReleaseReceipt>(); val available = CompletableFuture<VisionReleaseReceipt>()
+            val captured = VisionRetirementSnapshot(VisionCohortLease("7".repeat(64), "main", 1L), actual, available)
+            failPreparedClose(f, captured, local, model)
+            if (localFailed) local.completeExceptionally(IllegalStateException("local backing return failed"))
+            model.complete(Unit); actual.complete(VisionReleaseReceipt(captured.lease.cohortId, 234))
+            available.complete(actual.join())
+            assertFalse(f.lifecycle.resumeQuiescedForRecheck { true })
+            assertNull(f.lifecycle.reservePreparedPair { true })
+            assertTrue(f.execution.projection().closing)
+        }
+    }
+
+    @Test fun retiredCloseRejectsAnotherLeaseIdentityOrReceiptAndWrongCohortEvidence() {
+        for (mismatch in 0..3) {
+            val f = Fixture(); val local = CompletableFuture<Unit>(); val model = CompletableFuture<Unit>()
+            val actual = CompletableFuture<VisionReleaseReceipt>(); val available = CompletableFuture<VisionReleaseReceipt>()
+            val captured = VisionRetirementSnapshot(VisionCohortLease("6".repeat(64), "main", 1L), actual, available)
+            failPreparedClose(f, captured, local, model)
+            local.complete(Unit); model.complete(Unit)
+            actual.complete(VisionReleaseReceipt(if (mismatch == 3) "other" else captured.lease.cohortId, 234))
+            available.complete(actual.join())
+            val other = when (mismatch) {
+                0 -> captured.copy(lease = captured.lease.copy())
+                1 -> captured.copy(actualReleased = CompletableFuture.completedFuture(actual.join()))
+                2 -> captured.copy(allocationAvailable = CompletableFuture.completedFuture(actual.join()))
+                else -> captured
+            }
+            assertTrue(f.lifecycle.quiescedReleaseConfirmed(other).toCompletableFuture().isCompletedExceptionally)
+            assertNull(f.lifecycle.reservePreparedPair { true })
+            if (mismatch == 3) assertFalse(f.lifecycle.resumeQuiescedForRecheck { true })
+            else assertTrue(f.lifecycle.resumeQuiescedForRecheck { true })
+        }
+    }
+
+    @Test fun retiredCloseCanSettleAfterDestructionWithoutGrantingAReservation() {
+        val f = Fixture(); val local = CompletableFuture<Unit>(); val model = CompletableFuture<Unit>()
+        val actual = CompletableFuture<VisionReleaseReceipt>(); val available = CompletableFuture<VisionReleaseReceipt>()
+        val captured = VisionRetirementSnapshot(VisionCohortLease("5".repeat(64), "main", 1L), actual, available)
+        failPreparedClose(f, captured, local, model)
+        val cleanup = f.lifecycle.quiescedReleaseConfirmed(captured).toCompletableFuture()
+        f.destroyed = true
+        local.complete(Unit); model.complete(Unit); actual.complete(VisionReleaseReceipt(captured.lease.cohortId, 234))
+        available.complete(actual.join())
+        assertEquals(Unit, cleanup.join())
+        assertFalse(f.lifecycle.resumeQuiescedForRecheck { true })
+        assertNull(f.lifecycle.reservePreparedPair { true })
+        assertTrue(f.execution.projection().closing)
+    }
+
+    @Test fun anOlderCleanupCallbackCannotClearANewerFailedDetector() {
+        val f = Fixture(); val localA = CompletableFuture<Unit>(); val modelA = CompletableFuture<Unit>()
+        val localB = CompletableFuture<Unit>(); val modelB = CompletableFuture<Unit>()
+        val actual = CompletableFuture<VisionReleaseReceipt>(); val available = CompletableFuture<VisionReleaseReceipt>()
+        val captured = VisionRetirementSnapshot(VisionCohortLease("4".repeat(64), "main", 1L), actual, available)
+        fun create(instance: TfliteAndroidFrameDetector, local: CompletableFuture<Unit>, model: CompletableFuture<Unit>): PrimaryPreparedPairSlot {
+            f.enablePreparedAdmission(model, local, instance)
+            val slot = requireNotNull(f.lifecycle.reservePreparedPair { true })
+            f.lifecycle.retainCreatedLoad(slot, AndroidDetectorLoadResult(instance, true, true,
+                "unified_walksafe", false, "prepared", actualReleasedFuture = model))
+            f.lifecycle.finishPreparedCreation(slot)
+            return slot
+        }
+        val a = create(f.instance, localA, modelA)
+        f.lifecycle.cancelPendingLoad()
+        val newer = unsafe.allocateInstance(TfliteAndroidFrameDetector::class.java) as TfliteAndroidFrameDetector
+        val b = create(newer, localB, modelB)
+        f.closeFailure = DetectorCohortRetired(IllegalStateException("A remote close"), modelA)
+        f.lifecycle.rollbackPreparedLoad(a, captured); f.native.next()
+        f.lifecycle.quiesceForRuntimeError(captured); f.tuning.next(); f.native.next()
+        val older = f.lifecycle.quiescedReleaseConfirmed(captured).toCompletableFuture()
+        f.closeFailure = DetectorCohortRetired(IllegalStateException("B remote close"), modelB)
+        f.lifecycle.rollbackPreparedLoad(b, captured); f.native.next()
+        localA.complete(Unit); modelA.complete(Unit)
+        actual.complete(VisionReleaseReceipt(captured.lease.cohortId, 234)); available.complete(actual.join())
+        assertFalse(older.isDone)
+        localB.complete(Unit); modelB.complete(Unit)
+        assertTrue(older.isCompletedExceptionally)
+        assertTrue(runCatching { older.join() }.exceptionOrNull()!!.cause!!.message!!.contains("newer"))
+        assertEquals(Unit, f.lifecycle.quiescedReleaseConfirmed(captured).toCompletableFuture().join())
+        assertTrue(f.execution.projection().closing)
+        assertTrue(f.lifecycle.resumeQuiescedForRecheck { true })
+        val next = requireNotNull(f.lifecycle.reservePreparedPair { true })
+        f.lifecycle.finishPreparedNotStarted(next); f.lifecycle.rollbackPreparedLoad(next)
+    }
+
+    @Test fun aVerificationCloseFailureCanBindItsExactRollbackEvenWhenTheSecondCloseIsANoop() {
+        val f = Fixture(); val model = CompletableFuture<Unit>()
+        val actual = CompletableFuture<VisionReleaseReceipt>(); val available = CompletableFuture<VisionReleaseReceipt>()
+        val captured = VisionRetirementSnapshot(VisionCohortLease("3".repeat(64), "main", 1L), actual, available)
+        f.enablePreparedAdmission(model)
+        val slot = requireNotNull(f.lifecycle.reservePreparedPair { true })
+        f.lifecycle.retainCreatedLoad(slot, AndroidDetectorLoadResult(f.instance, true, true,
+            "unified_walksafe", false, "prepared", actualReleasedFuture = model))
+        f.lifecycle.finishPreparedCreation(slot)
+        f.install(f.instance)
+        val failure = DetectorCohortRetired(IllegalStateException("verification triggered remote close"), model)
+        f.closeFailure = failure
+        f.lifecycle.disableUnverified(f.instance)
+        assertSame(failure, runCatching { f.native.next() }.exceptionOrNull())
+        f.closeFailure = null // A CPU facade's closed flag makes its repeated close a normal no-op.
+        val rollback = f.lifecycle.rollbackPreparedLoad(slot, captured).toCompletableFuture()
+        f.native.next(); assertEquals(true, rollback.join())
+        f.lifecycle.quiesceForRuntimeError(captured); f.tuning.next(); f.native.next()
+        model.complete(Unit); actual.complete(VisionReleaseReceipt(captured.lease.cohortId, 234))
+        available.complete(actual.join())
+        assertTrue("Exact rollback metadata must enrich the earlier failure of this same facade",
+            f.lifecycle.resumeQuiescedForRecheck { true })
+        val next = requireNotNull(f.lifecycle.reservePreparedPair { true })
+        f.lifecycle.finishPreparedNotStarted(next); f.lifecycle.rollbackPreparedLoad(next)
+        val drain = mutableListOf<Boolean>()
+        f.lifecycle.cancelPendingLoadAfterDrain { drain += it }
+        f.tuning.next(); f.native.next(); f.ui.next()
+        assertEquals(listOf(true), drain)
+    }
+
+    private fun failPreparedClose(f: Fixture, captured: VisionRetirementSnapshot,
+        local: CompletableFuture<Unit>, model: CompletableFuture<Unit>) {
+        f.enablePreparedAdmission(model, local)
+        val slot = requireNotNull(f.lifecycle.reservePreparedPair { true })
+        f.lifecycle.retainCreatedLoad(slot, AndroidDetectorLoadResult(f.instance, true, true,
+            "unified_walksafe", false, "prepared", actualReleasedFuture = model))
+        f.lifecycle.finishPreparedCreation(slot)
+        f.closeFailure = DetectorCohortRetired(IllegalStateException("remote close unconfirmed"), model)
+        assertFalse(f.lifecycle.rollbackPreparedLoad(slot, captured).toCompletableFuture().isDone)
+        f.native.next()
+        f.lifecycle.quiesceForRuntimeError(captured)
+        f.tuning.next(); f.native.next()
+    }
+
     @Test fun destructionBeforeTheInitialDrainStillSettlesTheOriginalHandoffAfterRealHostClose() {
         val f = Fixture()
         val handoff = kr.co.hanium.dreamup.walksafe.CameraRuntimeHandoff.Registry()
@@ -1127,7 +1317,10 @@ class PrimaryDetectorLifecycleControllerTest {
             lifecycle.loadForCurrentProcess(); tuning.next(); native.next(); ui.next(); native.next(); ui.next()
             assertTrue(lifecycle.verifiedForOutput())
         }
-        fun enablePreparedAdmission(physical: CompletableFuture<Unit>) {
+        fun enablePreparedAdmission(physical: CompletableFuture<Unit>,
+            local: CompletableFuture<Unit> = CompletableFuture.completedFuture(Unit),
+            instance: TfliteAndroidFrameDetector = this.instance) {
+            TfliteAndroidFrameDetector::class.java.getDeclaredField("hostReleased").apply { isAccessible = true }.set(instance, local)
             TfliteAndroidFrameDetector::class.java.getDeclaredField("runtimeLock").apply { isAccessible = true }.set(instance, Any())
             TfliteAndroidFrameDetector::class.java.getDeclaredField("tensorFactory").apply { isAccessible = true }.set(instance,
                 object : PrimaryTensorEngineFactory {
