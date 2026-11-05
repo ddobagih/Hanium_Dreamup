@@ -299,13 +299,14 @@ internal class DeviceCheckPresenter(
                 PostLoginMetricDepthState.UNKNOWN -> "확인 불가(AR 서비스·권한 확인)"
                 PostLoginMetricDepthState.TIMED_OUT -> "제한(지원 확인 시간 초과)"
             }
+            // These labels are also the row lookup keys in OnboardingReadinessPanel.
             return listOf(
-                "거리 API 지원\t$distanceText",
-                "객체 인식(내장 이미지)\t$cameraText",
-                "GPS·위치 서비스\t$locationText",
+                "ARCore Depth\t$distanceText",
+                "카메라\t$cameraText",
+                "위치\t$locationText",
                 "현재 위치 수신\t${label(observation.locationFix, "수신 대기", "수신 미확인")}",
-                "한국어 음성 합성\t${label(observation.koreanTextToSpeech, "확인 중")}",
-                "기기 내 호출어 인식\t$microphoneText",
+                "한국어 음성\t${label(observation.koreanTextToSpeech, "확인 중")}",
+                "호출어\t$microphoneText",
                 "기기 상태\t${facts.resourceWaitNotice ?: label(observation.deviceResources, "상태 확인 중", "배터리·저장공간·발열 확인 필요")}",
             ).joinToString(separator = "\n")
         }
