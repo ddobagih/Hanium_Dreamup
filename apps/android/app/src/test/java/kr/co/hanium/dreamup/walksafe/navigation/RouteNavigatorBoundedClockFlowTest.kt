@@ -167,7 +167,7 @@ class RouteNavigatorBoundedClockFlowTest {
         assertFalse(nav.isDirectionRecheckPending())
     }
 
-    @Test fun aCompletedNominalClockDeduplicatesExactClockAtSixSecondsAndRepeatsAtTen() {
+    @Test fun aCompletedNominalClockDeduplicatesExactClockAtTwoSecondsAndRepeatsAtFive() {
         val nav = navigator()
         warmNominal(nav, rv(1_000L, 12f))
         val range = update(nav, 1_000L, rv(1_000L, 12f))
@@ -176,32 +176,32 @@ class RouteNavigatorBoundedClockFlowTest {
         nav.acknowledgeInstruction(range, 1_000L)
         assertNull(update(nav, 1_100L, rv(1_100L, 0.1f)).instruction)
         assertNull(update(nav, 1_200L, rv(1_200L, 0.1f)).instruction)
-        assertNull(update(nav, 6_999L, rv(6_999L, 0.1f)).instruction)
-        val sixSeconds = update(nav, 7_000L, rv(7_000L, 0.1f))
-        assertNull(sixSeconds.instruction)
-        assertEquals("guidance_already_completed", sixSeconds.reason)
-        assertNull(update(nav, 10_999L, rv(10_999L, 0.1f)).instruction)
-        val exactFacing = rv(11_000L, 0.1f)
-        val exact = update(nav, 11_000L, exactFacing)
+        assertNull(update(nav, 2_999L, rv(2_999L, 0.1f)).instruction)
+        val twoSeconds = update(nav, 3_000L, rv(3_000L, 0.1f))
+        assertNull(twoSeconds.instruction)
+        assertEquals("guidance_already_completed", twoSeconds.reason)
+        assertNull(update(nav, 5_999L, rv(5_999L, 0.1f)).instruction)
+        val exactFacing = rv(6_000L, 0.1f)
+        val exact = update(nav, 6_000L, exactFacing)
         assertEquals("route_guidance", exact.reason)
         assertEquals(RouteFacingExpression.CLOCK, exact.facingDiagnostic?.expression)
         assertTrue(requireNotNull(exact.instruction).contains("약 12시 방향"))
         assertFalse(exact.instruction.orEmpty().contains("사이 방향"))
         assertTrue(nav.reserveInstruction(exact))
-        assertTrue(nav.isInstructionCurrent(exact, 11_000L, exactFacing))
-        nav.acknowledgeInstruction(exact, 11_000L)
+        assertTrue(nav.isInstructionCurrent(exact, 6_000L, exactFacing))
+        nav.acknowledgeInstruction(exact, 6_000L)
     }
 
-    @Test fun anActuallyCompletedExactClockRetainsTheExistingTenSecondPeriodicRepeat() {
+    @Test fun anActuallyCompletedExactClockUsesTheFiveSecondPeriodicRepeat() {
         val nav = navigator()
         val first = update(nav, 1_000L, rv(1_000L, 0.1f))
         assertEquals(RouteFacingExpression.CLOCK, first.facingDiagnostic?.expression)
         assertTrue(nav.reserveInstruction(first))
         nav.acknowledgeInstruction(first, 1_000L)
-        val sixSeconds = update(nav, 7_000L, rv(7_000L, 0.1f))
-        assertEquals("guidance_already_completed", sixSeconds.reason)
-        assertNull(sixSeconds.instruction)
-        val periodic = update(nav, 11_000L, rv(11_000L, 0.1f))
+        val twoSeconds = update(nav, 3_000L, rv(3_000L, 0.1f))
+        assertEquals("guidance_already_completed", twoSeconds.reason)
+        assertNull(twoSeconds.instruction)
+        val periodic = update(nav, 6_000L, rv(6_000L, 0.1f))
         assertEquals(RouteFacingExpression.CLOCK, periodic.facingDiagnostic?.expression)
         assertNotNull(periodic.instruction)
     }

@@ -221,8 +221,9 @@ class RouteNavigatorTurnVertexLateralSafetyRegressionTest {
             assertEquals("north=$northM", "guidance_rate_limited", unchanged.reason)
             assertNull(unchanged.instruction)
             assertFalse(unchanged.cancelStaleNavigationSpeech)
-            val afterCadence = navigator.update(fix(50.0, northM, 10f, 7_000L), 7_000L, false,
-                facingObservation = facing(90.0, 7_000L))
+            val afterCadenceAt = if (northM == 0.0) 3_000L else 7_000L
+            val afterCadence = navigator.update(fix(50.0, northM, 10f, afterCadenceAt), afterCadenceAt, false,
+                facingObservation = facing(90.0, afterCadenceAt))
             assertEquals("north=$northM", "guidance_already_completed", afterCadence.reason)
             assertNull(afterCadence.instruction)
         }

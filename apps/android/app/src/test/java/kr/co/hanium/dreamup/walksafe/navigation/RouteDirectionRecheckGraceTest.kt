@@ -379,12 +379,12 @@ class RouteDirectionRecheckGraceTest {
         assertTrue(nav.isDirectionRecheckPending())
         assertEquals("guidance_rate_limited", nav.retryGuidance(3_300L, facing(3_300L))?.reason)
         assertFalse(nav.isDirectionRecheckPending())
-        val early = nav.update(fix(9_099L), 9_099L, false, facingObservation = facing(9_099L))
+        val early = nav.update(fix(5_099L), 5_099L, false, facingObservation = facing(5_099L))
         assertNull(early.instruction)
         assertEquals("guidance_rate_limited", early.reason)
-        assertNull(nav.retryGuidance(9_100L, facing(9_100L))?.instruction)
-        assertNull(nav.retryGuidance(13_099L, facing(13_099L))?.instruction)
-        assertClock(requireNotNull(nav.retryGuidance(13_100L, facing(13_100L))), 12)
+        assertNull(nav.retryGuidance(5_100L, facing(5_100L))?.instruction)
+        assertNull(nav.retryGuidance(8_099L, facing(8_099L))?.instruction)
+        assertClock(requireNotNull(nav.retryGuidance(8_100L, facing(8_100L))), 12)
     }
 
 

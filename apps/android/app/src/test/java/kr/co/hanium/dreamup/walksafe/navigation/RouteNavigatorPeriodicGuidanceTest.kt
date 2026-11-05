@@ -10,11 +10,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RouteNavigatorPeriodicGuidanceTest {
-    // These fixtures isolate speech completion, retry ownership, and the 6/10-second cadence.
+    // These fixtures isolate speech completion, retry ownership, and the 2/5-second facing and 6/10-second recovery cadence.
     // Production 1.5-second delay and immediate safety actions are covered by RouteDirectionRecheckGraceTest.
 
     @Test
-    fun stoppedUserGetsTheSameDirectionTenSecondsAfterEachCompletedSentence() {
+    fun stoppedUserGetsTheSameDirectionFiveSecondsAfterEachCompletedSentence() {
         // Positive maneuver fixture: independent, fresh camera-facing observation; raw fixes are unchanged.
         listOf(false, true).forEach { testMode ->
             val navigator = navigator(testMode)
@@ -22,8 +22,8 @@ class RouteNavigatorPeriodicGuidanceTest {
             assertTrue(navigator.reserveInstruction(first))
             navigator.acknowledgeInstruction(first, 4_000)
 
-            assertNull(navigator.update(fix(0.00055, 13_999), 13_999, false, facingObservation = RouteFacingObservation(90.0, 5.0, 13_999)).instruction)
-            val repeat = requireNotNull(navigator.retryGuidance(14_000, facingObservation = RouteFacingObservation(90.0, 5.0, 14_000)))
+            assertNull(navigator.update(fix(0.00055, 8_999), 8_999, false, facingObservation = RouteFacingObservation(90.0, 5.0, 8_999)).instruction)
+            val repeat = requireNotNull(navigator.retryGuidance(9_000, facingObservation = RouteFacingObservation(90.0, 5.0, 9_000)))
             assertEquals("route_guidance", repeat.reason)
             assertEquals(first.guideIndex, repeat.guideIndex)
             assertEquals(first.speechCueToken?.distanceBand, repeat.speechCueToken?.distanceBand)
@@ -33,10 +33,10 @@ class RouteNavigatorPeriodicGuidanceTest {
             assertFalse(repeat.instruction?.contains("전체 경로") == true)
             assertFalse(repeat.cancelStaleNavigationSpeech)
             assertTrue(navigator.reserveInstruction(repeat))
-            navigator.acknowledgeInstruction(repeat, 17_000)
+            navigator.acknowledgeInstruction(repeat, 12_000)
 
-            assertNull(navigator.update(fix(0.00055, 26_999), 26_999, false, facingObservation = RouteFacingObservation(90.0, 5.0, 26_999)).instruction)
-            val third = requireNotNull(navigator.retryGuidance(27_000, facingObservation = RouteFacingObservation(90.0, 5.0, 27_000)))
+            assertNull(navigator.update(fix(0.00055, 16_999), 16_999, false, facingObservation = RouteFacingObservation(90.0, 5.0, 16_999)).instruction)
+            val third = requireNotNull(navigator.retryGuidance(17_000, facingObservation = RouteFacingObservation(90.0, 5.0, 17_000)))
             assertEquals(repeat.instruction, third.instruction)
             assertNotEquals(repeat.speechCueToken, third.speechCueToken)
             assertTrue(navigator.reserveInstruction(third))
@@ -51,15 +51,15 @@ class RouteNavigatorPeriodicGuidanceTest {
             val first = navigator.update(fix(0.00055, 1_000), 1_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 1_000))
             assertTrue(navigator.reserveInstruction(first))
             navigator.acknowledgeInstruction(first, 2_000)
-            val newer = navigator.update(fix(0.00064, 11_999), 11_999, false, facingObservation = RouteFacingObservation(90.0, 5.0, 11_999))
+            val newer = navigator.update(fix(0.00064, 6_999), 6_999, false, facingObservation = RouteFacingObservation(90.0, 5.0, 6_999))
             assertNull(newer.instruction)
             val match = navigator.currentRouteMatch()
 
-            val repeat = requireNotNull(navigator.retryGuidance(12_000, facingObservation = RouteFacingObservation(90.0, 5.0, 12_000)))
+            val repeat = requireNotNull(navigator.retryGuidance(7_000, facingObservation = RouteFacingObservation(90.0, 5.0, 7_000)))
             assertTrue(repeat.instruction?.contains("약 40미터입니다. 다음 안내 지점에서 경로 기준으로 9시 방향으로 꺾으세요.") == true)
             assertEquals(first.speechCueToken?.distanceBand, repeat.speechCueToken?.distanceBand)
             assertSame(match, navigator.currentRouteMatch())
-            assertSame(match, navigator.currentAcceptedRouteMatchFor(11_999))
+            assertSame(match, navigator.currentAcceptedRouteMatchFor(6_999))
         }
     }
 

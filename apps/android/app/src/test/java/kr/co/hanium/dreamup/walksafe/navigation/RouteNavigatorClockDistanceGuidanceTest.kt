@@ -180,10 +180,10 @@ class RouteNavigatorClockDistanceGuidanceTest {
         assertTrue(nav.reserveInstruction(oneMeterLater))
         assertEquals("guidance_in_flight", nav.retryGuidance(1_200L, facing(90.0, 1_200L))?.reason)
         nav.acknowledgeInstruction(oneMeterLater, 1_300L)
-        val beforePeriodic = nav.update(fix(54.0, atMs = 10_000L), 10_000L, false,
-            facingObservation = facing(90.0, 10_000L))
+        val beforePeriodic = nav.update(fix(54.0, atMs = 6_299L), 6_299L, false,
+            facingObservation = facing(90.0, 6_299L))
         assertNull(beforePeriodic.instruction)
-        val periodic = requireNotNull(nav.retryGuidance(11_300L, facing(90.0, 11_300L)))
+        val periodic = requireNotNull(nav.retryGuidance(6_300L, facing(90.0, 6_300L)))
         assertTrue(requireNotNull(periodic.instruction).contains("약 46미터입니다"))
         assertNotEquals(first.speechCueToken, periodic.speechCueToken)
     }
@@ -201,7 +201,7 @@ class RouteNavigatorClockDistanceGuidanceTest {
         assertTrue(nav.isInstructionCurrent(recovered, 1_200L, facing(0.0, 1_200L)))
     }
 
-    @Test fun completedRecheckDoesNotDelayRecoveryAndActualClockDoneKeepsTheExistingCadence() {
+    @Test fun completedRecheckDoesNotDelayRecoveryAndActualClockDoneUsesTheFasterCadence() {
         for (useRetry in listOf(false, true)) {
             val nav = navigator()
             val imprecise = RouteFacingObservation(75.0, 30.0, 1_000L)
@@ -217,15 +217,15 @@ class RouteNavigatorClockDistanceGuidanceTest {
             nav.acknowledgeInstruction(recheck, 2_101L)
             assertEquals("guidance_in_flight", nav.retryGuidance(2_102L, facing(0.0, 2_102L))?.reason)
             nav.acknowledgeInstruction(recovered, 2_200L)
-            val early = nav.update(fix(50.0, atMs = 8_199L), 8_199L, false,
-                facingObservation = facing(0.0, 8_199L))
+            val early = nav.update(fix(50.0, atMs = 4_199L), 4_199L, false,
+                facingObservation = facing(0.0, 4_199L))
             assertNull(early.instruction)
             assertEquals("guidance_rate_limited", early.reason)
-            val sameClock = requireNotNull(nav.retryGuidance(8_200L, facing(0.0, 8_200L)))
+            val sameClock = requireNotNull(nav.retryGuidance(4_200L, facing(0.0, 4_200L)))
             assertNull(sameClock.instruction)
             assertEquals("guidance_already_completed", sameClock.reason)
-            assertNull(nav.retryGuidance(12_199L, facing(0.0, 12_199L))?.instruction)
-            val periodic = requireNotNull(nav.retryGuidance(12_200L, facing(0.0, 12_200L)))
+            assertNull(nav.retryGuidance(7_199L, facing(0.0, 7_199L))?.instruction)
+            val periodic = requireNotNull(nav.retryGuidance(7_200L, facing(0.0, 7_200L)))
             assertTrue(periodic.instruction.orEmpty().contains("약 3시 방향"))
             assertTrue(nav.reserveInstruction(periodic))
         }

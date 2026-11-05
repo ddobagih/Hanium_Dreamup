@@ -68,6 +68,9 @@ data class RouteNavigatorConfig(
     val minimumArrivalDwellMs: Long = 3_000L,
     /** Base confirmation window; the Android walking composition selects three consecutive windows. */
     val directionRecheckGraceMs: Long = 1_500L,
+    /** Shorter silence after a delivered clock direction; recovery/other notices keep their cadence. */
+    val facingGuidanceIntervalMs: Long = 2_000L,
+    val periodicFacingGuidanceIntervalMs: Long = 5_000L,
 )
 
 enum class RouteNavigatorUserDecision {
@@ -2107,10 +2110,25 @@ class RouteNavigator(
                     it.besideRoute == besideRoute && !it.destinationNotice &&
                     it.facingDirection == RouteFacingDirection.UNKNOWN && it.clockHour == null && it.clockRange == null
             } == true
+        // A supported clock direction needs faster feedback than recovery/overview notices.
+        // Keep explicit shorter caller intervals and all evidence/START guards above and below.
+        val facingGuidance = relativeDirectionEligible && hasFacingReference && magneticRecovery.isEmpty()
+        val minimumIntervalMs = if (facingGuidance)
+            minOf(config.guidanceIntervalMs, config.facingGuidanceIntervalMs) else config.guidanceIntervalMs
+        val periodicIntervalMs = if (facingGuidance)
+            minOf(config.periodicGuidanceIntervalMs, config.periodicFacingGuidanceIntervalMs) else config.periodicGuidanceIntervalMs
+        val directionChangedSinceDelivery = facingGuidance && lastGuidance != null &&
+            nowMs - lastGuidance >= minimumIntervalMs && lastDeliveredDirectionCue?.let {
+                it.guideIndex == cueKey.guideIndex && it.directionOnly == cueKey.directionOnly &&
+                    it.besideRoute == cueKey.besideRoute && !it.destinationNotice &&
+                    (it.clockHour != null || it.clockRange != null) &&
+                    (it.facingDirection != cueKey.facingDirection ||
+                        it.clockHour != null && cueKey.clockHour != null && it.clockHour != cueKey.clockHour)
+            } == true
         // The cadence begins after delivery finishes, and never replaces an in-flight sentence.
         val periodicGuidanceDue = !context.initialJoinReference && lastGuidance != null &&
-            nowMs - lastGuidance >= config.periodicGuidanceIntervalMs
-        if (lastGuidance != null && nowMs - lastGuidance < config.guidanceIntervalMs &&
+            nowMs - lastGuidance >= periodicIntervalMs
+        if (lastGuidance != null && nowMs - lastGuidance < minimumIntervalMs &&
             !periodicGuidanceDue && !manualGuidancePending && !guideAdvanced && !passageConfirmationChanged &&
             !fullGuidanceAfterReference && !besideSafetyChanged && !staleRecoveryExplanation &&
             !recoveredDirectionAfterCompletedExplanation &&
@@ -2122,7 +2140,8 @@ class RouteNavigator(
             lastCompletedInitialJoinReference?.covers(cueKey) == true
         } else completedSpeechCues.any { it.covers(cueKey) }
         if (alreadyCompleted && !periodicGuidanceDue && !manualGuidancePending &&
-            !besideSafetyChanged && !grace.problemTransition && !recoveredDirectionAfterCompletedExplanation
+            !besideSafetyChanged && !grace.problemTransition && !recoveredDirectionAfterCompletedExplanation &&
+            !directionChangedSinceDelivery
         ) {
             return noInstruction("guidance_already_completed")
         }

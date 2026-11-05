@@ -28,3 +28,7 @@ TMAP 보행 경로가 전역 경로다. production `AndroidTactileRouteObservati
 이 구조는 질문 수명주기의 **조정자(Coordinator)**와 안내/음성 계약의 **어댑터(Adapter)**를 적용한다. 질문별 State 하위 클래스나 범용 이벤트 시스템을 추가하지 않고 현재 시도 객체의 동일성으로 소유권을 표현한다. 센서 품질 기준, 경로 판단과 위험 출력 우선순위는 기존 소유자에 남는다.
 
 관련 행동 시험은 `RouteDecisionSpeechCoordinatorTest`, `VoiceCompositionBehaviorTest`, `RouteDecisionOwnerRecoveryRegressionTest`, `MainActivityRouteDecisionSpeechBehaviorTest`, `GuidanceDecisionOwnerRecoveryReplayTest`, `GuidanceFullJourneyReplayTest`다. 실제 컨트롤러 연결과 제어한 시계/음성 콜백을 검증하며, 실제 스피커 청취와 야외 보행은 별도 검증 범위다.
+
+## 방향 음성 안내 간격
+
+`RouteNavigator`는 신뢰 가능한 시계 방향을 안내한 음성의 실제 완료 뒤 기본 최소2초 후 변경된 안내를 전달하고, 같은 안내는5초 후 반복한다. 기존 수동 요청·근접·안전 안내의 즉시 처리 예외는 유지한다. 이전에 말한 방향으로 다시 돌아와도 마지막으로 전달한 방향과 다르면 변경으로 처리하되, 이 중복 해제에는 최소간격을 적용한다. 재생 중인 일반 방향 문장은 기존 방식대로 마치며, 센서 품질·방향 안정화·오래된 관측 차단과 위험 안내 우선순위는 유지한다. 위치·방향 재확인 설명, 경로 옆 안내, 도착 등 다른 문구에는 기존6초/10초 간격과 즉시 안내 예외를 유지한다. 실제 재생 시작은 음성 출력 상태와 다음 관측/갱신 시점에 따라 늦어질 수 있다. 홈의 동서남북 나침반 표시는 이 경로의 자동 음성이 아니다.

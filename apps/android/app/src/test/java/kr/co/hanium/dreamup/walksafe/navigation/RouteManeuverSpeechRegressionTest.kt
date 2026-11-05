@@ -48,10 +48,10 @@ class RouteManeuverSpeechRegressionTest {
         val whilePending = navigator.update(fix(0.00055, 2_000L), 2_000L, false, facingObservation = RouteFacingObservation(90.0, 5.0, 2_000L))
         assertEquals("guidance_in_flight", whilePending.reason)
         navigator.acknowledgeInstruction(first, 2_001L)
-        val stopped = navigator.update(fix(0.00055, 10_000L), 10_000L, false, facingObservation = RouteFacingObservation(90.0, 5.0, 10_000L))
+        val stopped = navigator.update(fix(0.00055, 7_000L), 7_000L, false, facingObservation = RouteFacingObservation(90.0, 5.0, 7_000L))
         assertEquals("guidance_already_completed", stopped.reason)
 
-        val near = navigator.update(fix(0.00082, 11_000L), 11_000L, false, facingObservation = RouteFacingObservation(90.0, 5.0, 11_000L))
+        val near = navigator.update(fix(0.00082, 8_000L), 8_000L, false, facingObservation = RouteFacingObservation(90.0, 5.0, 8_000L))
         assertTrue(near.instruction?.contains("약 12시 방향") == true)
         assertTrue(near.instruction?.contains("다음 안내 지점까지 경로를 따라 약 20미터") == true)
         assertNotEquals(first.speechCueToken, near.speechCueToken)
