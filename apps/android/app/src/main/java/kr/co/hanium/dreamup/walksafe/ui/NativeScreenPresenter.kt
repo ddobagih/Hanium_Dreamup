@@ -85,6 +85,8 @@ internal class NativeScreenPresenter(private val style: WalkSafeViewStyle) : Nat
         val needsKoreanVoice: Boolean,
         val voiceActionLabel: String,
         val voiceActionContentDescription: String,
+        val deviceProgressMessage: String? = null,
+        val wakeProbeRequired: Boolean = false,
     )
 
     data class PaneFacts(
@@ -312,10 +314,13 @@ internal class NativeScreenPresenter(private val style: WalkSafeViewStyle) : Nat
             firstRunPhonePostureText.contentDescription = firstRunPhonePostureText.text
             show(startupCapabilityText, false)
             show(nativeDeviceCheckPanel, facts.deviceDetails)
-            show(postLoginDeviceCheckLiveStatusText, facts.deviceScreen && readiness.deviceFailed)
-            if (facts.deviceScreen && readiness.deviceFailed) {
-                postLoginDeviceCheckLiveStatusText.text = readiness.deviceFailureMessage
-                style.applyNativeNoticeStyle(postLoginDeviceCheckLiveStatusText, "error")
+            val deviceStatus = if (readiness.deviceFailed) readiness.deviceFailureMessage else readiness.deviceProgressMessage
+            show(postLoginDeviceCheckLiveStatusText, facts.deviceScreen && !deviceStatus.isNullOrBlank())
+            if (facts.deviceScreen && !deviceStatus.isNullOrBlank()) {
+                if (postLoginDeviceCheckLiveStatusText.text.toString() != deviceStatus) {
+                    postLoginDeviceCheckLiveStatusText.text = deviceStatus
+                }
+                style.applyNativeNoticeStyle(postLoginDeviceCheckLiveStatusText, if (readiness.deviceFailed) "error" else "info")
             }
             if (facts.deviceDetails) {
                 nativeDeviceCheckValues.forEach { (label, view) ->
@@ -333,16 +338,10 @@ internal class NativeScreenPresenter(private val style: WalkSafeViewStyle) : Nat
             if (readiness.needsKoreanVoice) startupMetricPreflightButton.isEnabled = false
             show(postLoginDeviceCheckSettingsButton, facts.deviceScreen && readiness.deviceFailed &&
                 postLoginDeviceCheckSettingsButton.visibility == View.VISIBLE)
-            show(postLoginDeviceCheckWakePhraseInstructionText, facts.deviceScreen && facts.checking)
-            postLoginDeviceCheckWakePhraseInstructionText.text = "호출어 시험을 누른 뒤 “길라잡이”라고 말해 주세요."
-            postLoginDeviceCheckWakePhraseInstructionText.contentDescription = postLoginDeviceCheckWakePhraseInstructionText.text
-            show(postLoginDeviceCheckWakePhraseStartButton, facts.deviceScreen && facts.checking)
-            postLoginDeviceCheckWakePhraseStartButton.text = when {
-                readiness.wakeProbeActive -> "길라잡이 듣는 중"
-                readiness.wakeReady -> "호출어 다시 시험"
-                else -> "호출어 시험"
-            }
-            postLoginDeviceCheckWakePhraseStartButton.contentDescription = postLoginDeviceCheckWakePhraseStartButton.text
+            // DeviceCheckPresenter owns probe eligibility and its preparing/listening text.
+            val showWakeProbe = facts.deviceScreen && readiness.wakeProbeRequired
+            show(postLoginDeviceCheckWakePhraseInstructionText, showWakeProbe)
+            show(postLoginDeviceCheckWakePhraseStartButton, showWakeProbe)
             show(postLoginDeviceCheckHapticQuestionText, false)
             show(postLoginDeviceCheckHapticRejectButton, false)
             show(postLoginDeviceCheckHapticConfirmButton, false)

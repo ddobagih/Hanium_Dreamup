@@ -243,7 +243,7 @@ internal class DeviceCheckPresenter(
                 pending: String = "검사 중",
                 unavailable: String = "제한",
             ): String = when (signal) {
-                PostLoginDeviceCheckSignal.PENDING -> pending
+                PostLoginDeviceCheckSignal.PENDING -> if (state == PostLoginDeviceCheckState.FAIL) "미완료" else pending
                 PostLoginDeviceCheckSignal.READY -> "통과"
                 PostLoginDeviceCheckSignal.UNAVAILABLE -> unavailable
             }
@@ -267,6 +267,11 @@ internal class DeviceCheckPresenter(
                         observation.locationService,
                     ),
                 )
+            }
+            val locationFixText = if (observation.locationFix == PostLoginDeviceCheckSignal.PENDING) {
+                "보행 전 확인"
+            } else {
+                label(observation.locationFix, unavailable = "수신 미확인")
             }
             val cameraPending = if (facts.cameraPipelineActive) {
                 "두 모델 샘플 처리 중"
@@ -292,7 +297,7 @@ internal class DeviceCheckPresenter(
             ) {
                 if (facts.cameraPermission) "재점검 필요" else "권한 허용 후 재점검 필요"
             } else when (observation.metricDepth) {
-                PostLoginMetricDepthState.PENDING -> "지원 확인 중"
+                PostLoginMetricDepthState.PENDING -> if (state == PostLoginDeviceCheckState.FAIL) "미완료" else "지원 확인 중"
                 PostLoginMetricDepthState.SUPPORTED -> "API 지원 확인"
                 PostLoginMetricDepthState.AVAILABLE -> "실시간 거리 관측"
                 PostLoginMetricDepthState.EXPLICITLY_UNSUPPORTED -> "제한(거리 제한 모드)"
@@ -304,7 +309,7 @@ internal class DeviceCheckPresenter(
                 "ARCore Depth\t$distanceText",
                 "카메라\t$cameraText",
                 "위치\t$locationText",
-                "현재 위치 수신\t${label(observation.locationFix, "수신 대기", "수신 미확인")}",
+                "현재 위치 수신\t$locationFixText",
                 "한국어 음성\t${label(observation.koreanTextToSpeech, "확인 중")}",
                 "호출어\t$microphoneText",
                 "기기 상태\t${facts.resourceWaitNotice ?: label(observation.deviceResources, "상태 확인 중", "배터리·저장공간·발열 확인 필요")}",

@@ -9342,9 +9342,18 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
             phonePostureNotice = phonePostureNotice,
             deviceFailed = deviceState == PostLoginDeviceCheckState.FAIL,
             deviceFailureMessage = failureMessage,
+            deviceProgressMessage = when (deviceState) {
+                PostLoginDeviceCheckState.REQUESTING_PERMISSIONS -> "Android 권한을 확인하고 있습니다."
+                PostLoginDeviceCheckState.RUNNING -> postLoginDeviceCheckLastLiveStatus
+                    ?: "기기 기능을 점검하고 있습니다. 최대 5분이 걸릴 수 있습니다."
+                PostLoginDeviceCheckState.SAVING -> "점검 결과를 저장하고 있습니다. 잠시 기다려 주세요."
+                else -> null
+            },
             deviceValues = values,
             wakeProbeActive = wakeProbeActive,
             wakeReady = postLoginWakePhraseSignal == PostLoginDeviceCheckSignal.READY,
+            wakeProbeRequired = deviceState == PostLoginDeviceCheckState.RUNNING &&
+                postLoginWakePhraseSignal == PostLoginDeviceCheckSignal.PENDING,
             hapticReady = this@MainActivity.postLoginDeviceProbes.hapticSignal == PostLoginDeviceCheckSignal.READY,
             devicePassesFeatureGate = devicePassesFeatureGate,
             needsKoreanVoice = needsKoreanVoice,

@@ -68,6 +68,12 @@ adb install -r apps/android/app/build/outputs/apk/debug/app-debug.apk
 - 거리 지원 조회는 `:metric_support`의 Session 생성 → AUTOMATIC 지원 API → close만 사용하며 resume·촬영 프레임은 없습니다. 실제 회수와 journal 정산 뒤 모델 시험을 시작합니다. 명시적 false와 설치/권한/정지/미확인 오류를 구분합니다. TTS 합성은 실제 청취, 진동 요청은 체감 확인, GPS 지원 정보는 현재 위치 품질의 증거가 아닙니다.
 - 거리 조회의 부모 작업도 `MetricParentExecution`의 공용 실행기 4개로 제한합니다. bind/조회·unbind·EXIT와 조정을 분리하고 임시 스레드를 만들지 않습니다. `MetricReleaseJournal`은 정상·늦은 회수를 한 번 정산하며 실패한 옛 결과를 다시 발행하지 않습니다.
 
+### 기기점검 화면 상태
+
+- `NativePreviewPresentationPolicy`는 권한 확인·실행·결과 저장을 진행 중으로 분류합니다. `NativeScreenPresenter`는 이 동안 시작 버튼을 숨기고 `MainActivity`가 캡처한 단계별 진행 안내를 표시합니다. 저장 대기는 통과로 표시하지 않습니다.
+- 호출어 시험의 활성화·준비/듣기 문구는 `DeviceCheckPresenter`가 결정합니다. 화면은 현재 점검이 RUNNING이며 호출어 결과가 PENDING일 때만 시험 버튼을 표시합니다. 이전 화면의 버튼 가시성에 의존하지 않으므로 화면을 다시 열어도 필요한 시험을 할 수 있고, 권한 확인·저장·시험 완료 상태에는 버튼을 노출하지 않습니다.
+- 실패한 점검의 미확인 신호는 `미완료`로 표시합니다. 전달된 통과·제한 신호는 그대로 표시하고, 이 단계에서 측정하지 않는 현재 위치 수신은 `보행 전 확인`으로 구분합니다. 실제 위치 품질 검사는 보행 전 검사를 따릅니다.
+
 ### 원인 추적 로그와 복구 시험
 
 - debug APK의 `WalkSafeDeviceCheck` Logcat과 기존 `cache/runtime-diagnostics/events.log`, `events.previous.log`에 같은 고정 형식 메타데이터를 기록합니다. `runtime_build_id`·`source_commit`으로 코드 버전을 구분하고, 파일의 `run_id`·`elapsed_ms`·생성된 `flow_id`·session/attempt 숫자로 단계 전후를 연결합니다. Logcat은 `threadtime`의 프로세스 ID와 `elapsed_ms`로 실행을 구분합니다. actor/owner/operation 원문 ID, 이미지·음성·좌표·예외 원문은 받지 않습니다. release 수집·원격 전송은 추가하지 않습니다.

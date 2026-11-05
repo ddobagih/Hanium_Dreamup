@@ -138,7 +138,7 @@ class DeviceCheckPresenterTest {
         val result = DeviceCheckPresenter.startupPresentation(facts)
         assertFalse(result.confirmationAction!!.enabled)
         assertEquals("목적과 안전 제한 확인 완료", result.confirmationAction!!.text)
-        assertEquals("기기 안내\n기기 점검: 모든 기능 통과\n항목별 상태\n확인 완료: WalkSafe 기능을 시작할 수 있습니다.\n교육 안내", result.capabilityMessage)
+        assertEquals("기기 안내\n기기 점검: 필수 점검 완료\n항목별 상태\n확인 완료: WalkSafe 기능을 시작할 수 있습니다.\n교육 안내", result.capabilityMessage)
     }
 
     private fun failureFacts() = DeviceCheckPresenter.FailureFacts(null, DeviceCheckPresenter.LocationFailureFacts(null, null, false), null, null)

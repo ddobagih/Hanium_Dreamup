@@ -69,7 +69,7 @@ internal object NativePreviewPresentationPolicy {
                 settingsVisible = input.settingsVisible, forceSettings = input.forceSettings,
                 accountVisible = accountVisible, purpose = purpose, training = input.training,
                 checking = input.deviceState in setOf(PostLoginDeviceCheckState.RUNNING,
-                    PostLoginDeviceCheckState.REQUESTING_PERMISSIONS),
+                    PostLoginDeviceCheckState.REQUESTING_PERMISSIONS, PostLoginDeviceCheckState.SAVING),
                 guidanceVisible = guidanceVisible, deviceScreen = deviceScreen,
                 deviceDetails = deviceScreen && input.deviceState != PostLoginDeviceCheckState.NOT_RUN,
                 preparing = preparing, showPhysicalPreparation = physicalPreparation(preparing, deviceScreen),
