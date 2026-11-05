@@ -9305,6 +9305,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
             pendingPage = pendingNativeUiPage,
             prewalkPending = nativePrewalkStartEpoch != null,
             developmentBypass = developmentGuidanceStartBypassEnabled,
+            cameraHandoffPending = cameraRuntimeHandoffPendingForHome(),
         ), object : NativePreviewPresentationReader.Queries {
             override fun runtimeActive() = isWalkSessionRuntimeActive()
             override fun devicePassesFeatureGate() = postLoginDeviceCheckPassesFeatureGate()
@@ -11019,6 +11020,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                 runtimeActive = isWalkSessionRuntimeActive(),
                 voiceAvailable = nativeFeatureAvailable(NativeUiPage.VOICE_COMMAND),
                 searchAvailable = nativeFeatureAvailable(NativeUiPage.DESTINATION_SEARCH),
+                cameraHandoffPending = cameraRuntimeHandoffPendingForHome(),
             )
         }
         homeCardRefreshers.forEach { it() }
@@ -14508,6 +14510,13 @@ generation != cameraFallbackGeneration
             }
         }
         return true
+    }
+
+    /** Presentation only: the completed check remains valid while its models change screens. */
+    private fun cameraRuntimeHandoffPendingForHome(): Boolean {
+        val journey = cameraRuntimeJourney ?: return false
+        return !isDestroyed && !isFinishing && postLoginDeviceCheckSnapshot.passesFeatureGate &&
+            postLoginDeviceCheckController.isSnapshotBindingLive(journey.binding)
     }
 
     private fun failCameraRuntimeReturn(reason: String) {

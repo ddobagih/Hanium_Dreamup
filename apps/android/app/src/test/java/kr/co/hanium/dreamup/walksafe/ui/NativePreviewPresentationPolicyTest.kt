@@ -42,6 +42,7 @@ class NativePreviewPresentationPolicyTest {
                     stage = FirstRunOnboardingStage.COMPLETE, page = page,
                     homeVisible = page == NativeUiPage.HOME, pendingPage = null,
                     deviceState = state, devicePassesFeatureGate = false,
+                    cameraHandoffPending = true,
                 ))
                 assertTrue("$page/$state must expose device recovery after education", actual.deviceScreen)
                 assertEquals(state == PostLoginDeviceCheckState.FAIL, actual.deviceDetails)
@@ -57,6 +58,15 @@ class NativePreviewPresentationPolicyTest {
                 deviceState = PostLoginDeviceCheckState.LIMITED, devicePassesFeatureGate = true,
             ))
             assertFalse(actual.deviceScreen)
+        }
+        for (state in listOf(PostLoginDeviceCheckState.FULL, PostLoginDeviceCheckState.LIMITED)) {
+            val handingOff = input().copy(stage = FirstRunOnboardingStage.COMPLETE,
+                deviceState = state, devicePassesFeatureGate = false, cameraHandoffPending = true)
+            assertFalse(NativePreviewPresentationPolicy.project(handingOff).deviceScreen)
+            assertTrue(NativePreviewPresentationPolicy.project(handingOff.copy(cameraHandoffPending = false)).deviceScreen)
+            assertTrue(NativePreviewPresentationPolicy.project(handingOff.copy(pendingPage = NativeUiPage.DESTINATION_SEARCH)).deviceScreen)
+            assertTrue(NativePreviewPresentationPolicy.project(handingOff.copy(stage = FirstRunOnboardingStage.DEVICE_CHECK)).deviceScreen)
+            assertTrue(NativePreviewPresentationPolicy.project(handingOff.copy(page = NativeUiPage.VOICE_COMMAND, homeVisible = false)).deviceScreen)
         }
     }
     @Test fun pendingDestinationUsesPhysicalPreparationUnlessBypassedAndMountingNeedsCamera() {

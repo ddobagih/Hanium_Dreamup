@@ -26,6 +26,7 @@ internal object NativePreviewPresentationPolicy {
         val voiceAvailable: Boolean = false,
         val destinationAvailable: Boolean = false,
         val deletionPhase: AccountDeletionPhase = AccountDeletionPhase.IDLE,
+        val cameraHandoffPending: Boolean = false,
     )
 
     fun plan(input: Input) = Plan(input)
@@ -55,8 +56,12 @@ internal object NativePreviewPresentationPolicy {
         val deviceFeatureGateRequired = !deviceStage && (input.training || input.pendingPage != null ||
             input.homeVisible || input.page in setOf(NativeUiPage.DESTINATION_SEARCH, NativeUiPage.VOICE_COMMAND))
         val preparationRuntimeRequired = input.prewalkPending || input.pendingPage == NativeUiPage.DESTINATION_CONFIRM
+        private val retainingHomeForCamera = input.cameraHandoffPending && input.homeAvailable && input.homeVisible &&
+            input.page == NativeUiPage.HOME && input.pendingPage == null &&
+            input.stage == FirstRunOnboardingStage.COMPLETE &&
+            input.deviceState in setOf(PostLoginDeviceCheckState.FULL, PostLoginDeviceCheckState.LIMITED)
         fun deviceScreen(runtimeInactive: Boolean, featureGatePassed: Boolean) =
-            runtimeInactive && (deviceStage || deviceFeatureGateRequired && !featureGatePassed)
+            runtimeInactive && !retainingHomeForCamera && (deviceStage || deviceFeatureGateRequired && !featureGatePassed)
         fun physicalPreparation(preparing: Boolean, deviceScreen: Boolean) =
             !guidanceVisible && input.homeAvailable && preparing && !input.developmentBypass &&
                 !input.settingsVisible && !accountVisible && !purpose && !deviceScreen

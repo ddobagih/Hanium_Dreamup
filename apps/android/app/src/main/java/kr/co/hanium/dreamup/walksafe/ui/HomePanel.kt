@@ -99,6 +99,7 @@ internal class HomePanel(
         runtimeActive: Boolean,
         voiceAvailable: Boolean,
         searchAvailable: Boolean,
+        cameraHandoffPending: Boolean = false,
     ) {
         renderCardAvailability(
             cameraCard,
@@ -106,6 +107,7 @@ internal class HomePanel(
             available = true,
             title = "카메라 테스트",
             subtitle = "안내 시작 없이 객체 인식과 깊이를 확인합니다",
+            preparing = cameraHandoffPending,
         )
         renderCardAvailability(
             voiceCard,
@@ -113,6 +115,7 @@ internal class HomePanel(
             available = voiceAvailable,
             title = "음성 명령",
             subtitle = "음성으로 앱 기능을 사용합니다",
+            preparing = cameraHandoffPending,
             lockTitle = "앱 내의 기능 사용 제한",
             lockDetail = "기기 장착 상태와 기기 상태를 확인해주세요.",
         )
@@ -122,6 +125,7 @@ internal class HomePanel(
             available = searchAvailable,
             title = "길라잡이",
             subtitle = "목적지를 찾고 경로 안내를 시작합니다",
+            preparing = cameraHandoffPending,
             lockTitle = "앱 내의 기능 사용 제한",
             lockDetail = "기기 장착 상태와 기기 상태를 확인해주세요.",
         )
@@ -142,10 +146,13 @@ internal class HomePanel(
         subtitle: String,
         lockTitle: String = "",
         lockDetail: String = "",
+        preparing: Boolean = false,
     ) {
-        val cardEnabled = !runtimeActive || available
+        val cardEnabled = !preparing && (!runtimeActive || available)
         card.isEnabled = cardEnabled
-        card.contentDescription = if (cardEnabled) {
+        card.contentDescription = if (preparing) {
+            "$title. 홈으로 돌아오는 중입니다. 잠시 기다려 주세요."
+        } else if (cardEnabled) {
             "$title. $subtitle"
         } else {
             "$title. $subtitle. 잠김. $lockTitle. $lockDetail"

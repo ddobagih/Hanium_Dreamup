@@ -646,6 +646,10 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun showUnknownRuntimeStatus() {
         if (!foreground || isDestroyed || isFinishing) return
+        if (returningPair) {
+            unknownStatus.setTextIfChanged("")
+            return
+        }
         val state = unknownRuntime.status
         val choice = jointChoice ?: run {
             unknownStatus.setTextIfChanged("기기 점검 필요 · 추가 인식을 중지했습니다.")
@@ -899,7 +903,8 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         generation++
         unknownMaterialPoints.invalidate()
         jointChoice = null
-        status.text = "검증한 인식 모델을 홈으로 전달하는 중"
+        status.text = "홈으로 돌아가는 중입니다."
+        unknownStatus.text = ""
         val primaryToken = CompletableFuture<kr.co.hanium.dreamup.walksafe.inference.PrimaryTransferredDetector>()
         val auxiliaryToken = try { unknownRuntime.detachForTransfer() }
         catch (error: Throwable) { CompletableFuture<kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamTransferredModel>().also {
