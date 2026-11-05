@@ -157,6 +157,18 @@
 - 보존/공유: 기존 앱/서명 키/데이터는 그대로이며 테스트 후속 업데이트는 동일 테스트 signer/패키지가 필요하다. private keystore/key/password는 공유하지 않는다.
 - 범위: 문서 보완만 수행했다. 추가 빌드/폰 설치/기기점검은 하지 않았다. GitHub 새 브랜치 업로드 완료를 뜻하지 않는다.
 
+## LOG-016 — GitHub 새 브랜치 업로드와 원격 readback 검증
+
+- 사용자 요청: 다음 작업으로 넘어갈 수 있도록 업로드를 실제 진행.
+- 인증: Git Credential Manager의 정상 browser 로그인 후 GitHub API에서 로그인 Symok03 및 대상 저장소 push 권한을 확인했다. 토큰/비밀번호를 명령 인수/로그/공유 파일에 보존하지 않았다.
+- 대상: ddobagih/Hanium_Dreamup, 새 브랜치 `fix/walkmate-device-check-20261106`.
+- 기준 검증: 원본 archive9341개 파일 blob이 f4108026dd61af4ce8cf2d4ab28979ddae70474f와 전부 일치. 기존 integration tip의 이후 조원 변경은 덮어쓰지 않고 원본 시점에서 분기했다.
+- 게시: 소스/시험/문서42파일, 코드 커밋d9f84138dbf394474e61db4ef4aef1736c535496. 게시 복사본의 CRLF→LF만 정규화하고 git diff --check 통과. 원래 빌드 작업 복사본/APK는 변경하지 않았다.
+- 원격 검증: push 뒤 GitHub ref를 다시 읽어 commit 일치를 확인하고, 완전한 recursive tree의42개 게시 blob을 로컬 게시 파일과 비교했다. 성공 tool 결과만으로 업로드를 단정하지 않았다.
+- 제외: 신규 APK/모델/image/raw log/빌드 결과/키/비밀값/계정 데이터 없음. 원본/current/integration 브랜치 merge/force-push 없음. PR도 자동 생성하지 않았다.
+- 범위: 검증된 기존 앱 수리와 문서의 게시다. 추가 모델·폰 검사·전체 CI/현장 검증은 하지 않았다. 이 기록과 provenance 보완은 뒤의 문서 전용 커밋으로 업로드한다.
+- 로컬 증거: github-export-audit의 archive-base/full-archive-base-comparison/precommit-audit/publication-file-map/local-commit/remote-verification 자료. 이 로컬 보조 자료를 원격에서 제공했다고 주장하지 않는다.
+
 ## 이후 항목 템플릿
 
 ```markdown

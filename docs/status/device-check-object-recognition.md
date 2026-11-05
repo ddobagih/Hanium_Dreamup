@@ -27,6 +27,17 @@
 - 이 저장소는 해당 ZIP의 격리 작업 복사본이다. `.git` 메타데이터가 없어 commit hash를 만들거나 추정하지 않았다.
 - 이전 수정 앱과 이번 새 snapshot의 소스·정책을 섞지 않았다. 과거의 측정 생략/`NOT_REQUIRED` 패치를 자동 이식하지 않았다.
 
+### GitHub 공유 브랜치와 원본 시점 검증
+
+- 저장소: `ddobagih/Hanium_Dreamup`, 새 브랜치: **`fix/walkmate-device-check-20261106`**.
+- 코드 업로드 커밋: `d9f84138dbf394474e61db4ef4aef1736c535496`. 이후 보고서/이력 보완은 별도 문서 커밋으로 이어진다.
+- 게시 준비 중 별도 git clone으로 원본 ZIP의 **9341개 파일 전체 git blob**를 비교하여 기준 커밋이 **`f4108026dd61af4ce8cf2d4ab28979ddae70474f`**와 정확히 일치함을 확인했다. 앞의 '.git 메타데이터 없음'은 원래 격리 작업 복사본의 상태이며, 지금은 원본 archive 기준 commit을 실제 검증한 상태다.
+- 기존 integration tip에는 원본 ZIP 이후 조원 수정이 있었다. 그 최신 tip을 통째로 덮어쓰거나 충돌을 숨겨 병합하지 않고, **테스트한 원본 시점에서 새 브랜치**를 분기했다. 원본/default/current 브랜치에 merge/force-push하지 않았다.
+- 수정 소스/테스트/보고서 **42개 파일**을 게시했고 GitHub 원격 tree의 각 blob을 게시 파일과 대조했다. 게시 text는 CRLF→LF만 정규화했으며 실제 테스트한 로직을 추가 변경하지 않았다. 원래 빌드용 작업 복사본과 APK는 수정하지 않았다.
+- 새 private key/keystore/password/account data/APK/model binary/raw log/image는 게시 변경에 포함하지 않았다. 기존 repository가 원래 포함하던 자료까지 없다는 주장은 아니다.
+- 조원들이 새 integration tip과 합칠 때는 이후 수정과 이 브랜치의 차이를 검토하고 합친 결과를 별도 검증해야 한다. 현재 APK 성공을 다른 integration 결과의 성공으로 재사용하지 않는다. 이 업로드 자체로 GitHub CI/전체 시험이 통과했다고 주장하지 않는다.
+- debug 테스트 서명은 외부 비공개 `signing/latest-test-debug.p12`와 환경변수에 의존한다. 키를 공개하지 않았으므로 다른 clone이 같은 signer로 즉시 빌드/업데이트할 수 있다고 가정하지 않는다. 제품 로직 수정과 테스트용 identity/로컬 서명 설정을 구분한다.
+
 ### 조원 AI 주의 — 원본과 테스트 설치본의 이름·패키지·서명 변경
 
 이번 작업은 원본 앱을 삭제하거나 덮어쓰지 않고 함께 설치하기 위한 **별도 테스트 앱**으로 진행했다. 객체 인식 수리와 별도로 아래 배포 식별자 변경이 포함되어 있다.
