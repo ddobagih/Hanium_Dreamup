@@ -47,14 +47,57 @@ class AndroidPostLoginDeviceProbesTest {
         assertTrue(f.haptics.isEmpty())
     }
 
-    @Test fun automaticCapabilityStartDoesNotIntroduceGpsOrMicrophoneSubscriptions() {
+    @Test fun automaticAuthorizedStartConnectsDedicatedGpsWithoutMicrophone() {
         val f = Fixture()
         f.probes.startAutomaticProbes(f.binding)
         assertEquals(1, f.support.calls)
-        assertTrue(f.location.requests.isEmpty())
+        assertEquals(1, f.location.requests.size)
         assertTrue(f.camera.requests.isEmpty())
         assertTrue(f.wakes.isEmpty())
         assertTrue(f.haptics.isEmpty())
+    }
+
+    @Test fun duplicateAutomaticCallbacksNeverCancelOrRestartThisAttemptsLocation() {
+        val f = Fixture()
+        f.probes.resetForAttempt(f.binding)
+        f.probes.startAutomaticProbes(f.binding)
+        val run = f.location.requests.single()
+        repeat(3) { f.probes.startAutomaticProbes(f.binding) }
+        assertEquals(1, f.location.requests.size)
+        assertEquals(0, run.cancelled)
+        run.locations(listOf(f.sample()))
+        repeat(3) { f.probes.startAutomaticProbes(f.binding) }
+        assertEquals(1, f.location.requests.size)
+        assertEquals(PostLoginDeviceCheckSignal.READY, f.probes.signals.locationFix)
+    }
+
+    @Test fun cancelledAutomaticLocationRejectsLateCallbacksAndRestartsOnlyWithNewAttemptReset() {
+        val f = Fixture()
+        f.probes.resetForAttempt(f.binding)
+        f.probes.startAutomaticProbes(f.binding)
+        val old = f.location.requests.single()
+        f.probes.cancelFunctionalProbes()
+        f.probes.startAutomaticProbes(f.binding)
+        assertEquals(1, f.location.requests.size)
+        old.locations(listOf(f.sample()))
+        assertEquals(PostLoginDeviceCheckSignal.PENDING, f.probes.signals.locationFix)
+        f.binding = f.binding.copy(attemptGeneration = 2)
+        f.probes.resetForAttempt(f.binding)
+        f.probes.startAutomaticProbes(f.binding)
+        assertEquals(2, f.location.requests.size)
+        old.failed(); old.locations(listOf(f.sample(mock = true)))
+        assertNull(f.probes.locationDecision)
+        f.location.requests.last().locations(listOf(f.sample()))
+        assertEquals(PostLoginDeviceCheckSignal.READY, f.probes.signals.locationFix)
+    }
+
+    @Test fun timedOutAutomaticLocationRemainsTerminalOnRepeatedCallback() {
+        val f = Fixture()
+        f.probes.startAutomaticProbes(f.binding)
+        f.ui.fire(32_000L)
+        f.probes.startAutomaticProbes(f.binding)
+        assertEquals(1, f.location.requests.size)
+        assertEquals(PostLoginLocationFixTerminalFailure.TIMED_OUT, f.probes.locationTerminalFailure)
     }
 
     @Test fun freshBatchedGpsUsesOriginalElapsedTimestampAndCancelsRegistration() {

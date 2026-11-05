@@ -147,6 +147,15 @@ object VisionRuntimeProtocol {
         VisionPurpose.WARMUP -> 15_000L
         VisionPurpose.REFERENCE -> 10_000L
     }
+    /** DEBUG-only bounded cold initialization experiment; not a measured performance allowance. */
+    fun openBudget(spec: VisionModelSpec, debugColdOpenExperiment: Boolean = false): Long {
+        validateSpec(spec)
+        if (!debugColdOpenExperiment || spec.role != VisionRole.FASTSAM ||
+            VisionRuntimeCodec.decodeOptions(spec.runtimeJson).delegate != "gpu") return OPEN_MS
+        require(spec.modelKey == kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamModelContract.MODEL_ID && spec.assetPath == kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamModelContract.ASSET)
+        kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamModelContract.validate(spec.assetSha256, spec.inputShape, spec.outputShapes, true)
+        return 60_000L
+    }
     fun deadline(caller: Long, now: Long, maximum: Long): Long {
         require(caller > now && maximum > 0) { "vision_deadline_expired" }
         return minOf(caller, if (now > Long.MAX_VALUE - maximum) Long.MAX_VALUE else now + maximum)

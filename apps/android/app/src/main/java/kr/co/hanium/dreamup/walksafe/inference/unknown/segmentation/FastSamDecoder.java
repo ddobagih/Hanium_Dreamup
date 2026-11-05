@@ -137,6 +137,31 @@ public final class FastSamDecoder {
             projectionNanos, interpolationNanos, System.nanoTime() - begin, protoPixels, outputPixels);
     }
 
+    /** Calibration-only sparse replay of the identical ordered projection/interpolation at one pixel. */
+    public static float maskLogitAt(java.nio.FloatBuffer detections, java.nio.FloatBuffer prototypes,
+            int anchor, int width, int height, int x, int y) {
+        if (detections.remaining() != FastSamModelContract.DETECTION_FLOATS ||
+            prototypes.remaining() != FastSamModelContract.PROTOTYPE_FLOATS || anchor < 0 || anchor >= ANCHORS ||
+            width <= 0 || height <= 0 || x < 0 || x >= width || y < 0 || y >= height)
+            throw new IllegalArgumentException("Invalid sparse mask replay");
+        double gain = Math.min((double) PROTO_SIZE / width, (double) PROTO_SIZE / height);
+        double px = (PROTO_SIZE - roundEven(width * gain)) / 2.0;
+        double py = (PROTO_SIZE - roundEven(height * gain)) / 2.0;
+        int left = roundEven(px - .1), top = roundEven(py - .1);
+        AxisMap xm = new AxisMap(width, PROTO_SIZE - roundEven(px + .1) - left, left);
+        AxisMap ym = new AxisMap(height, PROTO_SIZE - roundEven(py + .1) - top, top);
+        float[] v = new float[4];
+        int[] xs = {xm.low[x], xm.high[x]}, ys = {ym.low[y], ym.high[y]};
+        for (int j=0;j<2;j++) for (int i=0;i<2;i++) {
+            float sum=0f; int base=(ys[j]*PROTO_SIZE+xs[i])*MASK_CHANNELS;
+            for (int ch=0;ch<MASK_CHANNELS;ch++) sum += detections.get((ch+5)*ANCHORS+anchor)*prototypes.get(base+ch);
+            v[j*2+i]=sum;
+        }
+        float wx=xm.weight[x], wy=ym.weight[y];
+        float upper=(1f-wx)*v[0]+wx*v[1], lower=(1f-wx)*v[2]+wx*v[3];
+        return (1f-wy)*upper+wy*lower;
+    }
+
     private static int roundEven(double value) { return (int) Math.rint(value); }
     private static float clip(float value, int limit) { return Math.max(0f, Math.min(value, limit)); }
     private static float iou(Candidate a, Candidate b) {

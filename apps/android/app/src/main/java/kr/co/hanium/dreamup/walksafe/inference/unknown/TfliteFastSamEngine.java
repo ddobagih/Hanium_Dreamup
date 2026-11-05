@@ -1,6 +1,8 @@
 package kr.co.hanium.dreamup.walksafe.inference.unknown;
 
 import kr.co.hanium.dreamup.walksafe.inference.RgbLetterboxPreprocessor;
+import kr.co.hanium.dreamup.walksafe.inference.NativeGpuDiagnostic;
+import kr.co.hanium.dreamup.walksafe.diagnostics.BoundedRuntimeDiagnosticLog;
 
 import android.content.Context;
 import android.content.res.AssetFileDescriptor;
@@ -84,11 +86,17 @@ final class TfliteFastSamEngine implements FastSamEngine {
         Interpreter.Options nativeOptions=new Interpreter.Options().setNumThreads(options.numThreads)
             .setUseNNAPI(false).setUseXNNPACK(true);
         if(backend==FastSamRuntimeOptions.Backend.GPU) {
-            delegate=new GpuDelegate(gpuOptions(options,cache));
+            delegate=NativeGpuDiagnostic.measure(NativeGpuDiagnostic.Role.AUXILIARY, NativeGpuDiagnostic.Stage.DELEGATE_INIT,
+                true,cache!=null,Thread.currentThread().getId()==owner,
+                () -> new GpuDelegate(gpuOptions(options,cache)),BoundedRuntimeDiagnosticLog::recordNativeGpu);
             nativeOptions.addDelegate(delegate);
         }
-        interpreter=new Interpreter(model,nativeOptions);
-        interpreter.allocateTensors();
+        interpreter=NativeGpuDiagnostic.measure(NativeGpuDiagnostic.Role.AUXILIARY, NativeGpuDiagnostic.Stage.INTERPRETER_INIT,
+            backend==FastSamRuntimeOptions.Backend.GPU,cache!=null,Thread.currentThread().getId()==owner,
+            () -> new Interpreter(model,nativeOptions),BoundedRuntimeDiagnosticLog::recordNativeGpu);
+        NativeGpuDiagnostic.measure(NativeGpuDiagnostic.Role.AUXILIARY, NativeGpuDiagnostic.Stage.ALLOCATE_TENSORS,
+            backend==FastSamRuntimeOptions.Backend.GPU,cache!=null,Thread.currentThread().getId()==owner,
+            () -> { interpreter.allocateTensors(); return null; },BoundedRuntimeDiagnosticLog::recordNativeGpu);
     }
 
     static GpuDelegateFactory.Options gpuOptions(FastSamRuntimeOptions options,SerializationCache cache) {

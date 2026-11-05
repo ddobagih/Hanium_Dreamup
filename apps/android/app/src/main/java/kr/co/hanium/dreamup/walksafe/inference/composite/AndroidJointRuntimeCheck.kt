@@ -133,6 +133,8 @@ class AndroidJointRuntimeCheck(
                     val host = JointRuntimeSampleHost.create(scoped, config, authority, fixtures,
                         epochs.incrementAndGet(), FastSamRuntimeService.Listener<Unit> { })
                     return object : JointRuntimeCheckSequenceTrial<JointRuntimeReferenceSet> {
+                        override val diagnosticStage get() = host.diagnosticStage
+                        override val primaryFailure get() = host.primaryFailure
                         override val actualReleased get() = host.actualReleasedFuture
                         override fun provisional(candidate: JointRuntimeCandidate, budget: JointRuntimePhaseBudget) =
                             host.measureProvisional(candidate, budget, ::current)
@@ -143,6 +145,8 @@ class AndroidJointRuntimeCheck(
                 }
                 override fun observeRelease(token: Any, released: CompletionStage<Unit>) = publisher.observe(token, released)
                 override fun releaseObserved(token: Any) = publisher.acknowledge(token)
+                override fun diagnostic(event: JointRuntimeCandidateDiagnostic) =
+                    kr.co.hanium.dreamup.walksafe.diagnostics.BoundedRuntimeDiagnosticLog.recordJointCandidate(event)
                 override fun progress(phase: JointRuntimeSearchPhase, candidate: JointRuntimeCandidate?) {
                     Log.i(TAG, "phase=$phase candidate=$candidate")
                     emit(if (phase == JointRuntimeSearchPhase.REFERENCE) "인식 결과를 비교할 기준 자료를 확인하고 있습니다."
@@ -150,7 +154,8 @@ class AndroidJointRuntimeCheck(
                 }
             }
             val check = JointRuntimeCheckSequence(JointRuntimeSearchPolicy(now(), deadlineMs,
-                Runtime.getRuntime().availableProcessors()), deadlineMs, completion, SystemClock::elapsedRealtime, ports)
+                Runtime.getRuntime().availableProcessors()), deadlineMs, completion, SystemClock::elapsedRealtime, ports,
+                debugColdOpenExperiment = kr.co.hanium.dreamup.walksafe.BuildConfig.DEBUG)
             sequence = check
             if (cancelled.get()) check.cancel(reason)
             val result = check.run()
@@ -171,7 +176,7 @@ class AndroidJointRuntimeCheck(
         val accepted = selection.takeIf { confirmed && current() }
         if (accepted == null) selection?.discardIfUnclaimed()
         if (confirmed) FixtureRuntimeSupervisor.release(owner, true)
-        Log.i(TAG, "finished=$resultReason releaseConfirmed=$confirmed candidate=${accepted?.plan?.candidate} validated=false")
+        if (kr.co.hanium.dreamup.walksafe.BuildConfig.DEBUG) Log.i(TAG, "finished=${jointDiagnosticReason(resultReason)} releaseConfirmed=$confirmed candidate=${accepted?.plan?.candidate} validated=false")
         main.post {
             val delivered = accepted.takeIf { !cancelled.get() && sourceCurrent() && now() < deadlineMs }
             if (delivered == null) accepted?.discardIfUnclaimed()

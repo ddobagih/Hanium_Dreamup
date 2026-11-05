@@ -13,6 +13,21 @@ import java.util.concurrent.*
 class JointRuntimeSampleHostTest {
     private val gpuCpu = JointRuntimeCandidate(RuntimeCandidate(RuntimeBackend.GPU, 1), RuntimeCandidate(RuntimeBackend.CPU, 1), 250, 500)
 
+    @Test fun actualUnsupportedAuxiliaryInitFailureKeepsItsStageAndReleasesWithoutSelection() =
+        JointRuntimeSampleTestFixture("unsupported-aux").use { f ->
+            f.auxiliaryFactory.loadFailure = UnsupportedOperationException("SECRET_IMAGE_PATH_TOKEN")
+            val host = f.host()
+            val failure = runCatching { host.measureProvisional(gpuCpu, f.budget(JointRuntimeSearchPhase.PROVISIONAL)) { true } }.exceptionOrNull()
+            assertNotNull(failure)
+            host.actualReleasedFuture.toCompletableFuture().get(3, TimeUnit.SECONDS)
+            assertEquals(JointDiagnosticStage.AUXILIARY_INIT, host.diagnosticStage)
+            val event = jointDiagnosticFailure(host.diagnosticStage, gpuCpu, failure!!)
+            assertEquals(JointDiagnosticOutcome.FAILED, event.outcome)
+            assertTrue(event.exception == JointDiagnosticException.UNSUPPORTED || event.cause == JointDiagnosticException.UNSUPPORTED)
+            assertFalse(formatJointRuntimeCandidateDiagnostic(event).contains("SECRET_IMAGE_PATH_TOKEN"))
+            assertEquals(0, f.ledger.snapshot().activeReservations)
+        }
+
     @Test fun nextAcquireWaitsForAllocationAcknowledgementEvenAfterPhysicalRelease() {
         val physical = CompletableFuture<VisionReleaseReceipt>()
         val available = CompletableFuture<VisionReleaseReceipt>()
@@ -88,6 +103,9 @@ class JointRuntimeSampleHostTest {
                 val measured = next.host().measureProvisional(gpuCpu, next.budget(JointRuntimeSearchPhase.PROVISIONAL)) { true }
                 assertEquals(gpuCpu, measured.candidate)
                 assertEquals(1, next.primaryCreates); assertEquals(0, failed.auxiliaryFactory.creates.get())
+                assertEquals(JointDiagnosticStage.PRIMARY_INIT, old.diagnosticStage)
+                val event = jointDiagnosticFailure(old.diagnosticStage, gpuCpu, marker, old.primaryFailure)
+                assertEquals(JointDiagnosticOutcome.FAILED, event.outcome)
             }
         }
     }

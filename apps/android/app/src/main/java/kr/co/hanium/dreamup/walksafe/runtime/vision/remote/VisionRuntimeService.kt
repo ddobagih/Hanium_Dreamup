@@ -33,6 +33,7 @@ class VisionRuntimeService : Service() {
     private val watch = ScheduledThreadPoolExecutor(1) { Thread(it, "VisionNativeWatchdog") }.apply { removeOnCancelPolicy = true }
     private val models = LinkedHashMap<String, Model>()
     private val requests = ConcurrentHashMap<Long, Long>()
+    private val openTraces = ConcurrentHashMap<Long, VisionOpenTrace>()
     private var nonce: String? = null
     private var owner = ""
     private var epoch = 1L
@@ -48,7 +49,7 @@ class VisionRuntimeService : Service() {
     private var retired = false
     @Volatile private var fault: String? = null
     @Volatile private var fakeEngine = false
-    private val parentDeath = IBinder.DeathRecipient { exitSelf() }
+    private val parentDeath = IBinder.DeathRecipient { exitSelf(VisionOpenEvent.PARENT_DIED) }
     private var admissionWatch: java.util.concurrent.ScheduledFuture<*>? = null
     private class Model(val id: String, val spec: VisionModelSpec) { @Volatile var engine: VisionNativeEngine? = null; var busy = false }
 
@@ -107,7 +108,7 @@ class VisionRuntimeService : Service() {
                 Binder.getCallingUid(), parentPid, Process.myUid(), token == nonce, requestEpoch == epoch, callback != null)) }
             if (code == VisionRuntimeProtocol.EXIT) {
                 require(data.dataAvail() == 0)
-                reply?.writeNoException(); exitSelf(); return true
+                reply?.writeNoException(); exitSelf(VisionOpenEvent.PARENT_EXIT); return true
             }
             require(now() < deadline) { "vision_operation_expired" }
             when (code) {
@@ -158,20 +159,36 @@ class VisionRuntimeService : Service() {
     }
 
     private fun open(id: Long, atEpoch: Long, deadline: Long, spec: VisionModelSpec) {
-        require(deadline - now() <= VisionRuntimeProtocol.OPEN_MS)
+        // Pin and wire validation precede the expanded watchdog allowance, not queued native work.
+        validatePinnedSpec(spec)
+        val openBudget = VisionRuntimeProtocol.openBudget(spec, BuildConfig.DEBUG)
+        require(deadline > now() && deadline - now() <= openBudget)
         val model = synchronized(lock) {
             require(!parked && !parking && models.values.none { it.spec.role == spec.role && it.spec.modelKey == spec.modelKey }) { "ALREADY_OPEN" }
             require(models.values.count { it.spec.role == spec.role } < if (spec.role == VisionRole.PRIMARY) 2 else 1)
             Model(UUID.randomUUID().toString(), spec).also { models[it.id] = it }
         }
+        val trace = VisionOpenTrace(spec.role == VisionRole.FASTSAM,
+            VisionOpenBackend.valueOf(VisionRuntimeCodec.decodeOptions(spec.runtimeJson).delegate.uppercase()), now(), deadline,
+            kr.co.hanium.dreamup.walksafe.diagnostics.BoundedRuntimeDiagnosticLog::recordVisionOpen)
+        openTraces[id] = trace
+        trace.emit(VisionOpenEvent.CHILD_DEADLINE_VALIDATED, now())
+        trace.emit(VisionOpenEvent.CHILD_QUEUED, now())
         execute(id, atEpoch, deadline, model.spec.role) {
             validatePinnedSpec(spec)
             hang("OPEN_HANG")
             verifyAsset(spec)
             check(now() < deadline)
-            model.engine = if (BuildConfig.DEBUG && fakeEngine) debugEngine(spec)
-                else if (spec.role == VisionRole.PRIMARY) PrimaryTensorEngines.createLocal(applicationContext, spec)
-                else FastSamNativeBridge.createLocal(applicationContext, spec)
+            trace.emit(VisionOpenEvent.NATIVE_ENTERED, now())
+            model.engine = kr.co.hanium.dreamup.walksafe.inference.NativeGpuDiagnostic.measure(
+                if (spec.role == VisionRole.PRIMARY) kr.co.hanium.dreamup.walksafe.inference.NativeGpuDiagnostic.Role.PRIMARY
+                else kr.co.hanium.dreamup.walksafe.inference.NativeGpuDiagnostic.Role.AUXILIARY,
+                kr.co.hanium.dreamup.walksafe.inference.NativeGpuDiagnostic.Stage.OPEN,
+                VisionRuntimeCodec.decodeOptions(spec.runtimeJson).delegate == "gpu", false, true, {
+                    if (BuildConfig.DEBUG && fakeEngine) debugEngine(spec)
+                    else if (spec.role == VisionRole.PRIMARY) PrimaryTensorEngines.createLocal(applicationContext, spec)
+                    else FastSamNativeBridge.createLocal(applicationContext, spec)
+                }, kr.co.hanium.dreamup.walksafe.diagnostics.BoundedRuntimeDiagnosticLog::recordNativeGpu)
             val runtime = VisionRuntimeCodec.validateRuntimeJson(requireNotNull(model.engine).runtimeJson)
             JSONObject().put("modelInstanceId", model.id).put("runtimeJson", runtime).toString()
         }
@@ -236,17 +253,29 @@ class VisionRuntimeService : Service() {
     private fun execute(id: Long, atEpoch: Long, deadline: Long, role: VisionRole, operation: () -> String) {
         arm(id, atEpoch, deadline)
         (if (role == VisionRole.PRIMARY) primary else auxiliary).execute {
-            try { result(id, atEpoch, true, operation()) }
-            catch (error: Throwable) {
-                result(id, atEpoch, false, JSONObject().put("reason", error.javaClass.simpleName + ":" + error.message.orEmpty().take(120)).toString())
-                exitSelf() // A failed native operation cannot leave a half-built reusable owner.
+            val trace = openTraces[id]
+            trace?.emit(VisionOpenEvent.CHILD_ENTERED, now())
+            try {
+                val payload = operation()
+                trace?.emit(VisionOpenEvent.CHILD_FINISHED, now())
+                result(id, atEpoch, true, payload)
             }
+            catch (error: Throwable) {
+                trace?.emit(VisionOpenEvent.NATIVE_EXCEPTION, now(), error)
+                result(id, atEpoch, false, JSONObject().put("reason", "vision_native_failed")
+                    .put("failureKind", visionFailureKind(error).name).toString())
+                exitSelf() // A failed native operation cannot leave a half-built reusable owner.
+            } finally { openTraces.remove(id) }
         }
     }
     private fun arm(id: Long, atEpoch: Long, deadline: Long) {
         require(deadline > now() && requests.putIfAbsent(id, atEpoch) == null)
         watch.schedule({ synchronized(lock) {
-            if (!retired && epoch == atEpoch && requests[id] == atEpoch) exitSelf()
+            if (!retired && epoch == atEpoch && requests[id] == atEpoch) {
+                val trace = openTraces[id]
+                trace?.emit(VisionOpenEvent.SERVICE_WATCHDOG, now(), java.util.concurrent.TimeoutException())
+                exitSelf()
+            }
         } }, (deadline - now()).coerceAtLeast(1), TimeUnit.MILLISECONDS)
     }
     private fun armParkDeadline(ticket: Any, deadline: Long) {
@@ -288,7 +317,7 @@ class VisionRuntimeService : Service() {
             data.writeString(payload)
             require(data.dataSize() <= VisionRuntimeProtocol.MAX_CONTROL_BYTES)
             require(requireNotNull(callback).transact(VisionRuntimeProtocol.RESULT, data, reply, 0)); reply.readException()
-        } catch (_: Throwable) { exitSelf() } finally { data.recycle(); reply.recycle() }
+        } catch (_: Throwable) { exitSelf(VisionOpenEvent.CALLBACK_FAILED) } finally { data.recycle(); reply.recycle() }
     }
     private fun validatePinnedSpec(spec: VisionModelSpec) {
         VisionRuntimeProtocol.validateSpec(spec)
@@ -331,9 +360,13 @@ class VisionRuntimeService : Service() {
             override fun close() = Unit
         }
     }
-    override fun onUnbind(intent: Intent?): Boolean { exitSelf(); return false }
-    override fun onDestroy() { exitSelf(); super.onDestroy() }
+    override fun onUnbind(intent: Intent?): Boolean { exitSelf(VisionOpenEvent.UNBIND); return false }
+    override fun onDestroy() { exitSelf(VisionOpenEvent.DESTROY); super.onDestroy() }
     private fun now() = SystemClock.elapsedRealtime()
     private fun isChild() = Application.getProcessName() == packageName + VisionRuntimeProtocol.PROCESS_SUFFIX
-    private fun exitSelf() { synchronized(lock) { retired = true }; if (isChild()) Process.killProcess(Process.myPid()) }
+    private fun exitSelf(event: VisionOpenEvent = VisionOpenEvent.CHILD_EXIT) {
+        synchronized(lock) { retired = true }
+        openTraces.values.forEach { it.emit(event, now()) }
+        if (isChild()) Process.killProcess(Process.myPid())
+    }
 }

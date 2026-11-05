@@ -45,6 +45,8 @@ internal class JointRuntimeSelectionOwnership<R : Closeable, F : Closeable>(refe
 }
 
 internal interface JointRuntimeCheckSequenceTrial<R : Closeable> : Closeable {
+    val diagnosticStage: JointDiagnosticStage get() = JointDiagnosticStage.PROVISIONAL
+    val primaryFailure: kr.co.hanium.dreamup.walksafe.inference.DetectorLoadFailureCode? get() = null
     val actualReleased: CompletionStage<Unit>
     fun provisional(candidate: JointRuntimeCandidate, budget: JointRuntimePhaseBudget): JointRuntimeProvisionalMeasurement
     fun references(budget: JointRuntimePhaseBudget): R
@@ -58,6 +60,7 @@ internal interface JointRuntimeCheckSequencePorts<F : Closeable, R : Closeable> 
     /** Must retain only the completion gate/token and a metadata-only late-release publisher. */
     fun observeRelease(token: Any, released: CompletionStage<Unit>)
     fun releaseObserved(token: Any)
+    fun diagnostic(event: JointRuntimeCandidateDiagnostic) {}
     fun progress(phase: JointRuntimeSearchPhase, candidate: JointRuntimeCandidate?)
 }
 internal data class JointRuntimeCheckSequenceResult<F : Closeable, R : Closeable>(
@@ -72,10 +75,12 @@ internal class JointRuntimeCheckSequence<F : Closeable, R : Closeable>(
     private val gate: JointRuntimeCompletionGate,
     private val nowMs: () -> Long,
     private val ports: JointRuntimeCheckSequencePorts<F, R>,
+    private val debugColdOpenExperiment: Boolean = false,
 ) {
     private val cancelled = AtomicBoolean()
     @Volatile private var currentTrial: JointRuntimeCheckSequenceTrial<R>? = null
     fun cancel(reason: String) { cancelled.set(true); currentTrial?.cancel(reason) }
+    private fun diagnostic(event: JointRuntimeCandidateDiagnostic) { runCatching { ports.diagnostic(event) } }
     private fun admit() { check(!cancelled.get() && nowMs() < deadlineMs && ports.sourceCurrent()) { "sample_check_source_retired" } }
 
     fun run(): JointRuntimeCheckSequenceResult<F, R> {
@@ -90,7 +95,12 @@ internal class JointRuntimeCheckSequence<F : Closeable, R : Closeable>(
                 val phase = policy.provisionalBudget(nowMs()) ?: break
                 val workEnd = phase.deadlineMs - JointRuntimeSearchPolicy.CLEANUP_MS
                 if (workEnd - nowMs() < MINIMUM_TRIAL_REMAINING_MS) break
-                val budget = JointRuntimePhaseBudget(phase.phase, nowMs(), minOf(workEnd, nowMs() + MAXIMUM_TRIAL_MS))
+                // Only the cold-init delta is reserved; measurement and phase/global limits are unchanged.
+                val coldInitExtra = if (debugColdOpenExperiment && candidate.auxiliary.backend ==
+                    kr.co.hanium.dreamup.walksafe.inference.RuntimeBackend.GPU) 40_000L else 0L
+                val budget = JointRuntimePhaseBudget(phase.phase, nowMs(),
+                    kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRuntimeProtocol.deadline(
+                        workEnd, nowMs(), MAXIMUM_TRIAL_MS + coldInitExtra))
                 ports.progress(phase.phase, candidate)
                 val trial = ports.createTrial(fixtures, phase.phase)
                 val token = Any()
@@ -102,7 +112,15 @@ internal class JointRuntimeCheckSequence<F : Closeable, R : Closeable>(
                 } catch (error: Throwable) { failure = error }
                 finally { release(trial, token, phase.deadlineMs) }
                 admit() // Dirty storage, stale source and unknown release stop the whole search.
-                if (failure == null) measurement?.let { policy.assessProvisional(it).measurement?.let(measured::add) }
+                if (failure != null) diagnostic(jointDiagnosticFailure(trial.diagnosticStage, candidate, failure, trial.primaryFailure))
+                else measurement?.let {
+                    val assessment = policy.assessProvisional(it)
+                    diagnostic(JointRuntimeCandidateDiagnostic(JointDiagnosticStage.TIMING,
+                        if (assessment.measurement != null) JointDiagnosticOutcome.ACCEPTED else JointDiagnosticOutcome.REJECTED,
+                        candidate, assessment.failure?.detail?.let(::jointDiagnosticReason) ?: JointDiagnosticReason.NONE,
+                        measurement = it))
+                    assessment.measurement?.let(measured::add)
+                }
             }
             check(measured.isNotEmpty()) { "no_measured_provisional_candidate" }
             admit()
@@ -115,12 +133,14 @@ internal class JointRuntimeCheckSequence<F : Closeable, R : Closeable>(
             catch (error: Throwable) { failure = error }
             finally { release(referenceTrial, token, minOf(deadlineMs, referenceBudget.deadlineMs + JointRuntimeSearchPolicy.CLEANUP_MS)) }
             admit()
-            if (failure != null) throw requireNotNull(failure)
+            if (failure != null) { diagnostic(jointDiagnosticFailure(JointDiagnosticStage.REFERENCE, null, failure, referenceTrial.primaryFailure)); throw requireNotNull(failure) }
             check(policy.finishReference(references != null, nowMs())) { "reference_accuracy_unconfirmed" }
             val plan = requireNotNull(policy.beginFinal(nowMs(), measured)) { "final_plan_unavailable" }
+            diagnostic(JointRuntimeCandidateDiagnostic(JointDiagnosticStage.TERMINAL, JointDiagnosticOutcome.SELECTED_UNVERIFIED, plan.candidate))
             transferred = true
             return JointRuntimeCheckSequenceResult(plan, fixtures, references, "sample_candidate_selected_unverified", gate.releaseConfirmed)
         } catch (error: Throwable) {
+            diagnostic(jointDiagnosticFailure(JointDiagnosticStage.TERMINAL, null, error))
             return JointRuntimeCheckSequenceResult(null, null, null, (error.message ?: "sample_check_failed").take(160), gate.releaseConfirmed)
         } finally {
             if (!transferred) try { references?.close() } finally { fixtures?.close() }

@@ -94,6 +94,7 @@ class RemoteVisionClient private constructor(private val context: Context) {
         var physicalReceipt: VisionReleaseReceipt? = null
         val retirementSignal = CompletableFuture<Unit>()
         val pending = ConcurrentHashMap<Long, Pending>()
+        val openTraces = ConcurrentHashMap<VisionOpenTrace, Boolean>()
         val models = LinkedHashMap<Pair<VisionRole, String>, Model>()
         val roleFlights = VisionRole.entries.associateWith { ReentrantLock() }
         val endpoints = LinkedHashMap<IBinder, Boolean>()
@@ -181,6 +182,7 @@ class RemoteVisionClient private constructor(private val context: Context) {
         requireWorker()
         VisionRuntimeProtocol.validateSpec(spec)
         val immutable = spec.copy(inputShape = spec.inputShape.copyOf(), outputShapes = spec.outputShapes.map { it.copyOf() }.toTypedArray())
+        val openBudget = VisionRuntimeProtocol.openBudget(immutable, kr.co.hanium.dreamup.walksafe.BuildConfig.DEBUG)
         val record = requireLease(lease)
         val model = synchronized(lock) {
             checkCurrent(record, lease)
@@ -188,8 +190,16 @@ class RemoteVisionClient private constructor(private val context: Context) {
             require(record.models.values.count { it.spec.role == spec.role } < if (spec.role == VisionRole.PRIMARY) 2 else 1)
             Model(immutable).also { record.models[spec.role to spec.modelKey] = it }
         }
+        val started = now()
+        val trace = VisionOpenTrace(spec.role == VisionRole.FASTSAM,
+            VisionOpenBackend.valueOf(VisionRuntimeCodec.decodeOptions(spec.runtimeJson).delegate.uppercase()), started,
+            minOf(deadlineElapsedMs, if (started > Long.MAX_VALUE - openBudget) Long.MAX_VALUE else started + openBudget),
+            kr.co.hanium.dreamup.walksafe.diagnostics.BoundedRuntimeDiagnosticLog::recordVisionOpen)
+        record.openTraces[trace] = true
+        trace.emit(VisionOpenEvent.PARENT_ENTERED, now())
         try {
-            val deadline = VisionRuntimeProtocol.deadline(deadlineElapsedMs, now(), VisionRuntimeProtocol.OPEN_MS)
+            val deadline = VisionRuntimeProtocol.deadline(deadlineElapsedMs, started, openBudget)
+            trace.emit(VisionOpenEvent.PARENT_DEADLINE_CLAMPED, now())
             val permit = onAdmission(record, deadline) {
                 await(record.ready, minOf(deadline, record.bindDeadline))
                 val source = synchronized(lock) { checkCurrent(record, lease); record.owner to requireNotNull(record.process) }
@@ -216,7 +226,7 @@ class RemoteVisionClient private constructor(private val context: Context) {
                 synchronized(lock) { checkCurrent(record, lease) }
                 value
             }
-            val payload = rpc(record, lease, VisionRuntimeProtocol.OPEN, deadline, VisionRuntimeProtocol.OPEN_MS, native = permit) {
+            val payload = rpc(record, lease, VisionRuntimeProtocol.OPEN, deadline, openBudget, native = permit, openTrace = trace) {
                 VisionRuntimeProtocol.writeSpec(this, immutable)
             }
             val body: JSONObject
@@ -233,14 +243,18 @@ class RemoteVisionClient private constructor(private val context: Context) {
                 checkCurrent(record, lease); model.handle = handle; model.nativeRef = reference
                 modelReceipts[handle.modelInstanceId] = model.released
             }
+            trace.emit(VisionOpenEvent.PARENT_FINISHED, now())
             return handle
         } catch (error: Throwable) {
+            trace.emit(VisionOpenEvent.PARENT_FAILED, now(), error)
+            if (error is java.util.concurrent.TimeoutException && error !is VisionNativeCallbackTimeout)
+                trace.emit(VisionOpenEvent.PARENT_AWAIT_TIMEOUT, now(), error)
             if (error is VisionStaleAuthorityException) {
                 abort(record, "vision_open_authority_stale", error, lease)
                 throw error
             }
             abort(record, "vision_open_failed", error, lease); throw failure(record, "vision_open_failed", error)
-        }
+        } finally { record.openTraces.remove(trace) }
     }
 
     fun invoke(handle: VisionModelHandle, input: ByteBuffer, outputs: Array<ByteBuffer>, width: Int,
@@ -415,6 +429,8 @@ class RemoteVisionClient private constructor(private val context: Context) {
     /** Never blocks a UI/consumer lane and never lets an old lease stop its transferred cohort. */
     fun requestExit(lease: VisionCohortLease, reason: String) {
         val record = synchronized(lock) { records[lease.cohortId]?.takeIf { it.lease === lease } } ?: return
+        val event = if (reason == "fastsam_load_cancelled") VisionOpenEvent.SOURCE_CANCEL else VisionOpenEvent.PARENT_RETIRE_REQUEST
+        record.openTraces.keys.forEach { it.emit(event, now()) }
         if (kr.co.hanium.dreamup.walksafe.BuildConfig.DEBUG) debugBeforeExitRetirement?.invoke(lease)
         abort(record, reason.take(160), expectedLease = lease, expectedTermination = true)
     }
@@ -584,17 +600,19 @@ class RemoteVisionClient private constructor(private val context: Context) {
             val pending = record.pending[id]
             if (pending != null && pending.epoch == epoch && !record.retired && now() < pending.deadline) {
                 if (success) pending.result.complete(payload)
-                else pending.result.completeExceptionally(failure(record, JSONObject(payload).optString("reason", "vision_native_failed")))
+                else pending.result.completeExceptionally(failure(record, "vision_native_failed",
+                    nativeCallbackFailure(JSONObject(payload).optString("failureKind"))))
             }
             reply!!.writeNoException(); return true
             } finally { work.finish(); confirmRelease(record) }
         }
     }
     private fun rpc(record: Cohort, lease: VisionCohortLease, code: Int, callerDeadline: Long,
-        maximum: Long, native: DeviceCheckNativePermit? = null, write: Parcel.() -> Unit = {}): String {
+        maximum: Long, native: DeviceCheckNativePermit? = null, openTrace: VisionOpenTrace? = null, write: Parcel.() -> Unit = {}): String {
         val dispatched = AtomicBoolean(false)
         try {
             val deadline = VisionRuntimeProtocol.deadline(callerDeadline, now(), maximum)
+            openTrace?.emit(VisionOpenEvent.PARENT_RPC_CLAMPED, now())
             val service = await(record.ready, minOf(deadline, record.bindDeadline))
             val id = ids.incrementAndGet(); val pending = Pending(lease.ownerEpoch, deadline)
             synchronized(lock) {
@@ -626,8 +644,15 @@ class RemoteVisionClient private constructor(private val context: Context) {
                 }
             }
               submitted = true
-              val result = await(pending.result, deadline)
-              await(pending.transportFinished, deadline)
+              val result = try {
+                  val value = await(pending.result, deadline)
+                  await(pending.transportFinished, deadline)
+                  value
+              } catch (error: java.util.concurrent.TimeoutException) {
+                  if (code == VisionRuntimeProtocol.OPEN && error !is VisionNativeCallbackTimeout)
+                      openTrace?.emit(VisionOpenEvent.PARENT_AWAIT_TIMEOUT, now(), error)
+                  throw error
+              }
               return result
             } finally {
                 record.pending.remove(id, pending)

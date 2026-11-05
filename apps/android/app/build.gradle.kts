@@ -50,7 +50,7 @@ fun buildConfigString(value: String): String = "\"" + value
     .replace("\r", "\\r") + "\""
 val debugGatewayOrigin = if (developmentQuickStart) {
     "http://127.0.0.1:8081"
-} else verifiedReleaseGatewayOrigin ?: "http://127.0.0.1:8081"
+} else verifiedReleaseGatewayOrigin ?: "http://127.0.0.1:18881"
 fun configuredReportQueueValue(name: String): String? = providers.gradleProperty(name)
     .orElse(providers.environmentVariable(name))
     .orNull
@@ -509,8 +509,20 @@ android {
         buildConfigField("long", "WALKSAFE_RAW_QUEUE_MAX_TOTAL_BYTES", "${rawQueueBuildMaxTotalBytes}L")
     }
 
+    // Private isolated-test signing; production release signing remains untouched.
+    signingConfigs {
+        create("latestTestDebug") {
+            storeFile = rootProject.file("../../../signing/latest-test-debug.p12")
+            storePassword = providers.environmentVariable("WALKMATE_TEST_STORE_PASSWORD").orNull
+            keyAlias = "walkmate-latest-test"
+            keyPassword = providers.environmentVariable("WALKMATE_TEST_KEY_PASSWORD").orNull
+            storeType = "PKCS12"
+        }
+    }
     buildTypes {
         debug {
+            applicationIdSuffix = ".latesttest"
+            signingConfig = signingConfigs.getByName("latestTestDebug")
             if (developmentReportQueue && !reportQueueEnabled) {
                 // Local development only; reserve 16 MiB beyond automatic storage for explicit reports.
                 buildConfigField("boolean", "WALKSAFE_REPORT_QUEUE_ENABLED", "true")

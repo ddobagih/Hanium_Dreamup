@@ -37,6 +37,15 @@ internal class LocalPrimaryTensorEngine(context: Context, private val spec: Visi
     }
     private val cache = if (options.delegate == "gpu") {
         GpuSerializationCache.prepare(options.gpuSerializationCacheEnabled) {
+            // CompatibilityList is advisory eligibility for OPTIONAL serialization, not native GPU proof.
+            // Keep failures inside prepare's cache-only recovery; uncached creation still verifies the GPU.
+            recorder.measure(AndroidDetectorLoadPhase.GPU_COMPATIBILITY, spec.modelKey, options.delegate) {
+                observe(NativeGpuDiagnostic.Stage.COMPATIBILITY, false) {
+                    CompatibilityList().use {
+                        check(it.isDelegateSupportedOnThisDevice) { "GPU delegate unsupported on this device" }
+                    }
+                }
+            }
             recorder.measure(AndroidDetectorLoadPhase.GPU_CACHE_PREPARE, spec.modelKey, "gpu") {
                 val contract = GpuSerializationContract(inputSize, options.numThreads, options.gpuPrecisionLossAllowed,
                     nativeRuntimeVersion, Build.FINGERPRINT, Build.SUPPORTED_ABIS.toList(), Build.VERSION.SDK_INT)
@@ -45,11 +54,6 @@ internal class LocalPrimaryTensorEngine(context: Context, private val spec: Visi
         }
     } else null
     private val handle: PrimaryInterpreterHandle = if (options.delegate == "gpu" && cache != null) {
-        recorder.measure(AndroidDetectorLoadPhase.GPU_COMPATIBILITY, spec.modelKey, options.delegate) {
-            CompatibilityList().use {
-                check(it.isDelegateSupportedOnThisDevice) { "GPU delegate unsupported on this device" }
-            }
-        }
         cache.create(::createInterpreter)
     } else createInterpreter(null)
     private val loadMs = (System.nanoTime() - startedNs) / 1_000_000.0
@@ -81,6 +85,11 @@ internal class LocalPrimaryTensorEngine(context: Context, private val spec: Visi
         recorder.measure(AndroidDetectorLoadPhase.NATIVE_CLOSE, spec.modelKey, options.delegate) { handle.close() }
     }
 
+    private fun <T> observe(stage: NativeGpuDiagnostic.Stage, serialized: Boolean, block: () -> T): T =
+        NativeGpuDiagnostic.measure(NativeGpuDiagnostic.Role.PRIMARY, stage, options.delegate == "gpu",
+            serialized, Thread.currentThread() === ownerThread, { block() },
+            kr.co.hanium.dreamup.walksafe.diagnostics.BoundedRuntimeDiagnosticLog::recordNativeGpu)
+
     private fun createInterpreter(serialization: GpuSerializationParameters?): PrimaryInterpreterHandle {
         var gpu: GpuDelegate? = null
         var interpreter: Interpreter? = null
@@ -93,11 +102,13 @@ internal class LocalPrimaryTensorEngine(context: Context, private val spec: Visi
                     .setInferencePreference(GpuDelegateFactory.Options.INFERENCE_PREFERENCE_SUSTAINED_SPEED)
                     .setQuantizedModelsAllowed(true)
                 serialization?.let { gpuOptions.setSerializationParams(it.directory.absolutePath, it.modelToken) }
-                gpu = recorder.measure(AndroidDetectorLoadPhase.DELEGATE_INIT, spec.modelKey, options.delegate) { GpuDelegate(gpuOptions) }
+                gpu = recorder.measure(AndroidDetectorLoadPhase.DELEGATE_INIT, spec.modelKey, options.delegate) {
+                    observe(NativeGpuDiagnostic.Stage.DELEGATE_INIT, serialization != null) { GpuDelegate(gpuOptions) }
+                }
                 nativeOptions.addDelegate(gpu)
             }
             val created = recorder.measure(AndroidDetectorLoadPhase.INTERPRETER_INIT, spec.modelKey, options.delegate) {
-                Interpreter(model, nativeOptions)
+                observe(NativeGpuDiagnostic.Stage.INTERPRETER_INIT, serialization != null) { Interpreter(model, nativeOptions) }
             }
             interpreter = created
             recorder.measure(AndroidDetectorLoadPhase.TENSOR_CHECK, spec.modelKey, options.delegate) {

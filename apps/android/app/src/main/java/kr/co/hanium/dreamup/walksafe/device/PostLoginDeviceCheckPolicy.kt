@@ -187,6 +187,7 @@ object PostLoginDeviceCheckPolicy {
         binding: PostLoginDeviceCheckBinding,
         foreground: Boolean,
         observation: PostLoginDeviceCheckObservation,
+        deferWakeFailureForActiveComposite: Boolean = false,
     ): PostLoginDeviceCheckSnapshot {
         if (!isCurrent(snapshot, binding)) return snapshot
         if (snapshot.state != PostLoginDeviceCheckState.RUNNING) return snapshot
@@ -197,6 +198,8 @@ object PostLoginDeviceCheckPolicy {
             return fail(snapshot, PostLoginDeviceCheckFailure.REQUIRED_PERMISSION)
         }
         if (observation.wakePhraseRecognition == PostLoginDeviceCheckSignal.UNAVAILABLE) {
+            // Keep the truthful UNAVAILABLE observation; RUNNING is never success admission.
+            if (deferWakeFailureForActiveComposite && observation.cameraPipeline == PostLoginDeviceCheckSignal.PENDING) return snapshot
             return fail(snapshot, PostLoginDeviceCheckFailure.WAKE_PHRASE_UNAVAILABLE)
         }
         if (hasPendingAutomaticProbe(observation)) return snapshot

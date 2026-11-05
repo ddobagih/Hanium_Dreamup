@@ -19,6 +19,16 @@
 - 이 기간에는 daylog·local-memory·checkpoint 갱신을 일반 기능 완료조건으로 삼지 않는다.
   기능과 직접 관련 없는 기록 작업 때문에 구현 범위를 늘리거나 완료를 지연하지 않는다.
 
+## 객체 인식 기기점검 문제 — AI 협업 인계·지속 기록
+
+- 이 문제를 이어서 다루는 AI는 `docs/status/device-check-ai-handoff-README.md`,
+  `docs/status/device-check-object-recognition.md`,
+  `docs/status/device-check-object-recognition-history.md`를 먼저 확인한다.
+- 사용자는 이 문제의 향후 조사·수정·시험·설치·수동 재현·기준 결정도 계속 기록하도록 요청했다.
+  각 작업 결과를 진행 이력에 추가하고 현황 보고서의 현재 상태/미확인/다음 작업을 갱신한다.
+- 이 문서는 개발 인계 자료이며 정식 정책/출시 승인 또는 없는 실기기 증거를 대신하지 않는다.
+  새 일반 통제 체계나 무관한 Goal graph gate를 확장하라는 뜻이 아니다.
+
 ## 먼저 읽을 문서
 
 새 세션에서는 다음 순서로 읽는다.

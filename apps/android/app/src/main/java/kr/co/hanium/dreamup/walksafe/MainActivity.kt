@@ -14984,12 +14984,20 @@ generation != cameraFallbackGeneration
                     else -> DevicePreparedPairAdoption.Verification.FAILED
                 }
             },
-            publish = { pair -> publishMainRuntimePair(preparation, pair) },
+            publish = { pair ->
+                android.util.Log.i("WalkSafeJointFinal", "event=JOINT_FINAL stage=PUBLISH outcome=STARTED")
+                publishMainRuntimePair(preparation, pair).also { accepted ->
+                    android.util.Log.i("WalkSafeJointFinal", "event=JOINT_FINAL stage=PUBLISH outcome=${if(accepted) "SUCCEEDED" else "FAILED"}")
+                }
+            },
             onReady = {
                 if (mainPairPreparation === preparation) mainPairPreparation = null
+                android.util.Log.i("WalkSafeJointFinal", "event=JOINT_FINAL stage=ADOPTION outcome=SUCCEEDED")
                 onReady()
             },
             onFailure = { reason ->
+                val safeReason = reason.takeIf { it in setOf("pair_adoption_retired", "pair_primary_adoption_failed", "pair_auxiliary_adoption_failed", "pair_verification_retired", "pair_verification_failed", "pair_publication_retired", "pair_creation_retired", "pair_creation_queue_rejected") } ?: "OTHER"
+                android.util.Log.i("WalkSafeJointFinal", "event=JOINT_FINAL stage=ADOPTION outcome=FAILED predicate=$safeReason")
                 retireMainPairPreparation(preparation)
                 onFailed(reason)
             },
@@ -15015,7 +15023,7 @@ generation != cameraFallbackGeneration
                             onAuxiliaryCreated = {
                                 preparation.auxiliary = it
                                 unknownServiceOwner.registerPreparedPair(auxiliarySlot, it)
-                            })).prepared
+                            }), diagnostic = { line -> android.util.Log.i("WalkSafeJointFinal", line) }).prepared
                 } else if (transfer == null) {
                 AndroidJointRuntimeLoader.preparePair(source.context, config, requireNotNull(choice), auxiliarySlot.epoch,
                     auxiliarySlot.listener, deadlineMs, deviceCheckAuthority, isCurrent = ::live,
@@ -15065,9 +15073,15 @@ generation != cameraFallbackGeneration
             runOnUiThread {
                 result.fold(onSuccess = { pair ->
                     preparation.pair = pair
-                    if (live()) preparation.adoption.prepared(pair)
+                    if (live()) {
+                        android.util.Log.i("WalkSafeJointFinal", "event=JOINT_FINAL stage=ADOPTION outcome=STARTED")
+                        preparation.adoption.prepared(pair)
+                    }
                     else { pair.proof.revoke(); preparation.adoption.fail("pair_creation_retired") }
-                }, onFailure = { preparation.adoption.fail("pair_creation_failed:${it.javaClass.simpleName}") })
+                }, onFailure = {
+                    android.util.Log.i("WalkSafeJointFinal", kr.co.hanium.dreamup.walksafe.inference.composite.JointRuntimeFinalDiagnostic.line(
+                        kr.co.hanium.dreamup.walksafe.inference.composite.JointFinalStage.PREPARED, "FAILED", it))
+                    preparation.adoption.fail("pair_creation_failed:${it.javaClass.simpleName}") })
             }
         } } catch (_: RuntimeException) {
             measured?.close()
@@ -15080,11 +15094,15 @@ generation != cameraFallbackGeneration
 
     private fun publishMainRuntimePair(preparation: MainPairPreparation,
         pair: AndroidJointRuntimeLoader.PreparedPair<UnknownRuntimeAttachment>): Boolean {
-        if (!preparation.current() || mainPairPreparation !== preparation || preparation.cleanupStarted.get()) return false
+        fun reject(code: String): Boolean {
+            android.util.Log.i("WalkSafeJointFinal", "event=JOINT_FINAL stage=PUBLISH outcome=FAILED predicate=$code")
+            return false
+        }
+        if (!preparation.current() || mainPairPreparation !== preparation || preparation.cleanupStarted.get()) return reject("OWNER_OR_PREPARATION_RETIRED")
         val snapshot = pair.proof.snapshot
         preparation.consumerLease?.let { transferred ->
             if (transferred.owner !== preparation.source.owner || transferred.runtime.lease !== snapshot.lease ||
-                !transferred.permits() || !pair.proof.isCurrent()) return false
+                !transferred.permits() || !pair.proof.isCurrent()) return reject("TRANSFER_AUTHORITY_OR_PROOF")
             mainPreparedRuntime = MainPreparedRuntime(preparation.binding, preparation.source, pair, transferred,
                 preparation.consumerDrained, preparation.primarySlot, preparation.auxiliarySlot)
             return true
@@ -15093,7 +15111,7 @@ generation != cameraFallbackGeneration
         val tag = DeviceCheckAuthorityValidation.digest("${preparation.binding.actorId}\u0000${preparation.binding.sessionGeneration}" +
             "\u0000${pair.choice.measurementId}\u0000${pair.choice.bindingHash}")
         val claim = registry.acquire(VisionConsumerRegistry.Owner(preparation.source.owner.ownerId, tag), snapshot.lease,
-            listOf(snapshot.primaryHandle, snapshot.auxiliaryHandle)) ?: return false
+            listOf(snapshot.primaryHandle, snapshot.auxiliaryHandle)) ?: return reject("CONSUMER_REGISTRY_ACQUIRE")
         val nativeReleased = RemoteVisionClient.forMainProcess(applicationContext).actualReleasedFuture(snapshot.lease.cohortId)
         val consumerReleased = checkNotNull(registry.pendingRelease())
         val lease = VisionConsumerLease(preparation.source.owner, snapshot, claim, nativeReleased, consumerReleased)
@@ -15112,7 +15130,7 @@ generation != cameraFallbackGeneration
                 primaryLifecycle.get()?.verifiedForOutput() == true && auxiliary != null && auxiliary.isReady &&
                 auxiliaryOwner.get()?.currentService === auxiliary
         }
-        if (!bound || !pair.proof.isCurrent() || !preparation.current()) return false
+        if (!bound || !pair.proof.isCurrent() || !preparation.current()) return reject("CONSUMER_BIND_OR_PROOF_OR_SOURCE")
         mainPreparedRuntime = MainPreparedRuntime(preparation.binding, preparation.source, pair, lease,
             preparation.consumerDrained, preparation.primarySlot, preparation.auxiliarySlot)
         return true

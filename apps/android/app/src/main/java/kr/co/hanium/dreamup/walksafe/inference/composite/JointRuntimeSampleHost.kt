@@ -156,6 +156,8 @@ class JointRuntimeSampleHost<T> internal constructor(
     private val thermalSupported: Boolean = false,
     private val heapSnapshot: () -> JointRuntimeManagedHeapSnapshot = ParentDirectBufferArena::currentManagedHeap,
 ) {
+    @Volatile internal var diagnosticStage = JointDiagnosticStage.ACQUIRE; private set
+    internal val primaryFailure get() = load?.failureCode
     private val begun = AtomicBoolean()
     private val cancelled = AtomicBoolean()
     private val bodyFinished = CompletableFuture<Unit>()
@@ -248,6 +250,7 @@ class JointRuntimeSampleHost<T> internal constructor(
                 numThreads = value.primary.numThreads, fallbackToCpu = false, gpuPrecisionLossAllowed = false, gpuSerializationCacheEnabled = true)
             var error: Throwable? = null
             try {
+                diagnosticStage = JointDiagnosticStage.PRIMARY_INIT
                 creationEntered = true
                 val created = ports.createPrimary(config.copy(fallbackModelKey = null, customTactile = null,
                     cocoGeneral = null, personSupplement = null), options, budget.deadlineMs)
@@ -265,6 +268,7 @@ class JointRuntimeSampleHost<T> internal constructor(
             val optionsAux = FastSamRuntimeOptions(FastSamRuntimeOptions.Backend.valueOf(value.auxiliary.backend.name),
                 value.auxiliary.numThreads, false, Math.multiplyExact(budget.deadlineMs, 1_000_000L), 800,
                 true, false, true, Math.multiplyExact(budget.deadlineMs, 1_000_000L))
+            diagnosticStage = JointDiagnosticStage.AUXILIARY_INIT
             val service = ports.createAuxiliary(epoch, optionsAux, samples)
             auxiliary = service
             val auxiliaryDone = auxiliaryReleased
@@ -300,13 +304,14 @@ class JointRuntimeSampleHost<T> internal constructor(
         try {
         preparePrimaryScratch()
         admit()
+        diagnosticStage = JointDiagnosticStage.PRIMARY_SAMPLE
         val output = ports.primarySample(requireNotNull(primary), fixture, purpose, budget.deadlineMs, raw)
         check(ledger.allocationCompleted(reservation))
         admit(); requirePrimary(requireNotNull(output.output.result.timing.modelRuntime))
         check(output.output.result.inferenceCompleted && !output.output.result.partial &&
             output.output.result.timing.modelKey == config.primaryModelKey &&
             output.output.result.timing.completedModels == listOf(config.primaryModelKey)) { "sample_primary_incomplete" }
-        if (raw) check(output.output.rawOutput?.let { it.size == JointRuntimeChoicePolicy.PRIMARY_RAW_VALUE_COUNT && it.all(Float::isFinite) } == true) { "sample_primary_raw_invalid" }
+        if (raw) check(output.output.rawOutput?.let { it.size == JointRuntimeChoicePolicy.PRIMARY_RAW_VALUE_COUNT && it.all(Float::isFinite) } == true) { if(output.output.rawOutput?.size != JointRuntimeChoicePolicy.PRIMARY_RAW_VALUE_COUNT) "sample_primary_raw_count" else "sample_primary_raw_nonfinite" }
         check(JointRuntimeChoicePolicy.validHash(output.inputDigest)) { "sample_primary_input_digest" }
         success = true; return consume(output)
         } finally { releaseFrame(reservation, success) }
@@ -321,6 +326,7 @@ class JointRuntimeSampleHost<T> internal constructor(
             Math.multiplyExact(at, 1_000_000L), "joint-sample-${fixture.definition.id}", image.width, image.height)
         val pending = samples.reserve(id)
         try {
+            diagnosticStage = JointDiagnosticStage.AUXILIARY_SAMPLE
             val request = FastSamExecutionRequest(purpose, Math.multiplyExact(budget.deadlineMs, 1_000_000L), raw)
             check(requireNotNull(auxiliary).submitArgb(image.width, image.height, image.pixels, token, null, request) ==
                 FastSamRuntimeService.Admission.ACCEPTED) { "sample_auxiliary_admission" }
@@ -404,7 +410,7 @@ class JointRuntimeSampleHost<T> internal constructor(
             requireNotNull(auxiliary).isReady && !requireNotNull(auxiliary).stats().inflight) { "sample_auxiliary_not_drained" }
         if (raw) { val outputs = requireNotNull(result.rawOutputs)
             check(outputs.detections().remaining() == FastSamModelContract.DETECTION_FLOATS && outputs.prototypes().remaining() == FastSamModelContract.PROTOTYPE_FLOATS &&
-                finite(outputs.detections()) && finite(outputs.prototypes())) { "sample_auxiliary_raw_invalid" } }
+                finite(outputs.detections()) && finite(outputs.prototypes())) { if(outputs.detections().remaining() != FastSamModelContract.DETECTION_FLOATS || outputs.prototypes().remaining() != FastSamModelContract.PROTOTYPE_FLOATS) "sample_auxiliary_raw_count" else "sample_auxiliary_raw_nonfinite" } }
     }
 
     internal fun primaryEvidence(fixture: JointRuntimeSampleFixture, sample: JointPairPrimarySample,

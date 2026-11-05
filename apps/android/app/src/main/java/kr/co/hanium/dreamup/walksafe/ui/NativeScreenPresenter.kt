@@ -319,7 +319,7 @@ internal class NativeScreenPresenter(private val style: WalkSafeViewStyle) : Nat
             }
             if (facts.deviceDetails) {
                 nativeDeviceCheckValues.forEach { (label, view) ->
-                    view.text = if (label == "호출어" && readiness.wakeProbeActive) "듣는 중"
+                    view.text = if (label == DeviceCheckItems.WAKE_PHRASE && readiness.wakeProbeActive) "듣는 중"
                         else readiness.deviceValues[label] ?: "확인 중"
                     view.contentDescription = "$label: ${view.text}"
                 }

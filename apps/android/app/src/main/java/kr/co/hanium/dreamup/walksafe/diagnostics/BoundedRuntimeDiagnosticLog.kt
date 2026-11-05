@@ -100,6 +100,30 @@ internal object BoundedRuntimeDiagnosticLog {
         }
     }
 
+    /** At most one outcome per bounded candidate plus reference/terminal outcomes. */
+    fun recordJointCandidate(event: kr.co.hanium.dreamup.walksafe.inference.composite.JointRuntimeCandidateDiagnostic) {
+        if (!BuildConfig.DEBUG) return
+        val metadata = kr.co.hanium.dreamup.walksafe.inference.composite.formatJointRuntimeCandidateDiagnostic(event)
+        runCatching { Log.i("WalkSafeJointCandidate", metadata) }
+        runCatching { writer?.enqueue(SystemClock.elapsedRealtime(), metadata) }
+    }
+
+    /** Original native cause, observed before IPC; enum metadata only. */
+    @JvmStatic
+    fun recordNativeGpu(event: kr.co.hanium.dreamup.walksafe.inference.NativeGpuDiagnostic.Snapshot) {
+        if (!BuildConfig.DEBUG) return
+        val metadata = event.toString()
+        runCatching { Log.i("WalkSafeNativeGpu", metadata) }
+        runCatching { writer?.enqueue(SystemClock.elapsedRealtime(), metadata) }
+    }
+
+    fun recordVisionOpen(event: kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionOpenSnapshot) {
+        if (!BuildConfig.DEBUG) return
+        val metadata = event.toString()
+        runCatching { Log.i("WalkSafeVisionOpen", metadata) }
+        runCatching { writer?.enqueue(SystemClock.elapsedRealtime(), metadata) }
+    }
+
     fun recordVoiceInput(
         event: VoiceInputDiagnosticEvent,
         backend: OfflineSpeechEngine? = null,

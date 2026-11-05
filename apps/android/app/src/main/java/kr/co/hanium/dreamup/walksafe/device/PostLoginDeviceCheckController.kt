@@ -495,7 +495,9 @@ internal class PostLoginDeviceCheckController(
         if (!isRunningBindingCurrent(binding)) return
         if (expireBeforeAcceptance(binding)) return
         val previous = current
-        val next = PostLoginDeviceCheckPolicy.evaluate(previous, binding, facts.actor().foreground, observation)
+        val next = PostLoginDeviceCheckPolicy.evaluate(previous, binding, facts.actor().foreground, observation,
+            deferWakeFailureForActiveComposite = probes.signals.compositeRuntimeActive &&
+                !probes.signals.compositeRuntimeFailed)
         if (current !== previous || !isSnapshotBindingLive(binding)) return
         if (next.passesFeatureGate && expireBeforeAcceptance(binding)) return
         if (next.passesFeatureGate && next != previous) {

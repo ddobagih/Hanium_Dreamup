@@ -8,6 +8,14 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
 class JointRuntimeFinalPairPreparationTest {
+    @Test fun boundedFailureFormattingDoesNotExposeUnknownFixturesOrMessages() {
+        val secret = "private_pixels_tokens_coordinates_actor"
+        val line = JointRuntimeFinalDiagnostic.line(JointFinalStage.QUALIFICATION, "FAILED", IllegalStateException(secret), secret)
+        assertFalse(line.contains(secret)); assertTrue(line.contains("fixture=NA"))
+        JointRuntimeFinalDiagnostic.emit({ throw IllegalStateException(secret) }, line)
+        val nested = JointRuntimeSampleFailure(JointRuntimeSearchFailure(JointRuntimeSearchFailureKind.ACCURACY_UNCONFIRMED, secret))
+        assertTrue(JointRuntimeFinalDiagnostic.line(JointFinalStage.AUXILIARY_STRICT,"FAILED",RuntimeException(secret,nested)).contains("kind=ACCURACY_UNCONFIRMED"))
+    }
     private val candidate = JointRuntimeCandidate(RuntimeCandidate(RuntimeBackend.GPU, 1), RuntimeCandidate(RuntimeBackend.CPU, 1), 250, 500)
 
     @Test fun allFourStrictFixturesAndASustainedWindowQualifyTheSameRetainedModelsWithoutAnotherOpen() = pair { reference, final, refs ->
@@ -33,9 +41,12 @@ class JointRuntimeFinalPairPreparationTest {
 
     @Test fun aStrictMismatchFailsTheChosenCandidateWithoutPreparingASecondPair() = pair { _, final, refs ->
         final.corruptFixture = "coco_872"
+        val events = mutableListOf<String>()
         val host = final.host()
         val error = runCatching { JointRuntimeFinalPairPreparation.prepare(host, candidate, refs,
-            final.budget(JointRuntimeSearchPhase.FINAL), { final.current }) }.exceptionOrNull()
+            final.budget(JointRuntimeSearchPhase.FINAL), { final.current }, diagnostic = { events += it }) }.exceptionOrNull()
+        assertTrue(events.any { "stage=PRIMARY_STRICT" in it && "outcome=FAILED" in it && "kind=ACCURACY_UNCONFIRMED" in it })
+        assertTrue(events.any { "predicate=" in it && "predicate=NONE" !in it })
         assertTrue(error is JointRuntimeSampleFailure)
         assertEquals(JointRuntimeSearchFailureKind.ACCURACY_UNCONFIRMED, (error as JointRuntimeSampleFailure).failure.kind)
         host.actualReleasedFuture.toCompletableFuture().get(3, TimeUnit.SECONDS)

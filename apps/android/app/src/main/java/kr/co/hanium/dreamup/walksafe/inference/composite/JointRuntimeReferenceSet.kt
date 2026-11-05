@@ -23,27 +23,91 @@ class JointRuntimeReferenceSet private constructor(val bindingHash: String,
     private val claimed = AtomicBoolean()
     private var readers = 0
     private var closing = false
-    internal class Verifier(private val owner: JointRuntimeReferenceSet) : Closeable {
+    internal class Verifier(private val owner: JointRuntimeReferenceSet, private val diagnostic: (String) -> Unit) : Closeable {
+        private fun report(fixture: JointRuntimeSampleFixture, role: String, predicate: String, count: Int = -1, maxAbs: Double = -1.0) {
+            val id = fixture.definition.id.takeIf { it in JointRuntimeChoicePolicy.REQUIRED_FIXTURE_IDS } ?: "NA"
+            JointRuntimeFinalDiagnostic.emit(diagnostic, "event=JOINT_STRICT role=$role fixture=$id predicate=$predicate mismatch_count=${if(count < 0) "NA" else count.coerceIn(0, 10000000).toString()} max_abs=${if(maxAbs < 0.0) "NA" else if(maxAbs.isFinite()) maxAbs.coerceIn(0.0, 1e9).toString() else "NA"}")
+        }
         fun primary(fixture: JointRuntimeSampleFixture, sample: JointPairPrimarySample): Boolean = owner.withFrame(fixture.definition.id) { reference ->
-            reference.fixture == fixture.definition && reference.argbDigest == fixture.argbDigest &&
-                reference.primaryInputDigest == sample.inputDigest && RuntimeCalibrationOutputGate.compare(reference.primaryRaw,
-                    sample.output.rawOutput, reference.primaryDetections, sample.output.result.detections, owner.model) &&
-                roles(reference.fixture, reference.primaryDetections, sample.output.result.detections, reference.primaryRaw,
-                    sample.output.rawOutput, owner.model)
+            if (reference.fixture != fixture.definition) { report(fixture,"PRIMARY","FIXTURE_IDENTITY"); false }
+            else if (reference.argbDigest != fixture.argbDigest) { report(fixture,"PRIMARY","ARGB_IDENTITY"); false }
+            else if (reference.primaryInputDigest != sample.inputDigest) { report(fixture,"PRIMARY","MODEL_INPUT_IDENTITY"); false }
+            else {
+                val output = RuntimeCalibrationOutputGate.compare(reference.primaryRaw, sample.output.rawOutput,
+                    reference.primaryDetections, sample.output.result.detections, owner.model,
+                    diagnostic = { report(fixture,"PRIMARY",it) })
+                if (!output) {
+                    val actual = sample.output.rawOutput
+                    var different = 0; var nonfinite = 0; var maximum = 0.0
+                    if(actual != null) for(i in 0 until minOf(reference.primaryRaw.size, actual.size)) {
+                        val a = reference.primaryRaw[i]; val v = actual[i]
+                        if(!a.isFinite() || !v.isFinite()) nonfinite++
+                        else { if(a != v) different++; maximum = maxOf(maximum,kotlin.math.abs(a.toDouble()-v)) }
+                    }
+                    val id = fixture.definition.id.takeIf { it in JointRuntimeChoicePolicy.REQUIRED_FIXTURE_IDS } ?: "NA"
+                    JointRuntimeFinalDiagnostic.emit(diagnostic,"event=JOINT_RAW_AGGREGATE role=PRIMARY fixture=$id different_values=$different nonfinite_values=$nonfinite max_abs_by_index=${maximum.coerceAtMost(1e9)}")
+                }
+                val rolesMatch = roles(reference.fixture, reference.primaryDetections, sample.output.result.detections,
+                    reference.primaryRaw, sample.output.rawOutput, owner.model)
+                if (!rolesMatch) {
+                    val roleGate = RuntimeCalibrationOutputGate.matchesFixtureRoles(reference.primaryDetections, sample.output.result.detections,
+                        RuntimeCalibrationFixtureRole.POSITIVE in reference.fixture.roles, RuntimeCalibrationFixtureRole.EMPTY in reference.fixture.roles,
+                        reference.fixture.groundTruth.filter { !it.isCrowd }.map { it.className to it.bboxNorm })
+                    if (!roleGate) report(fixture,"PRIMARY","FIXTURE_GROUND_TRUTH_ROLE_MATCHING")
+                    if(RuntimeCalibrationFixtureRole.NEAR_THRESHOLD in reference.fixture.roles) {
+                        if(!RuntimeCalibrationOutputGate.hasNearThresholdCandidate(reference.primaryRaw,owner.model)) report(fixture,"PRIMARY","NEAR_THRESHOLD_REFERENCE")
+                        if(!RuntimeCalibrationOutputGate.hasNearThresholdCandidate(sample.output.rawOutput,owner.model)) report(fixture,"PRIMARY","NEAR_THRESHOLD_ACTUAL")
+                    }
+                }
+                output && rolesMatch
+            }
         }
         fun auxiliary(fixture: JointRuntimeSampleFixture, sample: FastSamResult<*>): Pair<Boolean, Boolean> = owner.withFrame(fixture.definition.id) { reference ->
-            if (reference.fixture != fixture.definition || reference.argbDigest != fixture.argbDigest) false to false
-            else {
-                val raw = sample.rawOutputs ?: return@withFrame false to false
-                equivalentRaw(reference.auxiliaryRaw, raw) to sameMasks(reference.masks, sample.masks)
+            if (reference.fixture != fixture.definition || reference.argbDigest != fixture.argbDigest) {
+                report(fixture,"AUXILIARY","FIXTURE_OR_ARGB_IDENTITY"); false to false
+            } else {
+                val raw = sample.rawOutputs ?: run { report(fixture,"AUXILIARY","RAW_MISSING"); return@withFrame false to false }
+                val rawMatch = equivalentRaw(reference.auxiliaryRaw, raw)
+                if (!rawMatch) {
+                    val buffers = arrayOf(raw.detections(),raw.prototypes())
+                    var count = 0; var finite = 0; var size = reference.auxiliaryRaw.size != 2; var maxAbs = 0.0
+                    for(i in 0 until minOf(2,reference.auxiliaryRaw.size)) {
+                        val expected = reference.auxiliaryRaw[i]; val values = buffers[i]
+                        if(expected.isEmpty() || expected.size != values.remaining()) size = true
+                        for(j in 0 until minOf(expected.size,values.remaining())) {
+                            val a = expected[j]; val b = values.get()
+                            if(!a.isFinite() || !b.isFinite()) finite++
+                            else { maxAbs = maxOf(maxAbs,kotlin.math.abs(a.toDouble()-b)); if(kotlin.math.abs(a-b) > .0001f + .001f*kotlin.math.abs(a)) count++ }
+                        }
+                    }
+                    report(fixture,"AUXILIARY",if(size) "RAW_COUNT" else if(finite>0) "RAW_NONFINITE" else "RAW_TOLERANCE",if(finite>0) finite else count,maxAbs)
+                }
+                val maskMatch = JointMaskNumericalParity.compare(reference.masks, sample.masks, reference.auxiliaryRaw, raw, rawMatch, diagnostic)
+                if(!maskMatch) {
+                    val actual = sample.masks.sortedBy { it.anchorIndex() }; val expected = reference.masks
+                    if(expected.size != actual.size) report(fixture,"AUXILIARY","MASK_COUNT",kotlin.math.abs(expected.size-actual.size))
+                    if(actual.map { it.anchorIndex() }.distinct().size != actual.size) report(fixture,"AUXILIARY","MASK_DUPLICATE_ANCHOR",actual.size-actual.map { it.anchorIndex() }.distinct().size)
+                    var anchors=0; var roi=0; var bits=0
+                    expected.zip(actual).forEach { (a,b) ->
+                        if(a.anchor != b.anchorIndex()) anchors++
+                        if(a.width != b.imageWidth() || a.height != b.imageHeight() || a.left != b.maskLeft() || a.top != b.maskTop() || a.right != b.maskRightExclusive() || a.bottom != b.maskBottomExclusive()) roi++
+                        val packed=b.copyPackedBits()
+                        if(a.bits.size != packed.size) bits += kotlin.math.abs(a.bits.size-packed.size)
+                        for(i in 0 until minOf(a.bits.size,packed.size)) bits += Integer.bitCount((a.bits[i].toInt() xor packed[i].toInt()) and 255)
+                    }
+                    if(anchors>0) report(fixture,"AUXILIARY","MASK_ANCHOR",anchors)
+                    if(roi>0) report(fixture,"AUXILIARY","MASK_ROI_OR_DIMENSION",roi)
+                    if(bits>0) report(fixture,"AUXILIARY","MASK_BIT_PATTERN",bits)
+                }
+                rawMatch to maskMatch
             }
         }
         override fun close() = owner.close()
     }
-    internal fun claimForFinal(expectedBinding: String): Verifier {
+    internal fun claimForFinal(expectedBinding: String, diagnostic: (String) -> Unit = {}): Verifier {
         synchronized(lock) { check(!closing && frames != null && bindingHash == expectedBinding) { "reference_binding_or_lifetime" } }
         check(claimed.compareAndSet(false, true)) { "CPU1 references already have a final consumer" }
-        return Verifier(this)
+        return Verifier(this, diagnostic)
     }
     private fun <V> withFrame(id: String, block: (JointReferenceFrame) -> V): V {
         val frame = synchronized(lock) { check(!closing); requireNotNull(frames?.get(id)).also { readers++ } }

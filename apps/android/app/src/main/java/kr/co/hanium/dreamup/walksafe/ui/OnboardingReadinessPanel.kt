@@ -687,7 +687,7 @@ internal class OnboardingReadinessPanel(
         return LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             style.applyNativePanelStyle(this)
-            val labels = listOf("ARCore Depth", "카메라", "위치", "한국어 음성", "호출어", "기기 상태")
+            val labels = DeviceCheckItems.orderedLabels
             labels.forEachIndexed { index, label ->
                 val row = LinearLayout(context).apply {
                     orientation = LinearLayout.HORIZONTAL

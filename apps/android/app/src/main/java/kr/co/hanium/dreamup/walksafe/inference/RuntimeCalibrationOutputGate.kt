@@ -18,22 +18,24 @@ object RuntimeCalibrationOutputGate {
         referenceDetections: List<DetectionCandidate>,
         candidateDetections: List<DetectionCandidate>,
         config: ModelRuntimeConfig,
+        diagnostic: (String) -> Unit = {},
     ): Boolean {
+        fun reject(code: String): Boolean { runCatching { diagnostic(code) }; return false }
         if (referenceRaw == null || candidateRaw == null ||
             referenceRaw.size != config.outputTensorShape().fold(1) { size, axis -> size * axis } ||
             candidateRaw.size != referenceRaw.size ||
-            referenceRaw.any { !it.isFinite() } || candidateRaw.any { !it.isFinite() }) return false
+            referenceRaw.any { !it.isFinite() } || candidateRaw.any { !it.isFinite() }) return reject(if(referenceRaw == null || candidateRaw == null) "RAW_MISSING" else if(referenceRaw.size != candidateRaw.size || referenceRaw.size != config.outputTensorShape().fold(1) { size, axis -> size * axis }) "RAW_COUNT" else "RAW_NONFINITE")
         if (referenceDetections.size != candidateDetections.size ||
             referenceDetections.any { !it.hasFiniteOutput() } ||
-            candidateDetections.any { !it.hasFiniteOutput() }) return false
+            candidateDetections.any { !it.hasFiniteOutput() }) return reject("DETECTION_COUNT_OR_NONFINITE")
 
         val rawMatches = when (config.outputFormat) {
-            YoloOutputFormat.RAW_XYWH_PIXELS, YoloOutputFormat.RAW_XYWH_NORMALIZED -> rawChannelsMatch(referenceRaw, candidateRaw, config)
-            YoloOutputFormat.END_TO_END_XYXY, YoloOutputFormat.END_TO_END_XYXY_PIXELS -> endToEndRowsMatch(referenceRaw, candidateRaw, config)
+            YoloOutputFormat.RAW_XYWH_PIXELS, YoloOutputFormat.RAW_XYWH_NORMALIZED -> rawChannelsMatch(referenceRaw, candidateRaw, config, diagnostic)
+            YoloOutputFormat.END_TO_END_XYXY, YoloOutputFormat.END_TO_END_XYXY_PIXELS -> endToEndRowsMatch(referenceRaw, candidateRaw, config, diagnostic)
         }
-        if (!rawMatches) return false
+        if (!rawMatches) return reject("RAW_GATE")
 
-        return hasPerfectMatching(referenceDetections.size) { referenceIndex, candidateIndex ->
+        val detectionMatch = hasPerfectMatching(referenceDetections.size) { referenceIndex, candidateIndex ->
             val a = referenceDetections[referenceIndex]
             val b = candidateDetections[candidateIndex]
             a.className == b.className &&
@@ -43,6 +45,7 @@ object RuntimeCalibrationOutputGate {
                 abs(a.bboxNorm.width - b.bboxNorm.width) <= DETECTION_BOX_TOLERANCE &&
                 abs(a.bboxNorm.height - b.bboxNorm.height) <= DETECTION_BOX_TOLERANCE
         }
+        return detectionMatch || reject("DETECTION_CLASS_SCORE_BOX_MATCHING")
     }
 
     /** A candidate fixture label is not coverage until the current baseline produces such a value. */
@@ -71,10 +74,10 @@ object RuntimeCalibrationOutputGate {
     // Operational definition for calibration coverage, not a measured accuracy threshold.
     const val NEAR_THRESHOLD_WINDOW = 0.02f
 
-    private fun endToEndRowsMatch(referenceRaw: FloatArray, candidateRaw: FloatArray, config: ModelRuntimeConfig): Boolean {
+    private fun endToEndRowsMatch(referenceRaw: FloatArray, candidateRaw: FloatArray, config: ModelRuntimeConfig, diagnostic: (String) -> Unit): Boolean {
         val referenceMembership = thresholdMembership(referenceRaw, config)
         val candidateMembership = thresholdMembership(candidateRaw, config)
-        return hasPerfectMatching(RAW_ROWS) { referenceIndex, candidateIndex ->
+        val matches = hasPerfectMatching(RAW_ROWS) { referenceIndex, candidateIndex ->
             val a = referenceIndex * RAW_COLUMNS
             val b = candidateIndex * RAW_COLUMNS
             referenceRaw[a + 5] == candidateRaw[b + 5] &&
@@ -82,9 +85,21 @@ object RuntimeCalibrationOutputGate {
                 abs(referenceRaw[a + 4].toDouble() - candidateRaw[b + 4]) <= RAW_SCORE_TOLERANCE &&
                 (0..3).all { abs(referenceRaw[a + it].toDouble() - candidateRaw[b + it]) <= RAW_COORDINATE_TOLERANCE }
         }
+        if (!matches) {
+            fun report(code: String) { runCatching { diagnostic(code) } }
+            val predicates = listOf<Pair<String,(Int,Int)->Boolean>>(
+                "RAW_ROW_CLASS_MATCHING" to { a,b -> referenceRaw[a*6+5] == candidateRaw[b*6+5] },
+                "RAW_ROW_MEMBERSHIP_MATCHING" to { a,b -> referenceMembership[a] == candidateMembership[b] },
+                "RAW_ROW_SCORE_TOLERANCE_MATCHING" to { a,b -> abs(referenceRaw[a*6+4].toDouble()-candidateRaw[b*6+4]) <= RAW_SCORE_TOLERANCE },
+                "RAW_ROW_COORDINATE_TOLERANCE_MATCHING" to { a,b -> (0..3).all { abs(referenceRaw[a*6+it].toDouble()-candidateRaw[b*6+it]) <= RAW_COORDINATE_TOLERANCE } })
+            predicates.forEach { (code,predicate) -> if(!hasPerfectMatching(RAW_ROWS,predicate)) report(code) }
+            report("RAW_ROW_COMBINED_PERFECT_MATCHING")
+        }
+        return matches
     }
 
-    private fun rawChannelsMatch(reference: FloatArray, candidate: FloatArray, config: ModelRuntimeConfig): Boolean {
+    private fun rawChannelsMatch(reference: FloatArray, candidate: FloatArray, config: ModelRuntimeConfig, diagnostic: (String) -> Unit): Boolean {
+        fun reject(code: String): Boolean { runCatching { diagnostic(code) }; return false }
         val anchors = config.outputTensorShape()[2]
         val thresholds = config.classes.map(config::thresholdForClass)
         val allowed = config.classes.map(config::isAllowedClass)
@@ -92,7 +107,7 @@ object RuntimeCalibrationOutputGate {
             for (coordinate in 0..3) {
                 val index = coordinate * anchors + anchor
                 val coordinateScale = if (config.outputFormat == YoloOutputFormat.RAW_XYWH_NORMALIZED) config.inputSize else 1
-                if (abs(reference[index].toDouble() - candidate[index]) * coordinateScale > RAW_COORDINATE_TOLERANCE) return false
+                if (abs(reference[index].toDouble() - candidate[index]) * coordinateScale > RAW_COORDINATE_TOLERANCE) return reject("RAW_COORDINATE_TOLERANCE")
             }
             var referenceClass = -1
             var candidateClass = -1
@@ -102,16 +117,16 @@ object RuntimeCalibrationOutputGate {
                 val index = (4 + classIndex) * anchors + anchor
                 val a = reference[index]
                 val b = candidate[index]
-                if (a !in 0f..1f || b !in 0f..1f || abs(a.toDouble() - b) > RAW_SCORE_TOLERANCE) return false
+                if (a !in 0f..1f || b !in 0f..1f || abs(a.toDouble() - b) > RAW_SCORE_TOLERANCE) return reject("RAW_SCORE_RANGE_OR_TOLERANCE")
                 val aIncluded = a > 0f && allowed[classIndex] && a >= thresholds[classIndex]
                 val bIncluded = b > 0f && allowed[classIndex] && b >= thresholds[classIndex]
-                if (aIncluded != bIncluded) return false
+                if (aIncluded != bIncluded) return reject("RAW_THRESHOLD_MEMBERSHIP")
                 if (a > referenceBest) { referenceBest = a; referenceClass = classIndex }
                 if (b > candidateBest) { candidateBest = b; candidateClass = classIndex }
             }
             val referenceIncluded = referenceClass >= 0 && allowed[referenceClass] && referenceBest >= thresholds[referenceClass]
             val candidateIncluded = candidateClass >= 0 && allowed[candidateClass] && candidateBest >= thresholds[candidateClass]
-            if (referenceIncluded != candidateIncluded || (referenceIncluded && referenceClass != candidateClass)) return false
+            if (referenceIncluded != candidateIncluded || (referenceIncluded && referenceClass != candidateClass)) return reject("RAW_BEST_CLASS_MEMBERSHIP")
         }
         return true
     }

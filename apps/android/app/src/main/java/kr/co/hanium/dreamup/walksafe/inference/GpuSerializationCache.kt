@@ -77,7 +77,7 @@ internal class GpuSerializationCache private constructor(
         fun prepare(enabled: Boolean, prepareParameters: () -> GpuSerializationParameters): GpuSerializationCache {
             if (!enabled) return GpuSerializationCache(null, "disabled")
             return try {
-                // A device compatibility failure can still bypass the GPU attempt entirely.
+                // Advisory compatibility belongs in parameter preparation, never ahead of uncached creation.
                 GpuSerializationCache(prepareParameters(), "prepared")
             } catch (error: Throwable) {
                 if (!isRecoverable(error)) throw error

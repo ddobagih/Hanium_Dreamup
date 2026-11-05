@@ -9,6 +9,63 @@ import org.junit.Test
 import java.util.concurrent.CompletableFuture
 
 class PostLoginDeviceCheckControllerTest {
+    @Test fun wakeUnavailableDoesNotHideCompositeCameraFailure() {
+        val f = Fixture().running(); f.ready()
+        f.probes.value = f.probes.value.copy(wakePhrase = PostLoginDeviceCheckSignal.UNAVAILABLE,
+            cameraPipeline = PostLoginDeviceCheckSignal.UNAVAILABLE, compositeRuntimeActive = false,
+            compositeRuntimeFailed = true)
+        f.controller.evaluate()
+        assertEquals(PostLoginDeviceCheckFailure.CAMERA_PIPELINE_UNAVAILABLE, f.controller.snapshot.failure)
+        assertEquals(0, f.store.saves); assertEquals(0, f.effects.passes)
+    }
+    @Test fun wakeUnavailableWithoutAnActiveCompositeStillFailsImmediately() {
+        val f = Fixture().running(); f.ready()
+        f.probes.value = f.probes.value.copy(wakePhrase = PostLoginDeviceCheckSignal.UNAVAILABLE,
+            cameraPipeline = PostLoginDeviceCheckSignal.PENDING, compositeRuntimeActive = false)
+        f.controller.evaluate()
+        assertEquals(PostLoginDeviceCheckFailure.WAKE_PHRASE_UNAVAILABLE, f.controller.snapshot.failure)
+        assertEquals(0, f.store.saves)
+    }
+    @Test fun wakeUnavailableActiveCompositeStillRetiresOnBackground() {
+        val f = Fixture().running(); f.ready()
+        f.probes.value = f.probes.value.copy(wakePhrase = PostLoginDeviceCheckSignal.UNAVAILABLE,
+            cameraPipeline = PostLoginDeviceCheckSignal.PENDING, compositeRuntimeActive = true)
+        f.controller.evaluate(); f.controller.enteredBackground()
+        assertEquals(PostLoginDeviceCheckFailure.BACKGROUNDED, f.controller.snapshot.failure)
+        assertEquals(0, f.store.saves); assertFalse(f.controller.passesFeatureGate())
+    }
+
+    @Test fun wakeFailureKeepsOnlyAlreadyActiveCompositeRunningAndNeverSaves() {
+        val f = Fixture().running(); f.ready()
+        f.probes.value = f.probes.value.copy(wakePhrase = PostLoginDeviceCheckSignal.UNAVAILABLE,
+            cameraPipeline = PostLoginDeviceCheckSignal.PENDING, compositeRuntimeActive = true)
+        val binding = f.controller.snapshot.bindingOrNull!!
+        val stops = f.calls.count { it == "cameraStop" }
+        f.controller.evaluate(binding)
+        assertEquals(PostLoginDeviceCheckState.RUNNING, f.controller.snapshot.state)
+        assertEquals(PostLoginDeviceCheckSignal.UNAVAILABLE, f.controller.observation().wakePhraseRecognition)
+        assertTrue(f.controller.isRunningBindingCurrent(binding))
+        assertEquals(stops, f.calls.count { it == "cameraStop" })
+        assertFalse(f.controller.passesFeatureGate()); assertEquals(0, f.store.saves)
+        f.probes.value = f.probes.value.copy(cameraPipeline = PostLoginDeviceCheckSignal.READY, compositeRuntimeActive = false)
+        f.controller.evaluate(binding)
+        assertEquals(PostLoginDeviceCheckFailure.WAKE_PHRASE_UNAVAILABLE, f.controller.snapshot.failure)
+        assertEquals(0, f.store.saves); assertEquals(0, f.effects.passes)
+    }
+    @Test fun activeCompositeWakeFailureDoesNotDeferOtherFailuresOrDeadline() {
+        val f = Fixture().running(); f.ready()
+        f.probes.value = f.probes.value.copy(wakePhrase = PostLoginDeviceCheckSignal.UNAVAILABLE, compositeRuntimeActive = true)
+        f.reader.hardware = f.reader.hardware.copy(resourceReadiness = WalkSessionReadinessStatus.UNAVAILABLE)
+        f.controller.evaluate()
+        assertEquals(PostLoginDeviceCheckFailure.DEVICE_RESOURCE, f.controller.snapshot.failure)
+        assertEquals(0, f.store.saves)
+        val t = Fixture().running(); t.ready()
+        t.probes.value = t.probes.value.copy(wakePhrase = PostLoginDeviceCheckSignal.UNAVAILABLE, compositeRuntimeActive = true)
+        t.nowMs = t.controller.runtimeDeadlineMs!!; t.controller.evaluate()
+        assertEquals(PostLoginDeviceCheckFailure.CHECK_TIMEOUT, t.controller.snapshot.failure)
+        assertEquals(0, t.store.saves)
+    }
+
     @Test fun phaseDiagnosticsDistinguishSavingFromPassAndNeverExposeActorText() {
         val events = mutableListOf<DeviceCheckTraceEvent>()
         val f = Fixture(DeviceCheckTraceSink { events += it })

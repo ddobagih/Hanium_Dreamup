@@ -10,6 +10,100 @@ import java.util.concurrent.CompletionStage
 
 /** Sequence/ownership evidence only; no images, Android effects or native work are simulated as PASS. */
 class JointRuntimeCheckSequenceTest {
+    @Test fun debugGpuColdOpenIsNotSilentlyClampedByTheOuterTrial() = Fixture(true).run {
+        val result = sequence.run()
+        assertEquals(85_000L, budgets.first().deadlineMs - budgets.first().startedAtMs)
+        assertTrue(budgets.all { it.deadlineMs <= deadline })
+        result.references?.close(); result.fixtures?.close(); Unit
+    }
+
+    @Test fun candidateFailuresAndPolicyRejectionsAreDiagnosedWithoutChangingSelectionOrRelease() = Fixture().run {
+        failMeasurements += 0
+        rejectedMeasurements += 1
+        val result = sequence.run()
+        assertNotNull(result.plan)
+        assertEquals(policy.candidates, measured)
+        assertTrue(diagnostics.any { it.outcome == JointDiagnosticOutcome.FAILED && it.candidate == policy.candidates[0] })
+        assertTrue(diagnostics.any { it.reason == JointDiagnosticReason.PROVISIONAL_TIMING_INCOMPLETE && it.candidate == policy.candidates[1] })
+        assertTrue(diagnostics.any { it.outcome == JointDiagnosticOutcome.ACCEPTED })
+        assertTrue(diagnostics.any { it.outcome == JointDiagnosticOutcome.SELECTED_UNVERIFIED })
+        trials.zipWithNext().forEach { (old,next) -> assertTrue(events.indexOf("released-${old.id}") < events.indexOf("create-${next.id}")) }
+        result.references!!.close(); result.fixtures!!.close()
+    }
+
+    @Test fun allRejectedCandidatesAreDiagnosedAndNeverProduceFakeSelection() = Fixture().run {
+        rejectedMeasurements += policy.candidates.indices
+        val result = sequence.run()
+        assertNull(result.plan); assertEquals(0, referenceCalls)
+        assertEquals(policy.candidates.size, diagnostics.count { it.reason == JointDiagnosticReason.PROVISIONAL_TIMING_INCOMPLETE })
+        assertEquals(JointDiagnosticReason.NO_MEASURED_PROVISIONAL_CANDIDATE, diagnostics.last().reason)
+        assertTrue(result.releaseConfirmed)
+    }
+
+    @Test fun diagnosticSinkFailureCannotChangeSelectionOrDrain() = Fixture().run {
+        diagnosticFails = true
+        val result = sequence.run()
+        assertNotNull(result.plan); assertTrue(result.releaseConfirmed)
+        result.references!!.close(); result.fixtures!!.close()
+    }
+
+    @Test fun policyRejectionCodesPreserveThermalPerformanceHeadroomAndRuntimeMismatch() {
+        val changes: List<Pair<JointDiagnosticReason, (JointRuntimeProvisionalMeasurement) -> JointRuntimeProvisionalMeasurement>> = listOf(
+            JointDiagnosticReason.PROVISIONAL_RUNTIME_UNVERIFIED to { it.copy(fallbackUsed = true) },
+            JointDiagnosticReason.PROVISIONAL_PERFORMANCE_LIMIT to { it.copy(thermalStatus = 3) },
+            JointDiagnosticReason.PROVISIONAL_RUNTIME_HEADROOM to { it.copy(primaryTurnaroundMs = listOf(700.0, 700.0)) },
+        )
+        for ((reason, transform) in changes) Fixture().run {
+            changeMeasurement = transform
+            val result = sequence.run()
+            assertNull(result.plan)
+            assertEquals(policy.candidates.size, diagnostics.count { it.reason == reason })
+            assertTrue(diagnostics.filter { it.stage == JointDiagnosticStage.TIMING }.all { it.measurement != null })
+        }
+    }
+
+    @Test fun referenceFailureAndExceptionMetadataNeverExposeArbitraryUserData() = Fixture().run {
+        referenceFails = true
+        val result = sequence.run()
+        assertNull(result.plan); assertEquals(1, referenceCalls)
+        assertTrue(diagnostics.any { it.stage == JointDiagnosticStage.REFERENCE && it.outcome == JointDiagnosticOutcome.FAILED })
+        val sentinel = "SECRET_COORDINATES_TOKEN_/private/path"
+        val event = jointDiagnosticFailure(JointDiagnosticStage.AUXILIARY_INIT, policy.candidates.first(),
+            IllegalStateException(sentinel, UnsupportedOperationException(sentinel)))
+        val text = formatJointRuntimeCandidateDiagnostic(event)
+        assertFalse(text.contains(sentinel)); assertFalse(text.contains("/private"))
+        assertEquals(JointDiagnosticException.ILLEGAL_STATE, event.exception)
+        assertEquals(JointDiagnosticException.UNSUPPORTED, event.cause)
+        assertEquals(JointDiagnosticReason.NATIVE_FAILED, event.reason)
+        assertTrue(text.length < 1024)
+        assertEquals(JointDiagnosticReason.UNKNOWN, jointDiagnosticReason("provisional_timing_incomplete" + sentinel))
+    }
+
+    @Test fun remoteRuntimeAndSampleResourceFailuresRemainDistinctFromPolicyRejections() {
+        val remote = jointDiagnosticFailure(JointDiagnosticStage.AUXILIARY_INIT, null,
+            kr.co.hanium.dreamup.walksafe.runtime.vision.remote.VisionRuntimeException("SECRET_USER_DATA"))
+        assertTrue(remote.exception.name != "OTHER")
+        val resource = jointDiagnosticFailure(JointDiagnosticStage.ACQUIRE, null,
+            JointRuntimeSampleFailure(JointRuntimeSearchFailure(JointRuntimeSearchFailureKind.RESOURCE_BUDGET, "SECRET_USER_DATA")))
+        assertTrue(resource.reason != JointDiagnosticReason.NATIVE_FAILED)
+        assertFalse(formatJointRuntimeCandidateDiagnostic(remote).contains("SECRET_USER_DATA"))
+        assertFalse(formatJointRuntimeCandidateDiagnostic(resource).contains("SECRET_USER_DATA"))
+    }
+
+    @Test fun failedGpuTrialsDoNotPreventAnExplicitLaterCpuCpuSuccess() = Fixture().run {
+        failMeasurements += policy.candidates.indices.filter { index ->
+            val c = policy.candidates[index]
+            c.primary.backend != RuntimeBackend.CPU || c.auxiliary.backend != RuntimeBackend.CPU
+        }
+        val result = sequence.run()
+        assertNotNull(result.plan)
+        assertEquals(RuntimeBackend.CPU, result.plan!!.candidate.primary.backend)
+        assertEquals(RuntimeBackend.CPU, result.plan!!.candidate.auxiliary.backend)
+        assertTrue(diagnostics.any { it.outcome == JointDiagnosticOutcome.FAILED })
+        assertTrue(result.releaseConfirmed)
+        result.references!!.close(); result.fixtures!!.close()
+    }
+
     @Test fun gpuTimingRunsBeforeTheOnlyCpuReferenceAndEveryNextTrialWaitsForThePreviousRelease() = Fixture().run {
         val result = sequence.run()
         assertNotNull(result.plan)
@@ -136,7 +230,7 @@ class JointRuntimeCheckSequenceTest {
     }
 
     private class Resource : Closeable { var closed = 0; override fun close() { closed++ } }
-    private class Fixture {
+    private class Fixture(val debugCold: Boolean = false) {
         var now = 1_000L
         val deadline = 301_000L
         val policy = JointRuntimeSearchPolicy(now, deadline, 4)
@@ -147,6 +241,10 @@ class JointRuntimeCheckSequenceTest {
         val budgets = mutableListOf<JointRuntimePhaseBudget>()
         val measured = mutableListOf<JointRuntimeCandidate>()
         val failMeasurements = mutableSetOf<Int>()
+        val rejectedMeasurements = mutableSetOf<Int>()
+        val diagnostics = mutableListOf<JointRuntimeCandidateDiagnostic>()
+        var diagnosticFails = false
+        var changeMeasurement: (JointRuntimeProvisionalMeasurement) -> JointRuntimeProvisionalMeasurement = { it }
         val releasedTokens = Collections.newSetFromMap(java.util.IdentityHashMap<Any, Boolean>())
         val deferred = mutableListOf<() -> Unit>()
         var loads = 0; var referenceCalls = 0; var lateAcknowledgements = 0
@@ -172,8 +270,9 @@ class JointRuntimeCheckSequenceTest {
                 else released.whenComplete { _, error -> if (error == null) callback() }
             }
             override fun releaseObserved(token: Any) = acknowledged(token)
+            override fun diagnostic(event: JointRuntimeCandidateDiagnostic) { if (diagnosticFails) error("sentinel private data"); diagnostics += event }
             override fun progress(phase: JointRuntimeSearchPhase, candidate: JointRuntimeCandidate?) {}
-        })
+        }, debugColdOpenExperiment = debugCold)
         inner class Trial(val id: Int, val phase: JointRuntimeSearchPhase) : JointRuntimeCheckSequenceTrial<Resource> {
             val released = CompletableFuture<Unit>()
             override val actualReleased: CompletionStage<Unit> get() = released
@@ -183,8 +282,8 @@ class JointRuntimeCheckSequenceTest {
                 beforeMeasurement(id)
                 now = if (consumeTrialBudget) budget.deadlineMs else now + 3_000
                 check(id !in failMeasurements) { "controlled_native_prepare_failure" }
-                return JointRuntimeProvisionalMeasurement(candidate, 2_000, 2, 2, listOf(100.0, 150.0), listOf(200.0, 250.0),
-                    candidate.primary, candidate.auxiliary, false, 0)
+                return changeMeasurement(JointRuntimeProvisionalMeasurement(candidate, if (id in rejectedMeasurements) 1 else 2_000, 2, 2, listOf(100.0, 150.0), listOf(200.0, 250.0),
+                    candidate.primary, candidate.auxiliary, false, 0))
             }
             override fun references(budget: JointRuntimePhaseBudget): Resource {
                 events += "reference"; referenceCalls++; budgets += budget; now += 10_000

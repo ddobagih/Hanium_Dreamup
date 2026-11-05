@@ -91,7 +91,12 @@ class JointRuntimeFinalQualifiedPair<T> internal constructor(val prepared: Andro
 object JointRuntimeFinalPairPreparation {
     fun <T> prepare(host: JointRuntimeSampleHost<T>, candidate: JointRuntimeCandidate,
         references: JointRuntimeReferenceSet, budget: JointRuntimePhaseBudget, isCurrent: () -> Boolean,
-        hooks: JointRuntimeSampleHooks<T> = JointRuntimeSampleHooks()): JointRuntimeFinalQualifiedPair<T> {
+        hooks: JointRuntimeSampleHooks<T> = JointRuntimeSampleHooks(), diagnostic: (String) -> Unit = {}): JointRuntimeFinalQualifiedPair<T> {
+        var stage = JointFinalStage.HOST_OPEN
+        var fixtureId: String? = null
+        fun event(outcome: String, error: Throwable? = null) = JointRuntimeFinalDiagnostic.emit(diagnostic,
+            JointRuntimeFinalDiagnostic.line(stage, outcome, error, fixtureId))
+        fun begin(next: JointFinalStage) { stage = next; event("STARTED") }
         var entered = false
         var kept = false
         var returned = false
@@ -100,8 +105,12 @@ object JointRuntimeFinalPairPreparation {
             require(budget.phase == JointRuntimeSearchPhase.FINAL)
             require(host.bindingHash == references.bindingHash)
             entered = true
+            begin(JointFinalStage.HOST_OPEN)
             host.open(candidate, budget, isCurrent, hooks)
-            verifier = references.claimForFinal(host.bindingHash)
+            event("SUCCEEDED")
+            begin(JointFinalStage.REFERENCE_CLAIM)
+            verifier = references.claimForFinal(host.bindingHash, diagnostic)
+            event("SUCCEEDED")
             val strict = mutableListOf<JointRuntimeStrictSampleEvidence>()
             val quality = mutableListOf<JointFixtureQuality>()
             var lastPrimary: AndroidDetectorRuntime? = null
@@ -109,18 +118,23 @@ object JointRuntimeFinalPairPreparation {
             var finalPrimary: JointPairSampleEvidence? = null
             var finalAuxiliary: JointPairSampleEvidence? = null
             for (fixture in host.entries()) {
+                fixtureId = fixture.definition.id
+                begin(JointFinalStage.PRIMARY_STRICT)
                 val strictVerifier = requireNotNull(verifier)
                 val primary = host.consumePrimary(fixture, VisionPurpose.BENCHMARK, true) { sample ->
                     if (!strictVerifier.primary(fixture, sample)) accuracy("final_primary_strict_${fixture.definition.id}")
                     PrimaryStrict(requireNotNull(sample.output.result.timing.modelRuntime),
                         host.primaryEvidence(fixture, sample, JointPairSamplePhase.VERIFICATION, true), requireNotNull(sample.output.rawOutput).size)
                 }
+                event("SUCCEEDED")
+                begin(JointFinalStage.AUXILIARY_STRICT)
                 val auxiliary = host.consumeAuxiliary(fixture, VisionPurpose.BENCHMARK, true) { sample ->
                     val (rawMatches, masksMatch) = strictVerifier.auxiliary(fixture, sample)
                     if (!rawMatches || !masksMatch) accuracy("final_auxiliary_strict_${fixture.definition.id}")
                     AuxiliaryStrict(sample.runtime, host.auxiliaryEvidence(fixture, sample, JointPairSamplePhase.VERIFICATION, true),
                         requireNotNull(sample.rawOutputs).detections().remaining(), requireNotNull(sample.rawOutputs).prototypes().remaining())
                 }
+                event("SUCCEEDED")
                 lastPrimary = primary.runtime
                 lastAuxiliary = auxiliary.runtime
                 host.snapshot(lastPrimary, lastAuxiliary)
@@ -132,6 +146,8 @@ object JointRuntimeFinalPairPreparation {
             }
             // Reference arrays are no longer needed during sustained measurement or live ownership.
             verifier.close(); verifier = null
+            fixtureId = null
+            begin(JointFinalStage.SOAK)
             val window = host.measure(JointRuntimeChoicePolicy.MINIMUM_DURATION_MS, 24_000L)
             val evidence = JointFixtureRuntimeEvidence(window.completedAtMs - window.startedAtMs, window.primarySubmitted,
                 window.auxiliarySubmitted, window.primaryTimes, window.auxiliaryTimes, window.primaryGapMs, window.auxiliaryGapMs,
@@ -139,6 +155,8 @@ object JointRuntimeFinalPairPreparation {
             val choice = JointRuntimeChoicePolicy.evaluate(host.bindingHash, candidate, evidence, host.processors)
                 ?: throw JointRuntimeSampleFailure(JointRuntimeSearchFailure(JointRuntimeSearchFailureKind.PERFORMANCE_FAILED,
                     "final_${JointRuntimeChoicePolicy.rejectionReason(candidate, evidence, host.processors)}"))
+            event("SUCCEEDED")
+            begin(JointFinalStage.QUALIFICATION)
             host.admit()
             val snapshot = host.snapshot(requireNotNull(lastPrimary), requireNotNull(lastAuxiliary))
             val refs = host.references(snapshot)
@@ -151,6 +169,8 @@ object JointRuntimeFinalPairPreparation {
             val proof = JointPairReadyProof.issue(choice, host.ownerBinding(), snapshot, refs.first, refs.second,
                 minimal, current, finalQualification = qualification)
             host.admit()
+            event("SUCCEEDED")
+            begin(JointFinalStage.DRAIN)
             host.finish(true); kept = true
             val beforeDrain = host.nowMs()
             if (beforeDrain < budget.startedAtMs || beforeDrain >= budget.deadlineMs || !isCurrent())
@@ -161,7 +181,12 @@ object JointRuntimeFinalPairPreparation {
                 throw java.util.concurrent.TimeoutException("final_ready_deadline")
             val prepared = AndroidJointRuntimeLoader.PreparedPair(host.loadedPrimary().copy(reason = "DeviceCheckStrictJointPair"),
                 choice, requireNotNull(host.auxiliary), proof, minimal)
-            return JointRuntimeFinalQualifiedPair(prepared, qualification).also { returned = true }
+            event("SUCCEEDED")
+            begin(JointFinalStage.PREPARED)
+            return JointRuntimeFinalQualifiedPair(prepared, qualification).also { returned = true; event("SUCCEEDED") }
+        } catch (error: Throwable) {
+            event("FAILED", error)
+            throw error
         } finally {
             verifier?.close()
             if (!entered) hooks.onPrimaryCreationNotStarted()

@@ -187,7 +187,7 @@ internal class AndroidPostLoginDeviceProbes(
     private var metricDepth = PostLoginMetricDepthState.PENDING
     override val signals get() = PostLoginDeviceCheckProbeSignals(cameraSignal, locationSignal, wakeSignal, metricDepth,
         compositeRuntimeFailed = cameraFailure == PostLoginCameraPipelineFailure.COMPOSITE_RUNTIME_UNAVAILABLE,
-        compositeRuntimeActive = compositeCameraRun != null)
+        compositeRuntimeActive = compositeCameraRun?.let { !it.retired && cameraCurrent(it.binding, it.generation) } == true)
     override var metricPreflightStarted = false
         private set
     override val capabilityProbeStarted get() = support.capabilityProbeStarted
@@ -201,6 +201,7 @@ internal class AndroidPostLoginDeviceProbes(
         private set
     private var locationGeneration = 0L
     private var locationRun: LocationRun? = null
+    private var locationStartedBinding: PostLoginDeviceCheckBinding? = null
     private class LocationRun(val binding: PostLoginDeviceCheckBinding, val generation: Long) {
         var registration: PostLoginLocationRegistration? = null
         var timeout: DeviceCheckScheduledTask? = null
@@ -241,6 +242,8 @@ internal class AndroidPostLoginDeviceProbes(
     private var hapticProbe: PostLoginHapticProbe? = null
 
     override fun resetForAttempt(binding: PostLoginDeviceCheckBinding) {
+        cancelLocation()
+        locationStartedBinding = null
         metricDepth = PostLoginMetricDepthState.PENDING
         cameraSignal = PostLoginDeviceCheckSignal.PENDING
         cameraFailure = null
@@ -259,7 +262,12 @@ internal class AndroidPostLoginDeviceProbes(
     override fun prepareVoiceModelAndDetector() = support.prepareVoiceModelAndDetector()
     override fun prepareRuntimeLease(binding: PostLoginDeviceCheckBinding, onReady: (Boolean) -> Unit) =
         support.prepareRuntimeLease(binding, onReady)
-    override fun startAutomaticProbes(binding: PostLoginDeviceCheckBinding) = support.startAutomaticProbes(binding)
+    override fun startAutomaticProbes(binding: PostLoginDeviceCheckBinding) {
+        // Controller calls only after permission observation, journal commit and runtime lease.
+        if (!isCurrent(binding)) return
+        startLocation(binding)
+        if (isCurrent(binding)) support.startAutomaticProbes(binding)
+    }
     override fun startMetricPreflight(binding: PostLoginDeviceCheckBinding) = support.startMetricPreflight(binding)
     override fun cancelCalibration(reason: String) {
         retireCompositeCamera(reason)
@@ -287,6 +295,9 @@ internal class AndroidPostLoginDeviceProbes(
     override fun startStoredMetricRefresh(binding: PostLoginDeviceCheckBinding) = support.startStoredMetricRefresh(binding)
 
     fun startLocation(binding: PostLoginDeviceCheckBinding) {
+        if (!isCurrent(binding) || locationStartedBinding == binding) return
+        // Claim before native request or observer callbacks, including synchronous reentrancy.
+        locationStartedBinding = binding
         cancelLocation()
         locationDecision = null
         val env = environment()
