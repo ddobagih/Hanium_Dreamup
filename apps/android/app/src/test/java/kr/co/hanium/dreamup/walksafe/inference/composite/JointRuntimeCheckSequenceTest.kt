@@ -53,9 +53,10 @@ class JointRuntimeCheckSequenceTest {
         assertNotNull(result.plan)
         assertTrue(measured.size < policy.candidates.size)
         val provisionalEnd = deadline - JointRuntimeSearchPolicy.REFERENCE_MS - JointRuntimeSearchPolicy.FINAL_MS - JointRuntimeSearchPolicy.CLEANUP_MS
-        budgets.filter { it.phase == JointRuntimeSearchPhase.PROVISIONAL }.forEach { budget ->
+        budgets.filter { it.phase == JointRuntimeSearchPhase.PROVISIONAL }.zip(measured).forEach { (budget, candidate) ->
             assertTrue(budget.deadlineMs <= provisionalEnd - 10_000)
-            assertTrue(budget.deadlineMs - budget.startedAtMs <= 45_000)
+            val maximum = if (candidate.auxiliary.backend == RuntimeBackend.GPU) 95_000 else 45_000
+            assertTrue(budget.deadlineMs - budget.startedAtMs <= maximum)
             assertTrue(provisionalEnd - 10_000 - budget.startedAtMs >= 25_000)
         }
         assertTrue(result.plan!!.budget.deadlineMs <= deadline - 10_000)

@@ -189,7 +189,8 @@ class RemoteVisionClient private constructor(private val context: Context) {
             Model(immutable).also { record.models[spec.role to spec.modelKey] = it }
         }
         try {
-            val deadline = VisionRuntimeProtocol.deadline(deadlineElapsedMs, now(), VisionRuntimeProtocol.OPEN_MS)
+            val openBudget = VisionRuntimeProtocol.openBudget(immutable)
+            val deadline = VisionRuntimeProtocol.deadline(deadlineElapsedMs, now(), openBudget)
             val permit = onAdmission(record, deadline) {
                 await(record.ready, minOf(deadline, record.bindDeadline))
                 val source = synchronized(lock) { checkCurrent(record, lease); record.owner to requireNotNull(record.process) }
@@ -216,7 +217,7 @@ class RemoteVisionClient private constructor(private val context: Context) {
                 synchronized(lock) { checkCurrent(record, lease) }
                 value
             }
-            val payload = rpc(record, lease, VisionRuntimeProtocol.OPEN, deadline, VisionRuntimeProtocol.OPEN_MS, native = permit) {
+            val payload = rpc(record, lease, VisionRuntimeProtocol.OPEN, deadline, openBudget, native = permit) {
                 VisionRuntimeProtocol.writeSpec(this, immutable)
             }
             val body: JSONObject

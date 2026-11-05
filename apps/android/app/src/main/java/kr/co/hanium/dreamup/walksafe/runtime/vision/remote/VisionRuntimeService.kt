@@ -158,7 +158,7 @@ class VisionRuntimeService : Service() {
     }
 
     private fun open(id: Long, atEpoch: Long, deadline: Long, spec: VisionModelSpec) {
-        require(deadline - now() <= VisionRuntimeProtocol.OPEN_MS)
+        require(deadline - now() <= VisionRuntimeProtocol.openBudget(spec))
         val model = synchronized(lock) {
             require(!parked && !parking && models.values.none { it.spec.role == spec.role && it.spec.modelKey == spec.modelKey }) { "ALREADY_OPEN" }
             require(models.values.count { it.spec.role == spec.role } < if (spec.role == VisionRole.PRIMARY) 2 else 1)

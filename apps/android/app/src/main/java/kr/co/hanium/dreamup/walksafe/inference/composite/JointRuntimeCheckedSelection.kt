@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.inference.composite
 
 import kr.co.hanium.dreamup.walksafe.device.DeviceCheckAuthoritySource
+import kr.co.hanium.dreamup.walksafe.inference.RuntimeBackend
 import java.io.Closeable
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.TimeUnit
@@ -90,7 +91,9 @@ internal class JointRuntimeCheckSequence<F : Closeable, R : Closeable>(
                 val phase = policy.provisionalBudget(nowMs()) ?: break
                 val workEnd = phase.deadlineMs - JointRuntimeSearchPolicy.CLEANUP_MS
                 if (workEnd - nowMs() < MINIMUM_TRIAL_REMAINING_MS) break
-                val budget = JointRuntimePhaseBudget(phase.phase, nowMs(), minOf(workEnd, nowMs() + MAXIMUM_TRIAL_MS))
+                val maximumTrialMs = if (candidate.auxiliary.backend == RuntimeBackend.GPU)
+                    MAXIMUM_GPU_TRIAL_MS else MAXIMUM_TRIAL_MS
+                val budget = JointRuntimePhaseBudget(phase.phase, nowMs(), minOf(workEnd, nowMs() + maximumTrialMs))
                 ports.progress(phase.phase, candidate)
                 val trial = ports.createTrial(fixtures, phase.phase)
                 val token = Any()
@@ -147,5 +150,6 @@ internal class JointRuntimeCheckSequence<F : Closeable, R : Closeable>(
     private companion object {
         const val MINIMUM_TRIAL_REMAINING_MS = 25_000L
         const val MAXIMUM_TRIAL_MS = 45_000L
+        const val MAXIMUM_GPU_TRIAL_MS = 95_000L
     }
 }

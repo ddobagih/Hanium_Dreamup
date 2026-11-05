@@ -131,6 +131,7 @@ object VisionRuntimeProtocol {
     const val MAX_OUTPUT_BYTES = 8 * 1024 * 1024
     const val MAX_REQUEST_BYTES = 40 * 1024 * 1024
     const val HANDSHAKE_MS = 5_000L; const val OPEN_MS = 20_000L; const val CLOSE_MS = 5_000L
+    private const val FASTSAM_GPU_OPEN_MS = 80_000L
     const val DEATH_MS = 5_000L
     val TOKEN = Regex("[a-f0-9]{64}")
     val KEY = Regex("[a-zA-Z0-9_.-]{1,80}")
@@ -142,6 +143,11 @@ object VisionRuntimeProtocol {
         if (oneWay) return code == EXIT && pid == 0
         return pid > 0 && pid == parentPid
     }
+    /** Cold GPU kernel compilation must fit the caller's existing check deadline. */
+    fun openBudget(spec: VisionModelSpec): Long =
+        if (spec.role == VisionRole.FASTSAM && VisionRuntimeCodec.decodeOptions(spec.runtimeJson).delegate == "gpu")
+            FASTSAM_GPU_OPEN_MS else OPEN_MS
+
     fun operationBudget(purpose: VisionPurpose) = when (purpose) {
         VisionPurpose.LIVE, VisionPurpose.BENCHMARK -> 2_000L
         VisionPurpose.WARMUP -> 15_000L

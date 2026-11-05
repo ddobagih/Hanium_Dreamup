@@ -35,7 +35,7 @@ class JointRuntimeReferenceSet private constructor(val bindingHash: String,
             if (reference.fixture != fixture.definition || reference.argbDigest != fixture.argbDigest) false to false
             else {
                 val raw = sample.rawOutputs ?: return@withFrame false to false
-                equivalentRaw(reference.auxiliaryRaw, raw) to sameMasks(reference.masks, sample.masks)
+                equivalentRaw(reference.auxiliaryRaw, raw) to equivalentMasks(reference.masks, sample.masks)
             }
         }
         override fun close() = owner.close()
@@ -163,13 +163,28 @@ class JointRuntimeReferenceSet private constructor(val bindingHash: String,
                     mask.maskRightExclusive(), mask.maskBottomExclusive(), mask.copyPackedBits())
             }
         }
-        internal fun sameMasks(reference: List<JointReferenceMask>, actual: List<InstanceMask>): Boolean {
+        // CPU/GPU raw tensors already pass the strict floating-point tolerance above. A
+        // near-zero mask logit can still flip one pixel: require identical objects/ROIs
+        // and at least 99.9% per-object pixel IoU instead of bit-identical thresholding.
+        internal fun equivalentMasks(reference: List<JointReferenceMask>, actual: List<InstanceMask>): Boolean {
             if (reference.size != actual.size || actual.map { it.anchorIndex() }.distinct().size != actual.size) return false
             return reference.zip(actual.sortedBy { it.anchorIndex() }).all { (a, b) ->
                 a.anchor == b.anchorIndex() && a.width == b.imageWidth() && a.height == b.imageHeight() &&
                     a.left == b.maskLeft() && a.top == b.maskTop() && a.right == b.maskRightExclusive() && a.bottom == b.maskBottomExclusive() &&
-                    a.bits.contentEquals(b.copyPackedBits())
+                    equivalentMaskBits(a.bits, b.copyPackedBits())
             }
+        }
+        private fun equivalentMaskBits(reference: ByteArray, actual: ByteArray): Boolean {
+            if (reference.size != actual.size) return false
+            var different = 0L
+            var union = 0L
+            for (i in reference.indices) {
+                val a = reference[i].toInt() and 0xff
+                val b = actual[i].toInt() and 0xff
+                different += Integer.bitCount(a xor b)
+                union += Integer.bitCount(a or b)
+            }
+            return different * 1_000 <= union
         }
     }
 }

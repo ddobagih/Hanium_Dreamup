@@ -51,15 +51,23 @@ class JointRuntimeReferenceSetTest {
         assertFalse(JointRuntimeReferenceSet.roles(fixture, emptyList(), emptyList(), raw(.51f), raw(.53f), model))
     }
 
-    @Test fun masksRequireTheSameAnchorGeometryAndEveryPackedBit() {
+    @Test fun masksRequireTheSameAnchorGeometryAndPerObjectPixelOverlap() {
         fun mask(bits: BitSet, anchor: Int = 7): InstanceMask = InstanceMask::class.java.declaredConstructors.single().apply { isAccessible = true }
             .newInstance(2, 2, 0, 0, 2, 2, bits.cardinality(), anchor, 0f, 0f, 2f, 2f, 1f, bits) as InstanceMask
         val first = mask(BitSet().apply { set(0) })
         val reference = listOf(JointReferenceMask(7, 2, 2, 0, 0, 2, 2, first.copyPackedBits()))
-        assertTrue(JointRuntimeReferenceSet.sameMasks(reference, listOf(first)))
-        assertFalse(JointRuntimeReferenceSet.sameMasks(reference, listOf(mask(BitSet().apply { set(1) }))))
-        assertFalse(JointRuntimeReferenceSet.sameMasks(reference, listOf(mask(BitSet().apply { set(0) }, 8))))
-        assertFalse(JointRuntimeReferenceSet.sameMasks(reference, listOf(first, first)))
+        assertTrue(JointRuntimeReferenceSet.equivalentMasks(reference, listOf(first)))
+        assertFalse(JointRuntimeReferenceSet.equivalentMasks(reference, listOf(mask(BitSet().apply { set(1) }))))
+        assertFalse(JointRuntimeReferenceSet.equivalentMasks(reference, listOf(mask(BitSet().apply { set(0) }, 8))))
+        assertFalse(JointRuntimeReferenceSet.equivalentMasks(reference, listOf(first, first)))
+        fun largeMask(removed: Int): InstanceMask {
+            val bits = BitSet().apply { set(0, 10_000); clear(0, removed) }
+            return InstanceMask::class.java.declaredConstructors.single().apply { isAccessible = true }
+                .newInstance(100, 100, 0, 0, 100, 100, bits.cardinality(), 7, 0f, 0f, 100f, 100f, 1f, bits) as InstanceMask
+        }
+        val largeReference = listOf(JointReferenceMask(7, 100, 100, 0, 0, 100, 100, largeMask(0).copyPackedBits()))
+        assertTrue(JointRuntimeReferenceSet.equivalentMasks(largeReference, listOf(largeMask(10))))
+        assertFalse(JointRuntimeReferenceSet.equivalentMasks(largeReference, listOf(largeMask(11))))
     }
 
     @Test fun streamedRawComparisonPreservesTheExistingToleranceAndFiniteRulesAtItsBoundary() {
