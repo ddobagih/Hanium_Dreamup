@@ -46,6 +46,7 @@ adb install -r apps/android/app/build/outputs/apk/debug/app-debug.apk
 - CPU/GPU 정확성 비교는 기존 raw 수치 오차와 물체 개수·anchor·영역 좌표 일치를 요구합니다. 이진 mask는 실수 연산의 경계 픽셀 차이를 고려해 물체별 IoU99.9% 이상을 요구하며, 영역 전체가 아닌 전경의 합집합을 분모로 사용합니다. 작은 물체의 차이가 큰 배경에 묻혀 통과하지 않습니다.
 - `JointRuntimeChoicePolicy` v3는 정확성·완료율·간격·800ms 유효시간에 더해 두 모델의 샘플 P95가600ms 이하여야 합니다. 200ms의 공학적 운영 여유이며 카메라·ARCore·화면 성능 보장은 아닙니다. REFERENCE10초·BENCHMARK2초·WARMUP15초와 호출자 절대 기한을 함께 적용하고, raw 반환 여부는 목적과 별도로 명시합니다.
 - 최종 두 실체는 기존 primary/auxiliary 소유자에 채택되어 유지됩니다. 정상 Main↔Camera 인계는 old consumer 배출 → PARK → 동일 모델 ID의 epoch+1 양도 → dormant wrapper 두 개 부착 → registry 채택 → native 확인·활성화 순서입니다. 왕복 시 Main의 host ID는 유지하되 opaque owner scope를 교체해 이전 producer의 재진입을 막습니다. 보행도 검증된 pair를 사용하며 보조 모델을 독립 생성하지 않습니다.
+- 전달 직후 primary의 로드 결과는 사용 불가 상태이며, native 인계 확인·두 wrapper 활성화·동일 모델 증명 재발급이 성공한 뒤에만 사용 가능 상태로 전달합니다. 홈 복귀 시 실제 detector와 해제 확인 참조를 보존하면서 초기 dormant 상태 때문에 정상 모델을 거절하지 않도록 합니다.
 - `ParentDirectBufferArena`와 `JointRuntimeMemoryLedger`는 backing을 재사용하고, 프레임·참조·이미지·mapping의 소유 한도를 검사합니다. managed heap에는 최소32MiB 또는25% 여유를 남기며 알려진 direct/shared buffer 상한을 따릅니다. 768 bilinear scratch는 최초 실제 할당 전 한 번 예약하고 할당 완료 즉시 pending에서 제외합니다. 후속 primary 프레임은 실제 신규128,000B만 예약하며 scratch 소유는 serial consumer 배출·캐시 정리 후 반환합니다. GC나 null 대입을 실제 해제로 간주하지 않습니다. GPU 드라이버·native 전체 RAM을 이 원장이 측정한다고 표현하지 않습니다.
 - 실제 영상에서는 기존 frame·geometry·거리 freshness gate와 측정한 cadence floor를 유지합니다. IPC·전처리·후처리·UI/Depth 지연에 따라 입력을 늦추고, primary 과부하 때 보조 admission을 보류합니다. 새로운 정상 primary 결과4회와 필요한 온도·부하 회복을 확인해야 재개합니다. CPU/GPU 사용률을 예약하거나 고정했다고 표시하지 않습니다.
 

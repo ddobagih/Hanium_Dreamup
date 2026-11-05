@@ -48,7 +48,10 @@ internal class TransferredJointRuntimeAttachment<T> private constructor(
         val proof = AndroidJointRuntimeLoader.reissueTransferredPairProof(context, config, choice, witness,
             runtime.lease, primary, auxiliary, authority)
         activated = true
-        return AndroidJointRuntimeLoader.PreparedPair(load, choice, auxiliary, proof, proof.sampleEvidence)
+        // Attachment starts dormant. Publish availability only after native adoption,
+        // both wrapper activations and proof reissue have succeeded for these same instances.
+        val activeLoad = load.copy(detectorAvailable = true, reason = "transferred_pair_activated")
+        return AndroidJointRuntimeLoader.PreparedPair(activeLoad, choice, auxiliary, proof, proof.sampleEvidence)
     }
 
     /** A failed target closes its own wrappers; only the independent receipt proves native release. */
