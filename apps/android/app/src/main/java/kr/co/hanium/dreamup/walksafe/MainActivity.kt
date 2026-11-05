@@ -4450,6 +4450,9 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
         val result = currentPostLoginDeviceCheckResultBinding(current.actorId) ?: return
         val identity = (deviceAuthorityBinding(result) ?: return) to current.sessionGeneration
         if (authorityRefreshIdentity == identity) return
+        // Metadata can finish before Controller.bindSession. Bind the verified session
+        // before deduplicating this read, or an early stale_session blocks restoration.
+        authorityDeviceCheckResults.bindSession(current.actorId, current.sessionGeneration)
         authorityRefreshIdentity = identity
         authorityDeviceCheckResults.refresh(result)
     }
