@@ -111,7 +111,7 @@ internal class AuthorityPostLoginDeviceCheckSavedResults(
                     return CompletableFuture.completedFuture(cached)
                 }
                 if (settlement == null && cached is DeviceCheckAuthorityRead.Blocked &&
-                    cached.reason !in setOf("storage_read_failed", "not_loaded", "binding_not_loaded")) {
+                    cached.reason !in setOf("storage_read_failed", "not_loaded", "binding_not_loaded", "native_recovery_write_failed")) {
                     emit(flow, DeviceCheckTraceStage.AUTHORITY_READ, DeviceCheckTraceOutcome.BLOCKED, readReason(cached), session)
                     return CompletableFuture.completedFuture(cached)
                 }

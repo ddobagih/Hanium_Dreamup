@@ -90,10 +90,38 @@ internal class DeviceCheckAuthorityCore(
         }
         if (!DeviceCheckAuthorityValidation.binding(binding)) return DeviceCheckAuthorityRead.Blocked("invalid_binding")
         if (!loadIfNeeded()) return cachedSnapshot(binding)
-        val old = synchronized(lock) { requireNotNull(state).cohorts.filter { it.release == null && it.processNonce != processNonce } }
+        val previous = synchronized(lock) {
+            // A definite failed cleanup write is retryable, unlike an unresolved writer.
+            // Reevaluate it for this read so it cannot poison another account's binding.
+            if (readFailure == "native_recovery_write_failed") readFailure = null
+            requireNotNull(state)
+        }
+        val old = previous.cohorts.filter { it.release == null && it.processNonce != processNonce }
         if (old.isNotEmpty()) {
             val absent = old.filter { runCatching { observer.observe(it.process) }.getOrDefault(DeviceCheckProcessObservation.UNKNOWN) == DeviceCheckProcessObservation.ABSENT }
             synchronized(lock) { absentCohorts += absent.map { it.lease.cohortId } }
+            if (absent.size == old.size && synchronized(lock) { hasCommittedResult(previous, binding) }) {
+                // A dead process invalidates its native instances, not a committed device
+                // check. Settle the old instances before issuing historical restore rights.
+                val recoveredIds = absent.map { it.lease.cohortId }.toSet()
+                val recovered = previous.copy(cohorts = previous.cohorts.map { cohort ->
+                    if (cohort.lease.cohortId in recoveredIds) cohort.copy(
+                        release = "RECOVERED_PROCESS_ABSENT", loads = cohort.loads.map { it.copy(closed = true) })
+                    else cohort
+                })
+                val command = UUID.randomUUID().toString()
+                when (val outcome = publish(recovered, command, fingerprint("recover_absent_processes", recoveredIds.sorted()),
+                    binding, expectedSession) { readFailure = null }) {
+                    is DeviceCheckAuthorityOutcome.Committed -> Unit
+                    is DeviceCheckAuthorityOutcome.Indeterminate ->
+                        return DeviceCheckAuthorityRead.Blocked("publication_unconfirmed", outcome.operationId)
+                    is DeviceCheckAuthorityOutcome.NotPublished -> {
+                        synchronized(lock) { readFailure = "native_recovery_write_failed" }
+                        return DeviceCheckAuthorityRead.Blocked("native_recovery_write_failed")
+                    }
+                    is DeviceCheckAuthorityOutcome.Rejected -> return DeviceCheckAuthorityRead.Blocked(outcome.reason)
+                }
+            }
         }
         return synchronized(lock) {
             if (!requestCurrent(binding, expectedSession)) DeviceCheckAuthorityRead.Blocked("binding_or_session_superseded")
@@ -107,17 +135,25 @@ internal class DeviceCheckAuthorityCore(
         readFailure?.let { return DeviceCheckAuthorityRead.Blocked(it) }
         val current = state ?: return DeviceCheckAuthorityRead.Blocked("not_loaded")
         val dirty = current.cohorts.filter { it.release == null && it.processNonce != processNonce }
-        if (dirty.isNotEmpty()) return if (dirty.all { it.lease.cohortId in absentCohorts })
+        if (dirty.isNotEmpty()) return if (dirty.all { it.lease.cohortId in absentCohorts } && !hasCommittedResult(current, binding))
             DeviceCheckAuthorityRead.NeedsCheck("RECOVERED_PROCESS_ABSENT")
             else DeviceCheckAuthorityRead.Blocked("native_recovery_required")
         if (pendingNewAttempt != null) return DeviceCheckAuthorityRead.NeedsCheck("attempt_begin_pending")
         val latest = current.latest
         val bundle = current.bundle
         if (latest?.id in cancelledAttempts) return DeviceCheckAuthorityRead.NeedsCheck("attempt_retired_in_process")
-        if (latest?.phase != "COMMITTED" || bundle == null || latest.id != bundle.attemptId ||
-            latest.binding != binding || bundle.binding != binding || !validChoice(bundle.choice, binding))
+        if (!hasCommittedResult(current, binding))
             return DeviceCheckAuthorityRead.NeedsCheck("missing_current_bundle")
-        DeviceCheckAuthorityRead.Ready(bundleRef(bundle), bundle.result, bundle.choice)
+        val completed = requireNotNull(bundle)
+        DeviceCheckAuthorityRead.Ready(bundleRef(completed), completed.result, completed.choice)
+    }
+
+    /** Caller holds lock. Recovery cannot turn an incomplete or invalidated check into history. */
+    private fun hasCommittedResult(current: DeviceCheckAuthorityState, binding: DeviceCheckAuthorityBinding): Boolean {
+        val latest = current.latest ?: return false
+        val bundle = current.bundle ?: return false
+        return latest.phase == "COMMITTED" && latest.id !in cancelledAttempts && latest.id == bundle.attemptId &&
+            latest.binding == binding && bundle.binding == binding && validChoice(bundle.choice, binding)
     }
 
     fun beginAttempt(binding: DeviceCheckAuthorityBinding, commandId: String, started: Long,

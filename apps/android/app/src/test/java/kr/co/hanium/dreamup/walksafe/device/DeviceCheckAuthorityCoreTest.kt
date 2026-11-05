@@ -106,18 +106,45 @@ class DeviceCheckAuthorityCoreTest {
             assertNull(requireNotNull(DeviceCheckAuthorityCodec.decode(f.io.text)).bundle)
         }
     }
-    @Test fun dirtyProcessUnknownBlocksButPositiveAbsenceAllowsAnExplicitNewCheckWithoutAutoPass() {
+    @Test fun dirtyProcessUnknownBlocksButPositiveAbsenceRestoresCommittedHistoryForFreshModels() {
         val f = Fixture(); val pair = f.pair()
         ok(f.core.commitSuccess(id(), requireNotNull(f.core.freezeSuccess(pair.attempt, 1100, f.full, f.choice, pair.proof))))
         val unknown = f.restart(DeviceCheckProcessObservation.UNKNOWN)
         assertTrue(unknown.read(f.binding) is DeviceCheckAuthorityRead.Blocked)
         assertTrue(unknown.beginAttempt(f.binding, id(), 1000, 301000) is DeviceCheckAuthorityOutcome.Rejected)
+        val before = requireNotNull(DeviceCheckAuthorityCodec.decode(f.io.text))
         val absent = f.restart(DeviceCheckProcessObservation.ABSENT)
-        assertTrue(absent.read(f.binding) is DeviceCheckAuthorityRead.NeedsCheck)
-        assertTrue(absent.cachedSnapshot(f.binding) is DeviceCheckAuthorityRead.NeedsCheck)
-        val retried = ok(absent.beginAttempt(f.binding, id(), 1000, 301000))
-        assertTrue(absent.checkAttempt(retried, 1001))
-        assertTrue(absent.cachedSnapshot(f.binding) is DeviceCheckAuthorityRead.NeedsCheck)
+        val restored = absent.read(f.binding) as DeviceCheckAuthorityRead.Ready
+        assertTrue(absent.cachedSnapshot(f.binding) is DeviceCheckAuthorityRead.Ready)
+        val after = requireNotNull(DeviceCheckAuthorityCodec.decode(f.io.text))
+        assertEquals(before.latest, after.latest); assertEquals(before.bundle, after.bundle)
+        assertEquals("RECOVERED_PROCESS_ABSENT", after.cohorts.single().release)
+        assertTrue(after.cohorts.single().loads.all { it.closed })
+        assertNull(absent.modelRef(pair.primary.lease.cohortId, 1, pair.primary.modelId))
+        val owner = requireNotNull(absent.registerOwner("restored-main", restored.bundleRef, 1))
+        val lease = DeviceCheckNativeLease(id(), owner.ownerId, 1)
+        assertTrue(absent.prepareNativeOpen(owner, lease, Any(), id(), f.primarySpec,
+            f.child.copy(pid = 201, startTicks = 200), 20000) is DeviceCheckAuthorityOutcome.Committed)
+
+        for (publication in listOf(DeviceCheckPublication.NOT_PUBLISHED, DeviceCheckPublication.INDETERMINATE)) {
+            val failed = Fixture(); val original = failed.pair()
+            ok(failed.core.commitSuccess(id(), requireNotNull(failed.core.freezeSuccess(original.attempt, 1100,
+                failed.full, failed.choice, original.proof))))
+            val restarted = failed.restart(DeviceCheckProcessObservation.ABSENT)
+            failed.io.publication = publication
+            val blocked = restarted.read(failed.binding) as DeviceCheckAuthorityRead.Blocked
+            assertTrue(restarted.cachedSnapshot(failed.binding) is DeviceCheckAuthorityRead.Blocked)
+            failed.io.publication = DeviceCheckPublication.COMMITTED
+            if (publication == DeviceCheckPublication.NOT_PUBLISHED) {
+                val otherAccount = failed.binding.copy(actorBindingHash = "9".repeat(64))
+                assertTrue(restarted.admit(otherAccount))
+                assertTrue(restarted.read(otherAccount) is DeviceCheckAuthorityRead.NeedsCheck)
+                assertTrue(restarted.admit(failed.binding))
+            }
+            val recovered = if (publication == DeviceCheckPublication.INDETERMINATE)
+                restarted.reconcile(requireNotNull(blocked.operationId)) else restarted.read(failed.binding)
+            assertTrue(recovered is DeviceCheckAuthorityRead.Ready)
+        }
     }
     @Test fun interruptedNewCheckNeverPairsThePreviousFullWithANewChoice() {
         val f = Fixture(); val pair = f.pair()
@@ -227,7 +254,7 @@ class DeviceCheckAuthorityCoreTest {
         assertTrue(f.core.recordCohortReleased(pair.primary.lease.cohortId, f.child.pid, DeviceCheckNativeReleaseProof.CHILD_DEATH)
             is DeviceCheckAuthorityOutcome.NotPublished)
         assertTrue(f.restart(DeviceCheckProcessObservation.SAME_PROCESS).read(f.binding) is DeviceCheckAuthorityRead.Blocked)
-        assertTrue(f.restart(DeviceCheckProcessObservation.ABSENT).read(f.binding) is DeviceCheckAuthorityRead.NeedsCheck)
+        assertTrue(f.restart(DeviceCheckProcessObservation.ABSENT).read(f.binding) is DeviceCheckAuthorityRead.Blocked)
     }
     @Test fun failedUnselectedCandidateRetiresOnlyItsCapabilitiesAndAllowsTheNextCandidate() {
         val f = Fixture(); val pair = f.pair()
@@ -294,7 +321,7 @@ class DeviceCheckAuthorityCoreTest {
         val operation = id()
         assertTrue(f.core.commitSuccess(operation, frozen) is DeviceCheckAuthorityOutcome.Indeterminate)
         assertTrue(f.core.cachedSnapshot(f.binding) is DeviceCheckAuthorityRead.Blocked)
-        assertTrue(f.restart(DeviceCheckProcessObservation.ABSENT).read(f.binding) is DeviceCheckAuthorityRead.NeedsCheck)
+        assertTrue(f.restart(DeviceCheckProcessObservation.ABSENT).read(f.binding) is DeviceCheckAuthorityRead.Blocked)
         assertTrue(f.core.noteCohortRelease(pair.primary.lease.cohortId, f.child.pid, DeviceCheckNativeReleaseProof.CHILD_DEATH))
         f.io.publication = DeviceCheckPublication.COMMITTED
         assertTrue(f.core.reconcile(operation) is DeviceCheckAuthorityRead.NeedsCheck)
