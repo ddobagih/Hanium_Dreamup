@@ -44,8 +44,8 @@ import org.junit.runner.RunWith
 
 /**
  * Actual Main NAV wrapper on Android, without Main.onCreate/onDestroy or any HTTP/login call.
- * Nine purpose-bound fields attach prepared policy state and a platform speech runtime. Main's
- * clock, Looper, Handler, OS observations, authorization, gates, reservation and completion remain
+ * Prepared onboarding, session-bound device-result evidence and a speech runtime attach to Main.
+ * Its clock, Looper, Handler, OS observations, authorization, gates, reservation and completion remain
  * real. Synthetic onboarding/device/environment evidence is not a physical readiness measurement.
  * Synthetic Navigator endpoint evidence also enters Main's automatic arrival completion.
  * Gateway operations/publication and page transitions use the production owners without credential HTTP.
@@ -54,6 +54,48 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class MainActivityNavigationSpeechWrapperAndroidTest {
+    @Test(timeout = 20_000L)
+    fun preparedDeviceEvidenceCannotBypassMissingProofOrAReplacementSession() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        assertNull(GatewaySessionProcessCoordinator.snapshot().session)
+        var fixture: Fixture? = null
+        try {
+            fixture = onMain(instrumentation) { Fixture(instrumentation) }
+            val f = fixture
+            onMain(instrumentation) {
+                f.prepareAutomaticArrivalScreen()
+                assertEquals(ACTOR, f.invoke("currentReporterUserId"))
+                val controller = MainActivityControllerTestFixture.controller(f.main, "postLoginDeviceCheckController")
+                    as PostLoginDeviceCheckController
+                val slot = PostLoginDeviceCheckController::class.java.getDeclaredField("savedResults").apply { isAccessible = true }
+                val prepared = slot.get(controller) as PostLoginDeviceCheckSavedResults
+                try {
+                    for (missingRuntime in listOf(true, false)) {
+                        slot.set(controller, object : PostLoginDeviceCheckSavedResults by prepared {
+                            override fun runtimeReady(binding: PostLoginDeviceCheckBinding) =
+                                !missingRuntime && prepared.runtimeReady(binding)
+                            override fun acceptsPublishedSnapshot(snapshot: PostLoginDeviceCheckSnapshot) =
+                                missingRuntime && prepared.acceptsPublishedSnapshot(snapshot)
+                        })
+                        assertFalse("Missing ${if (missingRuntime) "runtime proof" else "published result"}", controller.passesFeatureGate())
+                        assertEquals(false, f.invoke("firstRunOnboardingComplete"))
+                        assertNull(f.invoke("currentReporterUserId"))
+                    }
+                } finally {
+                    slot.set(controller, prepared)
+                }
+                f.assertActualGates()
+                // Even the same actor's replacement credential cannot inherit this prepared binding.
+                f.publishReplacementSession(ACTOR)
+                assertFalse(controller.passesFeatureGate())
+                assertEquals(false, f.invoke("firstRunOnboardingComplete"))
+                assertNull(f.invoke("currentReporterUserId"))
+            }
+        } finally {
+            onMain(instrumentation) { fixture?.close() }
+        }
+    }
+
     @Test(timeout = 20_000L)
     fun actualMainHandlerRetriesUnknownFacingAfterTheConfiguredGrace() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -910,6 +952,7 @@ class MainActivityNavigationSpeechWrapperAndroidTest {
 
             setField(main, "firstRunOnboardingSnapshot", onboarding)
             setField(main, "postLoginDeviceCheckSnapshot", device)
+            prepareDeviceResultEvidence(device, session)
             setField(main, "walkSessionLifecycle", lifecycle)
             setField(main, "isActivityForeground", true)
             // Production activation begins this owner before environment and navigation work.
@@ -947,6 +990,30 @@ class MainActivityNavigationSpeechWrapperAndroidTest {
             // the next maneuver at 200 m still provides the safe unknown-facing overview.
             navigator.setRoute(route)
             runtime.ready()
+        }
+
+        /** This wrapper does not run models or persist readiness. Supply both declared pieces of
+         * device evidence; Main's real actor/session/foreground/controller gates still decide admission. */
+        private fun prepareDeviceResultEvidence(preparedSnapshot: PostLoginDeviceCheckSnapshot, session: GatewayFieldSession) {
+            val preparedBinding = requireNotNull(preparedSnapshot.bindingOrNull)
+            val prepared = object : PostLoginDeviceCheckSavedResults {
+                override fun candidatePresent() = false
+                override fun restore(binding: PostLoginDeviceCheckResultBinding): PersistedPostLoginDeviceCheckResult? = null
+                override fun save(snapshot: PostLoginDeviceCheckSnapshot, binding: PostLoginDeviceCheckResultBinding,
+                    cameraDependentChecksDeferred: Boolean, metricDepthState: PostLoginMetricDepthState): Boolean =
+                    error("The navigation wrapper cannot publish physical device-check results")
+                override fun runtimeReady(binding: PostLoginDeviceCheckBinding): Boolean {
+                    val current = GatewaySessionProcessCoordinator.snapshot()
+                    return binding == preparedBinding && current.session === session && current.generation == preparedBinding.sessionGeneration &&
+                        !current.storageBlocked && !current.deletionRecoveryOnly
+                }
+                override fun acceptsPublishedSnapshot(snapshot: PostLoginDeviceCheckSnapshot) = snapshot == preparedSnapshot
+            }
+            val controller = MainActivityControllerTestFixture.controller(main, "postLoginDeviceCheckController")
+            PostLoginDeviceCheckController::class.java.getDeclaredField("savedResults").apply {
+                isAccessible = true
+                set(controller, prepared)
+            }
         }
 
         fun prepareAutomaticArrivalScreen() {
