@@ -30,18 +30,19 @@ import org.junit.runner.RunWith
  * Coordinates (equatorial 100 m east, then 100 m north), headings, filtered positions and
  * measurement/decision clocks are synthetic. The replay clock is held during each utterance;
  * only actual offline Korean TTS STARTED/DONE callbacks permit the next replay phase.
- * Default route safety thresholds are retained. Only four selected utterances are played;
+ * Default route safety thresholds are retained. Only three selected utterances are played;
  * intermediate progress observations and optional route information are not narrated.
  * No Activity, account, consent, preference, permission or location-provider state is changed.
  * This is not MainActivity E2E, real sensor freshness, microphone recognition, human listening
- * or an outdoor journey. The announced arrival choice is supplied directly to the real parser.
+ * or an outdoor journey. Automatic arrival is committed through the real Navigator API;
+ * Activity lifecycle termination after final speech is outside this component replay.
  */
 @RunWith(AndroidJUnit4::class)
 class RouteJourneyReplayDeviceTest {
     @Test(timeout = 180_000L)
-    fun syntheticJourneyEndsOnlyAfterActualSpeechAndParsedArrivalConfirmation() {
+    fun syntheticJourneyCompletesAutomaticArrivalWithActualSpeech() {
         assumeTrue(
-            "Requires allowRouteJourneyReplayTest=true because four Korean utterances are played",
+            "Requires allowRouteJourneyReplayTest=true because three Korean utterances are played",
             InstrumentationRegistry.getArguments().getString("allowRouteJourneyReplayTest") == "true",
         )
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -126,29 +127,17 @@ class RouteJourneyReplayDeviceTest {
                 assertTrue(replay.navigator.hasRoute())
             }
             val token = checkNotNull(decisionToken)
-            terminals += speakAndAwait(instrumentation, output, events, "arrival_question", SpeechOutputKind.INTERACTION,
-                message = checkNotNull(checkNotNull(question).instruction),
-                current = { replay.navigator.pendingDecisionToken() == token },
-            )
-
             var end: RouteNavigatorUpdate? = null
             instrumentation.runOnMainSync {
-                // Completion of the question alone cannot end navigation or replace its token.
                 assertTrue(replay.navigator.hasRoute())
-                assertEquals(token, replay.navigator.pendingDecisionToken())
-                val text = checkNotNull(checkNotNull(question).instruction)
-                val choices = checkNotNull(Regex("도착했다면 (.+?), 아니면 (.+?)라고").find(text)) {
-                    "Arrival question must announce parseable choices: $text"
-                }.groupValues
-                assertEquals(AndroidVoiceCommand.RejectArrival, parseAndroidVoiceCommand(choices[2]))
-                val command = parseAndroidVoiceCommand(choices[1])
-                assertEquals(AndroidVoiceCommand.ConfirmArrival, command)
-                val stale = replay.navigator.confirmArrival(token.copy(decisionRevision = token.decisionRevision - 1L))
+                assertEquals("도착했습니다. 안내를 종료합니다", checkNotNull(question).instruction)
+                assertTrue(replay.navigator.canCompleteDetectedArrival(token))
+                val stale = replay.navigator.completeDetectedArrival(token.copy(decisionRevision = token.decisionRevision - 1L))
                 assertFalse(stale.arrived)
                 assertEquals("arrival_confirmation_stale", stale.reason)
                 assertTrue(replay.navigator.hasRoute())
                 assertEquals(token, replay.navigator.pendingDecisionToken())
-                if (command == AndroidVoiceCommand.ConfirmArrival) end = replay.navigator.confirmArrival(token)
+                end = replay.navigator.completeDetectedArrival(token)
                 assertEquals("arrival_confirmed", checkNotNull(end).reason)
                 assertTrue(checkNotNull(end).arrived)
                 assertFalse(replay.navigator.hasRoute())
@@ -160,22 +149,22 @@ class RouteJourneyReplayDeviceTest {
                 current = { !replay.navigator.hasRoute() && replay.navigator.pendingDecisionToken() == null },
             )
             instrumentation.runOnMainSync {
-                assertFalse("An old arrival response cannot finish another journey", replay.navigator.confirmArrival(token).arrived)
+                assertFalse("An old arrival response cannot finish another journey", replay.navigator.completeDetectedArrival(token).arrived)
                 assertFalse(replay.navigator.hasRoute())
                 assertNull(replay.navigator.currentGuidance(replay.atMs))
                 assertFalse(output.cancelNavigationSpeech())
             }
-            report(instrumentation, "journey=CONFIRMED_AND_CLEARED utterances=4 " +
+            report(instrumentation, "journey=AUTOMATIC_ARRIVAL_AND_CLEARED utterances=3 " +
                 "actual_started=${events.count { it.outcome == SpeechOutputOutcome.STARTED }} " +
                 "actual_done=${events.count { it.outcome == SpeechOutputOutcome.DONE }} outdoor_walk=NOT_TESTED")
         } finally {
             instrumentation.runOnMainSync { actuator?.close() }
         }
         // Late callbacks and close must not acknowledge an already finished phase twice.
-        assertEquals(4, terminals.size)
+        assertEquals(3, terminals.size)
         terminals.forEach { it.assertCompletedOnce() }
-        assertEquals(4, events.count { it.outcome == SpeechOutputOutcome.STARTED })
-        assertEquals(4, events.count { it.outcome == SpeechOutputOutcome.DONE })
+        assertEquals(3, events.count { it.outcome == SpeechOutputOutcome.STARTED })
+        assertEquals(3, events.count { it.outcome == SpeechOutputOutcome.DONE })
     }
 
     private fun speakGuidance(
