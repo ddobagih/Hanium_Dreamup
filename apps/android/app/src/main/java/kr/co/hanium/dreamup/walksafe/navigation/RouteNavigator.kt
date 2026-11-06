@@ -1031,6 +1031,14 @@ class RouteNavigator(
 
     /** The output owner must call this with fresh sensor evidence immediately before playback. */
     @Synchronized
+    fun isInstructionStartContextCurrent(update: RouteNavigatorUpdate, nowMs: Long): Boolean {
+        val token = update.speechCueToken ?: return false
+        return token == pendingSpeechCue && token == offeredSpeechCue &&
+            currentGuidanceContext(nowMs)?.let(::offeredContextStillSupports) == true
+    }
+
+    /** Live direction/ownership checks also used after START; spoken distance is checked separately. */
+    @Synchronized
     fun isInstructionCurrent(
         update: RouteNavigatorUpdate,
         nowMs: Long,
@@ -1215,7 +1223,7 @@ class RouteNavigator(
         val openedAt = decisionOpenedAtMs ?: return false
         val now = nowElapsedRealtimeMs()
         val routeId = activeRouteId ?: return false
-        return route != null && pendingDecision == RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION &&
+        return route?.let { !hasUnpassedProtectedGuide(it) } == true && pendingDecision == RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION &&
             expectedToken == RouteNavigatorDecisionToken(routeRevision, decisionRevision, routeId, RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION) &&
             now >= openedAt && now - openedAt < config.decisionTimeoutMs &&
             arrivalSampleCount >= config.arrivalConfirmSamples.coerceAtLeast(1) &&
@@ -1235,7 +1243,7 @@ class RouteNavigator(
     @Synchronized
     fun confirmArrival(): RouteNavigatorUpdate {
         expirePendingDecision()
-        if (route == null || pendingDecision != RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION) {
+        if (route?.let(::hasUnpassedProtectedGuide) != false || pendingDecision != RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION) {
             return RouteNavigatorUpdate(null, false, false, false, "arrival_confirmation_missing")
         }
         return clearAndCompleteArrival()
@@ -1579,6 +1587,7 @@ class RouteNavigator(
         val nearRouteEnd = remainingRouteM != null &&
             remainingRouteM <= maxOf(20.0, config.arrivalRadiusM + location.accuracyM)
         val authoritativeArrivalEvidence = !navigationOnlyPosition && nearRouteEnd &&
+            !hasUnpassedProtectedGuide(currentRoute) &&
             location.accuracyM <= config.arrivalMaxAccuracyM &&
             remainingToDestinationM + location.accuracyM <= config.arrivalRadiusM
         val currentStepProgressM = stepProgressM?.takeIf { it.isFinite() && it >= 0.0 }
@@ -2734,7 +2743,11 @@ class RouteNavigator(
                     sample.filteredPosition.elapsedRealtimeMs - it.sample.filteredPosition.elapsedRealtimeMs)
                 val reach = elapsed / 1000.0 * progressPriorSpeedBoundMps +
                     sample.filteredPosition.horizontalAccuracyM + it.sample.filteredPosition.horizontalAccuracyM
-                elapsed > 0L && match.segmentIndex != null && match.segmentIndex == it.match.segmentIndex &&
+                // The distance along this installed route, not its arbitrary vertex spacing,
+                // bounds recovery. A nearby parallel return leg has a different path distance.
+                elapsed > 0L && match.segmentIndex != null && it.match.segmentIndex != null &&
+                    routeGeometry?.segments?.getOrNull(match.segmentIndex) != null &&
+                    routeGeometry?.segments?.getOrNull(it.match.segmentIndex) != null &&
                     match.geometricProgressM != null && it.match.geometricProgressM != null &&
                     abs(match.geometricProgressM - it.match.geometricProgressM) <= reach &&
                     haversineMeters(sample.rawLocation.latitude, sample.rawLocation.longitude,
@@ -2748,7 +2761,7 @@ class RouteNavigator(
                 return null
             }
             val changedBranch = episode.retained?.alignment?.diagnostic?.segmentIndex?.let {
-                match.segmentIndex != null && match.segmentIndex != it
+                match.segmentIndex != null && !sameOrderedStraightSegment(routeGeometry, it, match.segmentIndex)
             } == true
             if (changedBranch) invalidateSpeechCue()
             episode = episode.copy(firstRecovery = RouteGeometryRecoverySample(sample, match),
@@ -3017,10 +3030,7 @@ class RouteNavigator(
             else -> "입니다. 다음 안내 지점까지 거리를 확인 중입니다. "
         }
         val action = if (direction == RouteFacingDirection.FRONT) {
-            if (instruction.guideIndex == null) "" else {
-                val maneuver = instruction.text.removePrefix("${instruction.distanceM}m 앞, ")
-                "다음 안내 지점에서 경로 기준으로 $maneuver"
-            }
+            instruction.actionText.orEmpty()
         } else {
             "안내한 방향으로 몸을 돌려주세요."
         }
@@ -3206,7 +3216,43 @@ class RouteNavigator(
         else maxOf(MINIMUM_GUIDE_PASSAGE_MARGIN_M, location.accuracyM.toDouble())
 
     private fun isProtectedGuide(guide: WalkingRouteGuidePoint): Boolean =
-        guide.turnType in setOf(12, 13, 14, 16, 17, 18, 19) || CrosswalkReferencePolicy.isCrosswalkGuide(guide)
+        guide.turnType in setOf(12, 13, 14, 16, 17, 18, 19, 125, 126, 128, 218) || CrosswalkReferencePolicy.isCrosswalkGuide(guide)
+
+    private fun hasUnpassedProtectedGuide(route: WalkingRoute): Boolean =
+        (nextGuideIndex until route.guidePoints.size).any { index ->
+            val guide = route.guidePoints[index]
+            isProtectedGuide(guide) && !isDepartureGuide(guide, guideProgressDistancesM.getOrNull(index))
+        }
+
+    /** The first protected guide can itself be the endpoint: display progress is clamped there.
+     * Require both paired observations, including their uncertainty, beyond that guide. */
+    private fun firstProtectedTerminalGuidePassed(
+        route: WalkingRoute, raw: TrustedLocation, guideProgressM: Double?, matched: Boolean,
+    ): Boolean {
+        if (!matched || guideProgressM == null || lastPassedImportantTurnRawAtMs != null) return false
+        val sample = latestLocationSample?.takeIf { it.rawLocation.hasSameObservationAs(raw) } ?: return false
+        val filtered = sample.filteredPosition
+        if (raw.elapsedRealtimeMs != filtered.elapsedRealtimeMs) return false
+        val match = currentAcceptedRouteMatchFor(filtered.elapsedRealtimeMs) ?: return false
+        if (match.segmentIndex != route.polyline.lastIndex - 1 || match.segmentFraction != 1.0 ||
+            match.reason in setOf(RouteMatchReason.AMBIGUOUS_CANDIDATES,
+                RouteMatchReason.ACTIVE_BRANCH_RETAINED, RouteMatchReason.BRANCH_SWITCH_PENDING)) return false
+        val bearing = match.bearingDeg ?: return false
+        val geometry = routeGeometry ?: return false
+        if (geometry.totalM <= 0.0 || route.summary.distanceM <= 0) return false
+        val gap = haversineMeters(raw.latitude, raw.longitude, filtered.point.latitude, filtered.point.longitude)
+        if (gap > raw.accuracyM + filtered.horizontalAccuracyM) return false
+        val end = route.polyline.last()
+        fun lowerProgress(point: RoutePoint, accuracy: Double): Double {
+            val distance = haversineMeters(end.latitude, end.longitude, point.latitude, point.longitude)
+            val heading = bearingDegrees(end.latitude, end.longitude, point.latitude, point.longitude)
+            val advance = distance * cos(Math.toRadians((heading - bearing).toDouble()))
+            return (geometry.totalM + advance - maxOf(MINIMUM_GUIDE_PASSAGE_MARGIN_M, accuracy)) *
+                route.summary.distanceM / geometry.totalM
+        }
+        return lowerProgress(RoutePoint(raw.latitude, raw.longitude), raw.accuracyM.toDouble()) > guideProgressM &&
+            lowerProgress(filtered.point, filtered.horizontalAccuracyM) > guideProgressM
+    }
 
     private fun isDepartureGuide(guide: WalkingRouteGuidePoint, progressM: Double?): Boolean =
         (guide.pointType.equals("SP", ignoreCase = true) || guide.turnType == 200) &&
@@ -3403,8 +3449,9 @@ class RouteNavigator(
                 subsequentTurnObservedProgressM
             } else progressM
             val passedMarginM = guidePassageMarginM(location)
-            val passed = passageProgressM != null && guideProgressM != null &&
-                passageProgressM >= guideProgressM + passedMarginM
+            val passed = (passageProgressM != null && guideProgressM != null &&
+                passageProgressM >= guideProgressM + passedMarginM) ||
+                (protectedGuide && firstProtectedTerminalGuidePassed(route, rawLocation, guideProgressM, matchedForTurnEvidence))
             if (!isDepartureGuide(guide, guideProgressM) && !passed) break
             if (holdProtectedGuides && protectedGuide && !isDepartureGuide(guide, guideProgressM)) break
             // One accepted fix can jump across nearby guides; the next protected guide needs another fix.
@@ -3494,6 +3541,7 @@ class RouteNavigator(
                     text = "$prefix$maneuver $notice",
                     guideIndex = nextGuideIndex,
                     distanceM = routeDistanceToGuideM,
+                    actionText = "다음 안내 지점에서 경로 기준으로 $maneuver $notice",
                 )
             }
             val instruction = guide.maneuverInstruction()
@@ -3508,6 +3556,10 @@ class RouteNavigator(
                 },
                 guideIndex = nextGuideIndex,
                 distanceM = routeDistanceToGuideM,
+                actionText = instruction?.let {
+                    guide.facilityNameKo()?.let { facility -> "다음 안내 지점은 $facility 진입 지점입니다." }
+                        ?: "다음 안내 지점에서 경로 기준으로 $it"
+                },
             )
         }
         val endpoint = route.polyline.last()
@@ -3734,6 +3786,8 @@ private data class RouteInstruction(
     val passageConfirmation: Boolean = false,
     val destinationApproach: Boolean = false,
     val routeEndGapNotice: Boolean = false,
+    /** Action at the guide only; never an approach-distance sentence reused as an action. */
+    val actionText: String? = null,
 ) {
     // Both explain destination context without a relative direction or a movement claim.
     val destinationNotice: Boolean get() = destinationApproach || routeEndGapNotice

@@ -226,12 +226,27 @@ class BackendWalkingRouteClientTest {
             "목적지를 서울역까지 안내해줘",
             "서울역으로 안내해줘",
             "서울역 목적지 설정해",
+            "서울역 안내해줘 안내해줘",
+            "서울역 가자 가자",
+            "서울역".padEnd(1_022, ' ') + "가자",
         ).forEach { spokenQuery ->
+            val canonical = requireNotNull(canonicalDestinationSearchQueryOrNull(spokenQuery))
+            assertEquals(canonical, canonicalDestinationSearchQueryOrNull(canonical))
             val response = client.searchDestinations(session, spokenQuery, limit = 5, origin = null)
             val sentQuery = requireNotNull(requestedUrl).substringAfter("?query=").substringBefore('&')
             assertEquals("서울역", URLDecoder.decode(sentQuery, Charsets.UTF_8.name()))
             assertEquals("서울역", response.query)
             assertEquals("서울역", response.results.single().name)
+        }
+        for (query in listOf(
+            "가자 가자", "설정 설정", "지정 지정",
+            "서울역".padEnd(1_025, ' '),
+            "서울역 " + "가자 ".repeat(20_000),
+        )) {
+            assertNull(canonicalDestinationSearchQueryOrNull(query))
+            assertThrows(IllegalArgumentException::class.java) {
+                client.searchDestinationsCall(session, query, limit = 5, origin = null)
+            }
         }
 
         responseQuery = "강남역"
@@ -794,6 +809,15 @@ class BackendWalkingRouteClientTest {
 
     @Test
     fun separatesFailureLayerReasonAndRetryPolicyBeforeShowingRouteError() {
+        for (code in listOf("route_safety_code_unknown", "invalid_tmap_response")) {
+            val invalidRoute = classifyNavigationBackendFailure(
+                GatewayProxyHttpException(502, "walking_route_failed", code),
+            )
+            assertEquals(NavigationBackendErrorKind.INVALID_RESPONSE, invalidRoute.kind)
+            assertEquals(NavigationFailureReason.INVALID_RESPONSE, invalidRoute.reason)
+            assertEquals(NavigationFailureRetryability.SERVICE_RECOVERY, invalidRoute.retryability)
+            assertEquals(code, invalidRoute.backendCode)
+        }
         val userSession = classifyNavigationBackendFailure(
             GatewayProxyHttpException(401, "walking_route_failed", null),
         )

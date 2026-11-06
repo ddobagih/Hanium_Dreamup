@@ -88,6 +88,26 @@ def test_valid_unknown_code_retains_identity_but_cannot_prove_stair_avoidance():
     assert unknown_turn.value.code == "route_safety_code_unknown"
 
 
+@pytest.mark.parametrize("coordinates", [None, [], [127.0005, 91.0]])
+@pytest.mark.parametrize("metadata", [
+    {"turnType": 127}, {"facilityType": 17}, {"turnType": 999},
+    {"facilityType": 0}, {"description": "계단 진입"}, {"turnType": 218},
+])
+@pytest.mark.parametrize("priority", ["STAIR_AVOID", "RECOMMEND"])
+def test_invalid_guide_coordinates_cannot_discard_safety_or_action_metadata(coordinates, metadata, priority):
+    payload = _straight_route()
+    payload["features"].insert(1, {
+        "geometry": {"type": "Point", "coordinates": coordinates},
+        "properties": metadata,
+    })
+    original = deepcopy(payload)
+    with pytest.raises(TmapPedestrianRouteError) as caught:
+        _normalize_tmap_response(payload, _request(priority))
+    assert (caught.value.code, caught.value.http_status) == ("invalid_tmap_response", 502)
+    assert caught.value.message == "TMAP pedestrian route guide coordinates are invalid."
+    assert payload == original
+
+
 @pytest.mark.parametrize("feature_index", [0, 1], ids=["guide", "line"])
 def test_undocumented_pedestrian_facility_zero_is_unknown(feature_index):
     payload = _straight_route()

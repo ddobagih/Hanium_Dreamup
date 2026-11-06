@@ -51,7 +51,7 @@ class EncryptedRouteSnapshotStoreTest {
                     facingObservation = RouteFacingObservation(90.0, 5.0, 1_000L),
                 )
                 // At summary progress 50m, the normalized 100m guide is 50m ahead.
-                assertTrue("$name: ${update.instruction}", update.instruction?.contains("50m") == true)
+                assertTrue("$name: ${update.instruction}", update.instruction?.contains("50미터") == true)
             }
         }
     }
@@ -135,14 +135,14 @@ class EncryptedRouteSnapshotStoreTest {
                 facingObservation = RouteFacingObservation(0.0, 5.0, 1_000L),
             )
 
-            assertTrue(update.instruction.toString(), update.instruction?.contains("100m") == true)
-            assertFalse(update.instruction?.contains("56m") == true)
+            assertTrue(update.instruction.toString(), update.instruction?.contains("100미터") == true)
+            assertFalse(update.instruction?.contains("56미터") == true)
             val backtracked = navigator.update(
                 TrustedLocation(37.000475, 127.0, 3f, 2_000L), nowMs = 2_000L, requestInFlight = false,
                 facingObservation = RouteFacingObservation(0.0, 5.0, 2_000L),
             )
             assertNotNull(navigator.currentAcceptedRouteMatchFor(2_000L))
-            assertTrue(backtracked.instruction.toString(), backtracked.instruction?.contains("105m") == true)
+            assertTrue(backtracked.instruction.toString(), backtracked.instruction?.contains("105미터") == true)
         }
     }
 

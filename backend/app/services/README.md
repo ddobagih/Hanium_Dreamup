@@ -39,6 +39,8 @@ Router에서 분리된 탐지, 관리자 보안, 개인정보 lifecycle, 신고 
 - legacy custom/COCO 탐지는 각 모델의 class id 공간을 유지한다.
 - 일반 객체와 `tactile_damage_area`는 `/reports/v2` 저장 대상이 아니다.
 - 외부 provider 응답은 그대로 노출하지 않고 `backend.app.schemas`의 앱 전용 schema로 변환한다.
+- 보행 경로의 Point 좌표가 잘못됐을 때 안내·시설 메타데이터가 있으면 전체 응답을 `invalid_tmap_response`로 거절한다. 안내점을 버려 계단 정보가 사라진 경로를 승인하지 않는다. 메타데이터 없는 placeholder의 기존 건너뛰기는 유지한다.
+- `route_safety_code_unknown` 등 경로 내용 오류는 worker 경계에서도 원래 코드·상태를 보존한다. 공개 전환은 승인된 고정 문구만 허용하며 provider의 임의 오류 원문을 노출하지 않는다.
 - 관리자 고위험 mutation은 database-bound session과 재확인을 우회하지 않으며, custody·분실 신고처럼 route-scoped device proof가 지정된 작업은 요청 서명도 우회하지 않는다.
 - DB check·unique는 관리자 control을 최대 한 행으로 제한하고, trusted provisioning과 보호 작업은 정확히 한 행을 요구한다. 0행·복수행 또는 custody 상태·시각·참조 digest·자료 종류·저장 위치·별도 백업 확인의 불일치는 store unavailable로 fail-closed 한다.
 - custody service는 canonical 32바이트 opaque 참조를 검증한 뒤 SHA-256과 최소 metadata·서버 시각만 저장·감사하며 원문 복구자료·opaque 참조를 남기지 않는다.

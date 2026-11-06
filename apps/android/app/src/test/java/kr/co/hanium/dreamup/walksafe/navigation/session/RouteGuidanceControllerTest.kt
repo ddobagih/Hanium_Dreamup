@@ -114,6 +114,36 @@ class RouteGuidanceControllerTest {
         assertEquals("guidance_rate_limited", f.nav.retryGuidance(f.now, f.heading.observation)?.reason)
     }
 
+    @Test fun queuedDistanceIsRecheckedAtStartEvenDuringTheOriginalFacingLease() {
+        for (delay in listOf(100L, 600L)) {
+            val f = GuidanceFixture(); f.install(); f.controller.updateRouteGuidance(f.fix)
+            val old = f.sent.single()
+            f.now += delay
+            f.heading = f.heading.copy(observation = f.heading.observation!!.copy(observedAtElapsedRealtimeMs = f.now))
+            val advanced = f.fix.copy(longitude = f.fix.longitude + 8.0 / 88_804.0, elapsedRealtimeMs = f.now)
+            f.nav.update(advanced, f.now, false, facingObservation = f.heading.observation)
+            f.validatingStarted = true
+            assertFalse("Stale queued distance at delay=$delay", old.current())
+            f.validatingStarted = false
+            old.failed()
+            assertTrue(f.lastResults.isEmpty())
+        }
+    }
+
+    @Test fun ordinaryProgressAfterActualStartDoesNotLoseDone() {
+        val f = GuidanceFixture(); f.install(); f.controller.updateRouteGuidance(f.fix)
+        val speech = f.sent.single()
+        f.validatingStarted = true
+        assertTrue(speech.current())
+        f.validatingStarted = false
+        f.now += 100L
+        val advanced = f.fix.copy(longitude = f.fix.longitude + 8.0 / 88_804.0, elapsedRealtimeMs = f.now)
+        f.nav.update(advanced, f.now, false, facingObservation = f.heading.observation)
+        assertTrue(speech.current())
+        speech.done()
+        assertEquals(listOf(speech.message), f.lastResults)
+    }
+
     @Test fun delayedRetryCannotCrossRequestOrFeedbackOwnership() {
         for (change in listOf<(GuidanceFixture) -> Unit>({ it.requestGeneration++ }, { it.feedbackCurrent = false })) {
             val f = GuidanceFixture(); f.install()

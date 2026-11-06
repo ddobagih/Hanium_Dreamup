@@ -110,6 +110,7 @@ class RouteNavigatorRetreatTest {
     @Test
     fun rejectedArrivalDoesNotRecreateDecisionUntilUserLeavesThenReapproaches() {
         val navigator = navigator()
+        sample(navigator, 298.0, 0, 180.0) // First retire the earlier protected guide.
         // S07-32 (R6): the arrival question needs 3 s of consecutive near-destination evidence.
         for (at in 1_000L..3_000L step 1_000L) assertFalse(sample(navigator, 298.0, at, 180.0).arrivalCandidate)
         assertTrue(sample(navigator, 298.0, 4_000, 180.0).arrivalCandidate)

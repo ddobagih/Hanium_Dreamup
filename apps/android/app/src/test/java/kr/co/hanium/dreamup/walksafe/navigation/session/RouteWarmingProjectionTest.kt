@@ -98,6 +98,29 @@ class RouteWarmingProjectionTest {
   assertNull(f.gate.pendingFailureDeadlineElapsedRealtimeMs());assertEquals(0,f.requests)
   assertEquals(1,f.warmingSchedules)
  }
+ @Test fun compassReassessmentUsesTheSameBoundedRawGpsDecisionAsLocationDelivery() {
+  val f=Fixture(weighted=true);f.publish(15f)
+  repeat(20) {
+   f.now+=300L
+   val snapshot=f.controller.coordinator.evaluate(f.now)
+   assertTrue(snapshot.confidence.guidancePaused)
+   assertFalse(f.controller.applyRoutePositionConfidence(snapshot,f.now,emitAnnouncements=false))
+   assertFalse(f.guide.positionPaused)
+   assertTrue(requireNotNull(f.controller.currentRouteLocationOrNull()).navigationOnly)
+  }
+  f.now=18000L;f.refreshSignalWeight();f.publish(15f,f.now)
+  assertNotNull(f.controller.currentRouteLocationOrNull())
+  f.now=19000L
+  assertTrue(f.controller.applyRoutePositionConfidence(f.controller.coordinator.evaluate(f.now),f.now,emitAnnouncements=false))
+  assertTrue(f.guide.positionPaused)
+  assertNull(f.controller.currentRouteLocationOrNull())
+
+  val rejected=Fixture(weighted=true);rejected.publish(15f)
+  rejected.now=1300L;rejected.publish(15f,1400L)
+  assertTrue(rejected.controller.applyRoutePositionConfidence(rejected.controller.coordinator.evaluate(rejected.now),rejected.now,emitAnnouncements=false))
+  assertTrue(rejected.guide.positionPaused)
+  assertNull(rejected.controller.currentRouteLocationOrNull())
+ }
  @Test fun originalTimeFutureMockAndOwnerRejectionStillPreventPositionReuse() {
   val f=Fixture();f.publish(7f)
   f.now=11000L;assertNotNull(f.controller.currentRouteLocationOrNull())

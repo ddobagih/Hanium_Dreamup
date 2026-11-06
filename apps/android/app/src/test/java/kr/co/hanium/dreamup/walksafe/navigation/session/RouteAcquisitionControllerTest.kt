@@ -143,6 +143,80 @@ class RouteAcquisitionControllerTest {
         assertEquals(0, f.executedCalls)
     }
 
+    @Test fun fiveTransientFailuresStopAutomaticRetryAndKeepSelectionForManualRestart() {
+        val f = Fixture(); f.prepareArchive()
+        f.beforeResponse = { throw java.net.SocketTimeoutException("fixture timeout") }
+        f.controller.requestRoute(f.destination, "user_destination", true)
+        repeat(5) { failure ->
+            f.runWorker(); f.runUi()
+            assertEquals(failure + 1, f.transportCalls)
+            if (failure < 4) {
+                assertNotNull(f.controller.explicitStart)
+                f.fireRetryTimer()
+            }
+        }
+        assertFalse(f.controller.requestPending)
+        assertNull(f.controller.explicitStart)
+        assertTrue(f.delayed.isEmpty())
+        assertFalse(f.run.active)
+        assertFalse(f.run.navigator.hasRoute())
+        assertEquals(f.destination, f.selected.point)
+        assertTrue(f.statusSpeech.last().contains("안내 시작을 다시 선택"))
+        f.now += 60_000L
+        f.controller.continuePendingExplicitRouteStartIfReady()
+        assertEquals(5, f.transportCalls)
+    }
+
+    @Test fun retryDeadlineCancelsPendingTransportOrQueuedResponseAndRejectsLateCompletion() {
+        for (delivery in listOf("pending transport", "queued response", "response before timer")) {
+            val f = Fixture(); f.prepareArchive()
+            f.beforeResponse = { throw java.net.SocketTimeoutException("fixture timeout") }
+            f.controller.requestRoute(f.destination, "user_destination", true)
+            f.runWorker(); f.runUi()
+            f.beforeResponse = {}
+            f.fireRetryTimer()
+            val oldCall = f.calls.last()
+            val oldRequest = f.controller.requestGeneration
+            if (delivery != "pending transport") f.runWorker()
+            val deadline = f.delayed.single()
+            assertEquals(58_000L, deadline.second)
+            f.now += deadline.second
+            f.location = f.fix.copy(elapsedRealtimeMs = f.now)
+            if (delivery == "response before timer") f.runUi() else {
+                f.delayed.removeAll { it.first === deadline.first }
+                deadline.first.run()
+            }
+            assertTrue(delivery, oldCall.isCancelled())
+            assertTrue(delivery, f.controller.requestGeneration > oldRequest)
+            assertFalse(delivery, f.controller.requestPending)
+            assertNull(delivery, f.controller.explicitStart)
+            assertTrue(delivery, f.delayed.isEmpty())
+            assertFalse(delivery, f.run.navigator.hasRoute())
+            f.controller.requestRoute(f.destination, "user_destination", true)
+            val replacementRequest = f.controller.requestGeneration
+            if (delivery == "pending transport") f.worker.removeAt(0).run()
+            f.runUi()
+            deadline.first.run()
+            assertEquals(delivery, replacementRequest, f.controller.requestGeneration)
+            assertTrue(delivery, f.controller.requestPending)
+            assertFalse(delivery, f.calls.last().isCancelled())
+            assertFalse(delivery, f.run.navigator.hasRoute())
+        }
+    }
+
+    @Test fun malformedSafetyMetadataNeverEntersTransientAutomaticRetry() {
+        for (code in listOf("route_safety_code_unknown", "invalid_tmap_response")) {
+            val f = Fixture(); f.prepareArchive()
+            f.beforeResponse = { throw GatewayProxyHttpException(502, "walking_route", code) }
+            f.controller.requestRoute(f.destination, "user_destination", true)
+            f.runWorker(); f.runUi()
+            assertFalse(code, f.controller.requestPending)
+            assertNull(code, f.controller.explicitStart)
+            assertTrue(code, f.delayed.isEmpty())
+            assertEquals(code, 1, f.transportCalls)
+        }
+    }
+
     @Test fun responseEnvironmentRejectionIsMonotonicButInstalledAnnouncementCanRecover() {
         val f = Fixture()
         f.prepareArchive()
@@ -233,6 +307,29 @@ class RouteAcquisitionControllerTest {
         assertNull(f.controller.completeDetectedArrival(token))
     }
 
+    @Test fun installedArrivalIgnoresTemporarySearchSelectionButRejectsAnActualRouteReplacement() {
+        for (clearSelection in listOf(false, true)) {
+            val f = Fixture(); val token = f.prepareArrival()
+            if (clearSelection) f.selectionCleared = true
+            else f.selected = f.selected.copy(point = RoutePoint(38.0, 128.0))
+            assertTrue(requireNotNull(f.controller.completeDetectedArrival(token)).arrived)
+            assertFalse(f.run.navigator.hasRoute())
+        }
+        val changed = Fixture(); val changedToken = changed.prepareArrival()
+        changed.run.selectDestination(RoutePoint(38.0, 128.0))
+        assertNull(changed.controller.completeDetectedArrival(changedToken))
+        val replacing = Fixture(); val replacingToken = replacing.prepareArrival()
+        replacing.controller.requestRoute(RoutePoint(38.0, 128.0), "destination_replaced", true)
+        assertTrue(replacing.controller.requestPending)
+        assertNull(replacing.controller.completeDetectedArrival(replacingToken))
+        assertTrue(replacing.run.navigator.hasRoute())
+        val reentrant = Fixture(); val reentrantToken = reentrant.prepareArrival()
+        assertNull(reentrant.controller.completeDetectedArrival(reentrantToken) {
+            reentrant.run.selectDestination(RoutePoint(38.0, 128.0)); true
+        })
+        assertTrue(reentrant.run.navigator.hasRoute())
+    }
+
     @Test fun installedArrivalAllowsOnlyAVerifiedCredentialContinuationOfTheSameWalk() {
         fun credential(f: Fixture, rotation: Long, family: String = "arrival-family", actor: String = f.actor) =
             GatewayFieldSession.longLivedSession("https://gateway.example.test", actor,
@@ -311,7 +408,6 @@ class RouteAcquisitionControllerTest {
             { it.actor = "actor_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
             { it.lifecycle.handle(WalkSessionEvent.EnteredBackground) },
             { it.lifecycle.handle(WalkSessionEvent.NewWalkRequested) },
-            { it.selected = it.selected.copy(point = RoutePoint(38.0, 128.0)) },
             { it.controller.cancelActiveRouteRequest() },
         )) {
             val f = Fixture(); val token = f.prepareArrival()
@@ -355,7 +451,7 @@ class RouteAcquisitionControllerTest {
             "gateway generation" to { it.generation++ },
             "gateway session" to { it.session = GatewayFieldSession.verified("https://gateway.example.test", it.session.actorId,
                 "walksafe_field_session=v2.replacement", Long.MAX_VALUE) },
-            "destination" to { it.selected = it.selected.copy(point = RoutePoint(38.0, 128.0)) },
+            "destination" to { it.run.selectDestination(RoutePoint(38.0, 128.0)) },
             "background epoch" to { it.lifecycle.handle(WalkSessionEvent.EnteredBackground) },
             "end" to { it.lifecycle.handle(WalkSessionEvent.EndRequested) },
             "cancel" to { it.controller.cancelActiveRouteRequest() },
@@ -407,11 +503,13 @@ class RouteAcquisitionControllerTest {
         var transportCalls = 0
         var executedCalls = 0
         val events = mutableListOf<String>()
+        val statusSpeech = mutableListOf<String>()
         val buttonStates = mutableListOf<Triple<RoutePoint?, Boolean, Boolean>>()
         val destination = RoutePoint(37.0009, 127.0, "목적지")
         val fix = TrustedLocation(37.0, 127.0, 5f, 1_900L)
         var location: TrustedLocation? = fix
         var selected = DestinationSearchResult("destination", "목적지", destination, null, null, null, null)
+        var selectionCleared = false
         var session = GatewayFieldSession.verified("https://gateway.example.test", "actor_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "walksafe_field_session=v2.route-controller", Long.MAX_VALUE)
         val lifecycle = WalkSessionLifecycle({ "route-controller-walk" }, { now }, { now })
@@ -430,7 +528,7 @@ class RouteAcquisitionControllerTest {
             override fun status(title: String, detail: String) = Unit
             override fun navigationStatus(text: String) = Unit
             override fun speak(message: String) = Unit
-            override fun speakStatus(message: String) = Unit
+            override fun speakStatus(message: String) { statusSpeech += message }
             override fun updateRouteButton() {
                 events += "button"
                 buttonStates += Triple(run.destination, run.active, run.onRoute)
@@ -478,7 +576,7 @@ class RouteAcquisitionControllerTest {
                 override val resources get() = WalkSessionDeviceResourceSnapshot(true, true, true)
                 override val developmentBypass = false
                 override val locationPermissionReady = true
-                override val selectedDestination get() = selected
+                override val selectedDestination get() = selected.takeUnless { selectionCleared }
                 override val guidancePage = true
                 override val currentLocation get() = location
                 override val latestTrustedLocation get() = location
@@ -575,6 +673,13 @@ class RouteAcquisitionControllerTest {
             } as T
 
         fun runWorker() { while (worker.isNotEmpty()) worker.removeAt(0).run() }
+        fun fireRetryTimer() {
+            val (timer, delay) = delayed.single()
+            delayed.removeAll { it.first === timer }
+            now += delay
+            location = fix.copy(elapsedRealtimeMs = now)
+            timer.run()
+        }
         fun runIo() { while (io.isNotEmpty()) io.removeAt(0).run() }
         fun runUi() { while (ui.isNotEmpty()) ui.removeAt(0).run() }
         fun store(): EncryptedRouteSnapshotStore = EncryptedRouteSnapshotStore(object : RouteSnapshotStorage {

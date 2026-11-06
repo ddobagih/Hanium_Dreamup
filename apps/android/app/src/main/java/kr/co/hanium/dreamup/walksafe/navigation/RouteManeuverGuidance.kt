@@ -66,6 +66,10 @@ internal fun WalkingRouteGuidePoint.maneuverInstruction(): String? = when (turnT
     17 -> "10시 방향 길로 이동하세요."
     18 -> "2시 방향 길로 이동하세요."
     19 -> "4시 방향 길로 이동하세요."
+    125 -> "육교 진입 지점입니다."
+    126 -> "지하보도 진입 지점입니다."
+    128 -> "경사로 진입 지점입니다."
+    218 -> "엘리베이터 진입 지점입니다."
     // These describe the crossing relative to the incoming route, never permission to cross.
     212 -> "다음 횡단보도는 9시 방향입니다."
     213 -> "다음 횡단보도는 3시 방향입니다."
@@ -75,6 +79,14 @@ internal fun WalkingRouteGuidePoint.maneuverInstruction(): String? = when (turnT
     217 -> "다음 횡단보도는 4시 방향입니다."
     201 -> "목적지 근처 안내 지점입니다. 실제 목적지를 확인해 주세요."
     // Provider text is not verified as a motion instruction, whether the code is missing or unknown.
+    else -> null
+}
+
+internal fun WalkingRouteGuidePoint.facilityNameKo(): String? = when (turnType) {
+    125 -> "육교"
+    126 -> "지하보도"
+    128 -> "경사로"
+    218 -> "엘리베이터"
     else -> null
 }
 
@@ -88,6 +100,10 @@ internal fun WalkingRouteGuidePoint.maneuverInstruction(): String? = when (turnT
  * any mapped turn, never as a crossing command or a signal judgement.
  */
 internal fun WalkingRouteGuidePoint.maneuverOverview(distanceM: Int?): String? {
+    facilityNameKo()?.let { facility ->
+        val approach = if (distanceM != null && distanceM > 0) "경로를 따라 ${distanceM}m 가면" else "다음 안내 지점에"
+        return "$approach $facility 진입 지점이 있습니다."
+    }
     val maneuver = when (turnType) {
         11 -> "경로는 직진으로 이어집니다."
         12 -> "경로 기준 9시 방향 회전이 있습니다."

@@ -177,7 +177,7 @@ internal class NavigationSessionComposition(
                             val snapshot = binding.coordinator.evaluate(nowMs, binding.inputGeneration)
                             snapshot.userMotion?.let { positioning.value.applyUserMotionState(it) }
                             if (activity.navigationAllowed || activity.fieldAllowed) {
-                                guidance.value.applyPositionConfidenceDecision(snapshot, emitAnnouncements = false)
+                                positioning.value.applyRoutePositionConfidence(snapshot, nowMs, emitAnnouncements = false)
                             }
                         },
                     )

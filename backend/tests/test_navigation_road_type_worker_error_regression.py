@@ -100,10 +100,10 @@ def test_existing_invalid_json_rejection_keeps_its_fixed_public_error():
 
 @pytest.mark.parametrize(("facility", "code", "status", "decoded_code", "decoded_status"), [
     (17, "route_stairs_present", 422, "route_stairs_present", 422),
-    # Existing unsupported legacy worker message; this exact roadType fix must not widen it.
-    (999, "route_safety_code_unknown", 502, "tmap_processing_unavailable", 503),
+    (0, "route_safety_code_unknown", 502, "route_safety_code_unknown", 502),
+    (999, "route_safety_code_unknown", 502, "route_safety_code_unknown", 502),
 ])
-def test_existing_facility_rejection_and_worker_classification_are_unchanged(facility, code, status, decoded_code, decoded_status):
+def test_facility_rejection_keeps_its_route_content_error_through_worker_decode(facility, code, status, decoded_code, decoded_status):
     payload = json.loads((CAPTURE / "road-16.provider-input.json").read_bytes())
     payload["features"][1]["properties"]["facilityType"] = facility
     envelope = job(json.dumps(payload).encode())
@@ -111,6 +111,21 @@ def test_existing_facility_rejection_and_worker_classification_are_unchanged(fac
     with pytest.raises(TmapRuntimeError) as caught:
         _decode_response("route", envelope)
     assert (caught.value.code, caught.value.http_status) == (decoded_code, decoded_status)
+
+
+@pytest.mark.parametrize("coordinates", [None, [], [127.0005, 91.0]])
+def test_invalid_stair_guide_coordinates_are_rejected_through_worker_decode(coordinates):
+    payload = json.loads((CAPTURE / "road-16.provider-input.json").read_bytes())
+    payload["features"].insert(1, {
+        "geometry": {"type": "Point", "coordinates": coordinates},
+        "properties": {"turnType": 127, "facilityType": 17, "description": "계단 진입"},
+    })
+    envelope = job(json.dumps(payload).encode())
+    assert (envelope["code"], envelope["http_status"]) == ("invalid_tmap_response", 502)
+    with pytest.raises(TmapRuntimeError) as caught:
+        _decode_response("route", envelope)
+    assert (caught.value.code, caught.value.http_status) == ("invalid_tmap_response", 502)
+    assert caught.value.message == "TMAP pedestrian route guide coordinates are invalid."
 
 
 @pytest.mark.parametrize(("provider_status", "result_code"), [(None, None), (418, 73)])
@@ -143,9 +158,13 @@ def test_other_normalizer_errors_are_rethrown_unchanged(monkeypatch, code, statu
     assert caught.value is original
 
 
-def test_worker_decoder_still_rejects_arbitrary_provider_detail():
-    envelope = {"kind": "domain_error", "code": "invalid_tmap_response", "http_status": 502,
-                "message": ROAD_MESSAGE + " private provider detail", "provider_status": None,
+@pytest.mark.parametrize("code,message", [
+    ("invalid_tmap_response", ROAD_MESSAGE),
+    ("route_safety_code_unknown", "TMAP returned a route code whose stair safety is unknown."),
+])
+def test_worker_decoder_still_rejects_arbitrary_provider_detail(code, message):
+    envelope = {"kind": "domain_error", "code": code, "http_status": 502,
+                "message": message + " private provider detail", "provider_status": None,
                 "provider_result_code": None}
     with pytest.raises(TmapRuntimeError) as caught:
         _decode_response("route", envelope)

@@ -783,6 +783,11 @@ internal class RouteGuidanceController(
                 if (!current && compassOwned && routeNavigator.prepareFreshDirectionStart(update, nowMs, facing)) {
                     current = routeNavigator.isInstructionCurrent(update, nowMs, facing)
                 }
+                // Queued words must still describe the latest guide/distance at actual START.
+                // After START, ordinary distance drift must not discard that utterance's DONE.
+                if (current && (!startRecorded.get() || speech.validatingStarted)) {
+                    current = routeNavigator.isInstructionStartContextCurrent(update, nowMs)
+                }
                 current.also {
                     if (speech.validatingStarted && startRecorded.compareAndSet(false, true) &&
                         diagnostics.recording

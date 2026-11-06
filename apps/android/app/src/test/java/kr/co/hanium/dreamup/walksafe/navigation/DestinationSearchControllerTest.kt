@@ -178,6 +178,31 @@ class DestinationSearchControllerTest {
         assertTrue(f.controller.search(true))
         assertEquals(2, f.requests.size)
         assertEquals(1, f.locationCallbacks.size)
+
+        val constructionFailure = Fixture()
+        constructionFailure.constructionError = IllegalArgumentException("empty_query")
+        constructionFailure.controller.requestVoiceResults(constructionFailure.query)
+        constructionFailure.startLocatedSearch()
+        assertFalse(constructionFailure.controller.state.inFlight)
+        assertFalse(constructionFailure.requestsCoordinator.hasActiveDestinationSearch())
+        assertTrue(constructionFailure.workerQueue.isEmpty())
+        assertNull(constructionFailure.controller.state.pendingVoiceQuery)
+        assertEquals(1, constructionFailure.spoken.size)
+        assertTrue(constructionFailure.events.any { it.contains("searchEnabled=true") })
+        constructionFailure.constructionError = null
+        assertTrue(constructionFailure.controller.search(true))
+        constructionFailure.runWorker()
+        constructionFailure.runUi()
+        assertFalse(constructionFailure.controller.state.inFlight)
+        assertEquals(1, constructionFailure.controller.state.results.size)
+
+        for (query in listOf("가자 가자", "설정 설정", "지정 지정", "서울역 " + "가자 ".repeat(20_000))) {
+            val invalid = Fixture().apply { this.query = query }
+            assertFalse(invalid.controller.search(true))
+            assertFalse(invalid.controller.state.inFlight)
+            assertTrue(invalid.requests.isEmpty())
+            assertTrue(invalid.workerQueue.isEmpty())
+        }
     }
 
     @Test fun semanticVoiceAndRetirementCommandsKeepOneCandidateOwnerWithoutEffects() {
@@ -212,6 +237,7 @@ class DestinationSearchControllerTest {
         var rejectWorker = false
         var failureCurrent = true
         var error: Exception? = null
+        var constructionError: Exception? = null
         var response = DestinationSearchResponse("fixture", query, listOf(candidate(1)))
         var revalidation = GatewaySessionRevalidation(GatewaySessionRevalidationStatus.READY, "fixture")
         val requestsCoordinator = AndroidNavigationRequestCoordinator()
@@ -260,6 +286,7 @@ class DestinationSearchControllerTest {
             },
             backend = object : DestinationSearchController.Backend {
                 override fun searchCall(session: GatewayFieldSession, query: String, limit: Int, origin: RoutePoint?): CancellableNetworkCall<DestinationSearchResponse> {
+                    constructionError?.let { throw it }
                     requests += Request(session, query, limit, origin)
                     return CancellableNetworkCall(executeBlock = {
                         executions += 1

@@ -239,6 +239,7 @@ class SpeechOutputControllerBehaviorTest {
         val f = Fixture()
         f.controller.ensureFeedbackActuator()
         f.runtime.ready()
+        f.controller.beginCommandSpeech(1L)
         var completed = 0
         var failed = 0
         assertTrue(f.controller.dispatchNavigationSpeech("오른쪽으로 이동하세요.", { completed++ }, { failed++ }))
@@ -248,6 +249,40 @@ class SpeechOutputControllerBehaviorTest {
         f.runtime.done(id)
         assertEquals(0, completed)
         assertEquals(1, failed)
+        assertEquals(CommandSpeechProgress.FAILED, f.controller.commandSpeechProgress(1L))
+
+        f.navigationCurrent = true
+        f.controller.beginCommandSpeech(2L)
+        assertFalse(f.controller.dispatchNavigationSpeech("바뀐 방향", { completed++ }, { failed++ },
+            isInstructionStillCurrent = { false }))
+        assertEquals(2, failed)
+        assertEquals(CommandSpeechProgress.FAILED, f.controller.commandSpeechProgress(2L))
+        // A subsequent successful retry must not wait for a suppressed response's absent callback.
+        assertTrue(f.controller.dispatchNavigationSpeech("현재 방향", { completed++ }, { failed++ }))
+        val retryId = f.runtime.spoken.last().id
+        f.runtime.start(retryId)
+        f.runtime.done(retryId)
+        assertEquals(1, completed)
+        assertEquals(2, failed)
+        assertEquals(CommandSpeechProgress.FAILED, f.controller.commandSpeechProgress(2L))
+        f.controller.beginCommandSpeech(3L)
+        val submittedCount = f.runtime.spoken.size
+        var suppressedProgress: CommandSpeechProgress? = null
+        // Duplicate suppression has no native utterance and therefore no native terminal callback.
+        assertFalse(f.controller.dispatchNavigationSpeech("현재 방향", { completed++ }, {
+            failed++
+            suppressedProgress = f.controller.commandSpeechProgress(3L)
+            f.controller.beginCommandSpeech(4L)
+        }))
+        assertEquals(submittedCount, f.runtime.spoken.size)
+        assertEquals(3, failed)
+        assertEquals(CommandSpeechProgress.FAILED, suppressedProgress)
+        assertEquals(CommandSpeechProgress.NO_OUTPUT, f.controller.commandSpeechProgress(4L))
+        assertTrue(f.controller.speakCommandResponse("보행을 일시정지합니다."))
+        val nextId = f.runtime.spoken.last().id
+        f.runtime.start(nextId)
+        f.runtime.done(nextId)
+        assertEquals(CommandSpeechProgress.COMPLETED, f.controller.commandSpeechProgress(4L))
     }
 
     @Test

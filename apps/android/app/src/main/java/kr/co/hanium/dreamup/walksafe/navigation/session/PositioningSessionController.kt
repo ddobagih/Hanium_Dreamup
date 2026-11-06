@@ -1098,10 +1098,11 @@ internal class PositioningSessionController(
         return routeWarmingProjection.current(binding, source, snapshot, nowMs)
     }
 
-    private fun applyRoutePositionConfidence(snapshot: PositioningSnapshot, nowMs: Long): Boolean {
+    internal fun applyRoutePositionConfidence(snapshot: PositioningSnapshot, nowMs: Long,
+        emitAnnouncements: Boolean = true): Boolean {
         val selected = routeWarmingSelection(snapshot, nowMs)
         if (selected != null) return guidance().applyPositionConfidenceDecision(snapshot,
-            routeConfidence = selected.confidence)
+            emitAnnouncements = emitAnnouncements, routeConfidence = selected.confidence)
         if (latestTrustedLocation?.navigationOnly == true) {
             latestTrustedLocation = null
             latestRawRouteLocation = null
@@ -1109,7 +1110,7 @@ internal class PositioningSessionController(
             gps().reconcileContinuousGpsRecovery()
         }
         if (routeWarmingDeadlineElapsedRealtimeMs == null) {
-            return guidance().applyPositionConfidenceDecision(snapshot)
+            return guidance().applyPositionConfidenceDecision(snapshot, emitAnnouncements = emitAnnouncements)
         }
         val binding = positioningCollectionBinding
         val source = gps().currentSource()
@@ -1124,13 +1125,14 @@ internal class PositioningSessionController(
         }
         val warmingOwned = binding != null && source != null && scope.fineLocationGranted &&
             isPositioningCollectionCurrent(binding) && routeWarmingProjection.owns(binding, source)
-        if (warmingOwned && (scope.navigationAllowed || scope.fieldAllowed) &&
+        if (emitAnnouncements && warmingOwned && (scope.navigationAllowed || scope.fieldAllowed) &&
             routeWarmingProjection.shouldAnnounceTimeout(nowMs)) {
             effects.pauseDirection("position_filter_warming_timeout",
                 "위치 추정을 다시 확인하고 있습니다. 새 위치가 확인되면 안내를 이어갑니다.")
         }
         val warmingExpired = warmingOwned && routeWarmingDeadlineElapsedRealtimeMs?.let { nowMs >= it } == true
         return guidance().applyPositionConfidenceDecision(snapshot,
+            emitAnnouncements = emitAnnouncements,
             routeConfidence = if (warmingExpired) snapshot.confidence.copy(quality = PositionQuality.UNAVAILABLE,
                 guidancePaused = true, announcementRequest = null) else snapshot.confidence)
     }

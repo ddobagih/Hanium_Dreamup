@@ -179,6 +179,7 @@ _ERROR_MESSAGES = {
         "TMAP pedestrian route LineString distance is missing or invalid.",
         "TMAP pedestrian route guide distance exceeds the route summary.",
         "TMAP pedestrian route guide position is ambiguous or out of order.",
+        "TMAP pedestrian route guide coordinates are invalid.",
         "TMAP pedestrian route response exceeds the safe step limit.",
         "TMAP pedestrian route response exceeds the safe resource limit.",
         "TMAP pedestrian route response is not valid JSON.",
@@ -201,6 +202,9 @@ _ERROR_MESSAGES = {
     }),
     ("route", "route_stairs_present", 422): frozenset({
         "TMAP returned stairs despite the stair-exclusion request.",
+    }),
+    ("route", "route_safety_code_unknown", 502): frozenset({
+        "TMAP returned a route code whose stair safety is unknown.",
     }),
     ("route", "route_geometry_missing", 502): frozenset({
         "TMAP Walking route has no usable geometry.",

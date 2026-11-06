@@ -798,6 +798,13 @@ def _normalize_tmap_response(
         if geometry.get("type") == "Point":
             point = _route_point_from_coordinate(geometry.get("coordinates"))
             if point is None:
+                # Dropping an unusable guide must not erase stairs/facilities or an action.
+                # Metadata-free placeholders retain the existing skip/bearing-boundary behavior.
+                if any(key in properties for key in ("turnType", "facilityType", "pointType", "description")):
+                    raise TmapPedestrianRouteError(
+                        code="invalid_tmap_response",
+                        message="TMAP pedestrian route guide coordinates are invalid.",
+                    )
                 pending_guide_indices.clear()
                 continue
             if len(guide_points) >= TMAP_MAX_GUIDE_POINTS:

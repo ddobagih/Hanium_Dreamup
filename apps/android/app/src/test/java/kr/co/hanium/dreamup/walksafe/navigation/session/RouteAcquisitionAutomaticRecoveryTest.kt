@@ -61,18 +61,43 @@ class RouteAcquisitionAutomaticRecoveryTest {
         f.drainResponse(); assertTrue(f.run.navigator.hasRoute())
     }
 
-    @Test fun repeatedFailuresBackOffToTenSecondsAndAnnounceTheEpisodeOnce() {
+    @Test fun repeatedFailuresBackOffThenStopWithOneRecoveryNoticeAndRequireManualRestart() {
         val f = F(); f.failProvider(); f.startAndFail()
         val firstFailure = f.recoveryLong("firstFailureAtMs")
-        listOf(2_000L, 4_000L, 8_000L, 10_000L, 10_000L).forEach { delay ->
+        val selected = f.get<DestinationSearchResult>("selected")
+        listOf(2_000L, 4_000L, 8_000L, 10_000L).forEachIndexed { index, delay ->
             assertEquals(delay, f.delayed.single().second)
             f.freshAt(f.now + delay); f.fire(delay); f.drainFailure()
-            assertNotNull(f.controller.explicitStart)
-            assertEquals(2_000L, f.controller.explicitStart!!.requestedAtElapsedRealtimeMs)
-            assertEquals(firstFailure, f.recoveryLong("firstFailureAtMs"))
+            assertEquals(index + 2, f.created)
+            if (index < 3) {
+                assertNotNull(f.controller.explicitStart)
+                assertEquals(2_000L, f.controller.explicitStart!!.requestedAtElapsedRealtimeMs)
+                assertEquals(firstFailure, f.recoveryLong("firstFailureAtMs"))
+                assertEquals(1, f.get<List<String>>("spokenStatus").size)
+            }
         }
-        assertEquals(1, f.get<List<String>>("spokenStatus").size)
+        assertNull(f.controller.explicitStart)
+        assertFalse(f.controller.requestPending)
+        assertTrue(f.delayed.isEmpty())
+        assertFalse(f.run.active); assertFalse(f.run.navigator.hasRoute())
+        assertSame(selected, f.get<DestinationSearchResult>("selected"))
+        val notices = f.get<List<String>>("spokenStatus")
+        assertEquals(2, notices.size)
+        assertEquals(1, notices.count { it.contains("자동으로 다시 요청") })
+        assertEquals(1, notices.count { it.contains("안내 시작을 다시 선택") })
         assertTrue(f.get<List<String>>("spoken").isEmpty())
+        f.now += 10_000L; f.fresh(); f.controller.continuePendingExplicitRouteStartIfReady()
+        assertEquals("Fresh GPS cannot recreate an exhausted human intent", 5, f.created)
+
+        f.put("responseTransform", { route: WalkingRoute -> route })
+        f.controller.requestRoute(selected.point, "user_destination", true)
+        assertEquals(6, f.created)
+        f.drainResponse()
+        assertTrue(f.run.navigator.hasRoute()); assertNull(f.controller.explicitStart)
+        assertEquals("Successful storage schedules only its normal archive expiry", 1, f.delayed.size)
+        f.archive.cancelEncryptedRouteSnapshotExpirySchedule()
+        assertTrue(f.delayed.isEmpty())
+        assertEquals(2, notices.size)
     }
 
     @Test fun cancelOwnerPermissionDestinationAndEpochInvalidateDelayedAndLateRetries() {

@@ -187,7 +187,7 @@ internal class DestinationSearchController(
         }
         val query = canonicalDestinationSearchQueryOrNull(rawQuery) ?: run {
             actions.navigationStatus("navigation=destination_query_invalid max_code_points=80")
-            actions.speak("목적지는 80자 이하로 입력해 주세요.")
+            actions.speak("검색할 장소명을 80자 이하로 입력해 주세요.")
             return false
         }
         val expectedWalkEpoch = facts.epoch()
@@ -255,6 +255,33 @@ internal class DestinationSearchController(
             actions.offerCandidates(state, message + " " + state.voicePrompt())
             return true
         }
+        fun handleSearchFailure(error: Exception) {
+            if (!isCurrentSearchRequest()) return
+            val failureGuard = actions.failureAdmission(gatewaySession, error)
+            destinationSearchInFlight = false
+            actions.controls(Controls(searchEnabled = true))
+            actions.controls(Controls(cancelEnabled = false))
+            actions.render()
+            val voiceRequest = pendingVoiceDestinationQuery == query
+            if (voiceRequest) {
+                pendingVoiceDestinationQuery = null
+                pendingVoiceDestinationPageIndex = null
+            }
+            if (failureGuard?.invoke() != true) {
+                return
+            }
+            val failure = classifyNavigationBackendFailure(error)
+            // Shared error kinds, search wording: a search failure is not a route failure,
+            // and each message names the next step (search again, another name, login).
+            val searchFailureMessage = failure.kind.destinationSearchUserMessage
+            destinationSearchLocationMessage = searchFailureMessage
+            actions.render()
+            actions.navigationStatus("navigation=destination_search_failed ${failure.kind.statusToken}")
+            actions.status("목적지 검색 실패", searchFailureMessage)
+            if (!recoverRetainedCandidates("추가 검색에 실패했습니다. 다시 더 듣기라고 말씀해 주세요.")) {
+                actions.speak(searchFailureMessage)
+            }
+        }
         // S06-9: one request for the whole cap; voice then reads it three at a time from this one list.
         val queryLimit = DESTINATION_SEARCH_MAX_RESULTS
         destinationSearchInFlight = true
@@ -263,14 +290,19 @@ internal class DestinationSearchController(
         actions.controls(Controls(cancelEnabled = true))
         // The list was cleared for the new query: show "searching" until the response, not a zero result.
         actions.render()
-        val searchCall = navigationRequests.trackDestinationSearch(
-            backend.searchCall(
-                session = gatewaySession,
-                query = query,
-                limit = queryLimit,
-                origin = origin,
-            ),
-        )
+        val searchCall = try {
+            navigationRequests.trackDestinationSearch(
+                backend.searchCall(
+                    session = gatewaySession,
+                    query = query,
+                    limit = queryLimit,
+                    origin = origin,
+                ),
+            )
+        } catch (error: Exception) {
+            handleSearchFailure(error)
+            return false
+        }
         try {
             worker.execute {
                 try {
@@ -439,30 +471,7 @@ internal class DestinationSearchController(
                         if (
                             !isCurrentSearchRequest()
                         ) return@postToUi
-                        val failureGuard = actions.failureAdmission(gatewaySession, error)
-                        destinationSearchInFlight = false
-                        actions.controls(Controls(searchEnabled = true))
-                        actions.controls(Controls(cancelEnabled = false))
-                        actions.render()
-                        val voiceRequest = pendingVoiceDestinationQuery == query
-                        if (voiceRequest) {
-                            pendingVoiceDestinationQuery = null
-                            pendingVoiceDestinationPageIndex = null
-                        }
-                        if (failureGuard?.invoke() != true) {
-                            return@postToUi
-                        }
-                        val failure = classifyNavigationBackendFailure(error)
-                        // Shared error kinds, search wording: a search failure is not a route failure,
-                        // and each message names the next step (search again, another name, login).
-                        val searchFailureMessage = failure.kind.destinationSearchUserMessage
-                        destinationSearchLocationMessage = searchFailureMessage
-                        actions.render()
-                        actions.navigationStatus("navigation=destination_search_failed ${failure.kind.statusToken}")
-                        actions.status("목적지 검색 실패", searchFailureMessage)
-                        if (!recoverRetainedCandidates("추가 검색에 실패했습니다. 다시 더 듣기라고 말씀해 주세요.")) {
-                            actions.speak(searchFailureMessage)
-                        }
+                        handleSearchFailure(error)
                     }
                 } finally {
                     navigationRequests.completeDestinationSearch(searchCall)

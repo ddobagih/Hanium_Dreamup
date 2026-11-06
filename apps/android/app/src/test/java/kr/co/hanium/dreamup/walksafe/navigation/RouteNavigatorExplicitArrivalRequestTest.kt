@@ -12,6 +12,7 @@ class RouteNavigatorExplicitArrivalRequestTest {
     @Test
     fun explicitRequestCannotCreateArrivalOrBypassTheExistingDwell() {
         val navigator = navigator()
+        sample(navigator, 298.0, 0) // Retire the earlier protected guide before starting arrival dwell.
         sample(navigator, 298.0, 1_000)
         sample(navigator, 298.0, 2_000)
         val request = navigator.requestArrivalConfirmation(2_500)
@@ -30,6 +31,7 @@ class RouteNavigatorExplicitArrivalRequestTest {
     @Test
     fun explicitRequestAfterRejectionNeverRearmsOrAsksAQuestion() {
         val navigator = navigator()
+        sample(navigator, 298.0, 0)
         for (at in 1_000L..4_000L step 1_000L) sample(navigator, 298.0, at)
         navigator.rejectArrival()
         val request = navigator.requestArrivalConfirmation(4_500)

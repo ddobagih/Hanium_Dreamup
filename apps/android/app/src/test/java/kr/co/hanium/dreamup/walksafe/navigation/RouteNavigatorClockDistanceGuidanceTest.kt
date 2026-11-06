@@ -231,6 +231,23 @@ class RouteNavigatorClockDistanceGuidanceTest {
         }
     }
 
+    @Test fun facilityCodesSpeakTheFacilityWithoutRepeatingApproachDistanceAsAnAction() {
+        for ((code, name) in mapOf(125 to "육교", 126 to "지하보도", 128 to "경사로", 218 to "엘리베이터")) {
+            val text = requireNotNull(navigator(code).update(fix(50.0), 1_000L, false,
+                facingObservation = facing(90.0)).instruction)
+            assertTrue(text, text.contains("다음 안내 지점은 $name 진입 지점입니다."))
+            assertTrue(text, text.contains("약 50미터"))
+            assertFalse(text, text.contains("50m"))
+            val overview = requireNotNull(navigator(code).update(fix(50.0), 1_000L, false).instruction)
+            assertTrue(overview, overview.contains(name))
+        }
+        val unknown = requireNotNull(navigator(999).update(fix(50.0), 1_000L, false,
+            facingObservation = facing(90.0)).instruction)
+        assertTrue(unknown, unknown.contains("약 50미터"))
+        assertFalse(unknown, unknown.contains("다음 안내 지점에서 경로 기준으로"))
+        assertFalse(unknown, unknown.contains("50m"))
+    }
+
     private fun assertClockAndDistance(heading: Double, hour: Int) {
         val update = navigator().update(fix(50.0), 1_000L, false, facingObservation = facing(heading))
         val text = requireNotNull(update.instruction)

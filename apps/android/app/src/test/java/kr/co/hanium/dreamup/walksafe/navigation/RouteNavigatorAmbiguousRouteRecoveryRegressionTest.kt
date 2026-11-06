@@ -146,6 +146,34 @@ class RouteNavigatorAmbiguousRouteRecoveryRegressionTest {
         assertTrue(requireNotNull(update.instruction).contains("새 경로 요청"))
     }
 
+    @Test fun recoveryDoesNotRequireStandingOnTheSameOneMeterSegment() {
+        val points = (0..200).map { RoutePoint(0.0, it / 111_194.92664455874) }
+        val nav = RouteNavigator(nowElapsedRealtimeMs = { 1_000L }).apply {
+            setRoute(WalkingRoute("TEST", WalkingRouteSummary(200, 200), points, emptyList()))
+        }
+        fun fix(east: Double, at: Long) = TrustedLocation(0.0, east / 111_194.92664455874, 1f, at)
+        nav.update(fix(10.2, 1_000L), 1_000L, false)
+        nav.onUntrustedLocation()
+        val first = fix(11.6, 2_000L)
+        nav.update(first, 2_000L, false, filteredPosition(first))
+        assertNull(nav.currentAcceptedRouteMatchFor(2_000L))
+        val second = fix(13.0, 3_000L)
+        nav.update(second, 3_000L, false, filteredPosition(second),
+            facingObservation = RouteFacingObservation(90.0, 3.0, 3_000L))
+        assertNotNull(nav.currentAcceptedRouteMatchFor(3_000L))
+        assertNull(nav.pendingDecisionToken())
+    }
+
+    @Test fun recoveryCannotJumpToANearbyParallelReturnLeg() {
+        val nav = navigator(); nav.update(midpoint, 1_000L, false)
+        val first = normalLocation(2_000L)
+        nav.update(first, 2_000L, false, filteredPosition(first))
+        val otherLeg = first.copy(latitude = 37.00005, elapsedRealtimeMs = 3_000L)
+        nav.update(otherLeg, 3_000L, false, filteredPosition(otherLeg))
+        assertNull(nav.currentAcceptedRouteMatchFor(3_000L))
+        assertNull(nav.currentInstruction(otherLeg))
+    }
+
     private fun normalLocation(atMs: Long) = TrustedLocation(37.0, 127.0005, 1f, atMs)
 
     private fun filteredPosition(location: TrustedLocation) = FilteredRoutePosition(

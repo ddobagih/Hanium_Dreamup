@@ -235,6 +235,7 @@ class RouteNavigatorSpeechRetryTest {
     @Test
     fun arrivalTimerPollsCannotAccumulateConfirmationSamples() {
         val navigator = navigator()
+        navigator.setRoute(route().copy(guidePoints = emptyList()))
         val endpoint = route().polyline.last()
         val location = TrustedLocation(endpoint.latitude, endpoint.longitude, 2f, 1_000)
         val first = navigator.update(location, 1_000, false)

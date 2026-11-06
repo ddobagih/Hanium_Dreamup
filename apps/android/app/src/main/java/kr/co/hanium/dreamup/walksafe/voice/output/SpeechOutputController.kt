@@ -400,7 +400,11 @@ internal class SpeechOutputController(
                     }
                 },
                 onFailed = ::failOnce,
-            )
+            ).also { accepted ->
+                // SUPPRESSED (including a stale START guard) may return without a native
+                // callback. Every registered command response still needs one terminal.
+                if (!accepted) failOnce()
+            }
         }
         if (!scheduler.isMainThread()) {
             scheduler.runOnMain { deliver() }

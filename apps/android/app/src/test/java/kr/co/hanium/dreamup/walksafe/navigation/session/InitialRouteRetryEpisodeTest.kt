@@ -9,7 +9,7 @@ class InitialRouteRetryEpisodeTest {
     @Test fun retriesKeepOneIntentAndFirstFailureAcrossBoundedFailureBackoff() {
         val f = Fixture()
         val episode = f.fail()
-        listOf(2_000L, 4_000L, 8_000L, 10_000L, 10_000L).forEachIndexed { index, delay ->
+        listOf(2_000L, 4_000L, 8_000L, 10_000L).forEachIndexed { index, delay ->
             assertEquals(delay, episode.delayMs)
             assertEquals(f.now + delay, episode.retryAtMs)
             assertEquals(1_000L, episode.requestedAtMs)
@@ -19,6 +19,11 @@ class InitialRouteRetryEpisodeTest {
             f.owner.bindRequest(index + 2)
             assertSame(episode, f.fail(requestId = index + 2))
         }
+        assertEquals(5, episode.failureCount)
+        assertTrue(episode.exhaustedAt(f.now))
+        assertFalse(f.owner.eligibleAt(episode.retryAtMs))
+        assertSame(episode, f.fail(requestId = 6))
+        assertEquals(5, episode.failureCount)
     }
 
     @Test fun pollingRetainsDeadlineAndDoesNotAdvanceTheFailureEpisode() {
@@ -54,7 +59,7 @@ class InitialRouteRetryEpisodeTest {
         assertEquals(replacementTimer, f.scheduler.pending.single())
     }
 
-    @Test fun bindingANewRequestRetiresThePreviousTimerWithoutReplacingTheEpisode() {
+    @Test fun bindingANewRequestRetiresBackoffButKeepsTheAbsoluteDeadlineDuringTransport() {
         val f = Fixture()
         val episode = f.fail()
         f.owner.schedule(episode)
@@ -62,10 +67,29 @@ class InitialRouteRetryEpisodeTest {
         f.owner.bindRequest(2)
         late.run()
         assertEquals(0, f.polls)
-        assertTrue(f.scheduler.pending.isEmpty())
+        assertEquals(60_000L, f.scheduler.pending.single().second)
         assertSame(episode, f.owner.current)
         assertEquals(2, episode.requestId)
         assertEquals(4_000L, episode.retryAtMs)
+        f.fire()
+        assertTrue(episode.exhaustedAt(f.now))
+        assertFalse(f.owner.eligibleAt(f.now))
+        assertEquals(1, f.polls)
+        assertTrue("An expired episode cannot spin a zero-delay polling loop", f.scheduler.pending.isEmpty())
+    }
+
+    @Test fun waitingForGpsCannotExtendTheFirstFailureDeadline() {
+        val f = Fixture()
+        val episode = f.fail()
+        f.now = episode.deadlineMs - 500L
+        f.owner.schedule(episode, 1_000L)
+        assertEquals(500L, f.scheduler.pending.single().second)
+        f.fire()
+        assertEquals(62_000L, f.now)
+        assertEquals(1, episode.failureCount)
+        assertEquals(1, f.polls)
+        assertTrue(f.scheduler.pending.isEmpty())
+        assertFalse(f.owner.eligibleAt(f.now))
     }
 
     @Test fun replacementDuringRetryCannotBeOverwrittenByTheRetiredPollingCallback() {

@@ -58,8 +58,8 @@ class BackendWalkingRouteClient(
         limit: Int,
         origin: RoutePoint?,
     ): CancellableNetworkCall<DestinationSearchResponse> {
+        val safeQuery = normalizeDestinationQuery(query)
         require(Charsets.UTF_8.newEncoder().canEncode(query)) { "destination_query_invalid" }
-        val safeQuery = normalizeDestinationQuery(query.replace('\u0085', ' '))
         require(safeQuery.isNotEmpty()) { "empty_query" }
         require(validDestinationSearchQuery(safeQuery)) { "destination_query_invalid" }
         val safeLimit = limit.coerceIn(1, MAX_DESTINATION_RESULT_LIMIT)
@@ -549,7 +549,7 @@ fun parseDestinationSearchResponse(
     if (limit !in 1..MAX_DESTINATION_RESULT_LIMIT) {
         throw GatewayResponseProtocolException("destination_limit_invalid")
     }
-    val normalizedQuery = normalizeDestinationQuery(query.replace('\u0085', ' '))
+    val normalizedQuery = normalizeDestinationQuery(query)
     val responseQuery = json.opt("query") as? String
     if (responseQuery != normalizedQuery) {
         throw GatewayResponseProtocolException("destination_query_mismatch")
@@ -921,9 +921,12 @@ private fun RoutePoint.isValidCoordinate(): Boolean =
     latitude.isFinite() && longitude.isFinite() && latitude in -90.0..90.0 && longitude in -180.0..180.0
 
 private fun normalizeDestinationQuery(query: String): String {
-    var normalized = query.replace(Regex("[\\s\\p{Z}]+"), " ").trim()
-    val action = KOREAN_DESTINATION_ACTION_RE.find(normalized)
-    if (action != null) {
+    require(query.length <= MAX_DESTINATION_QUERY_INPUT_CHARS) { "query_too_long" }
+    var normalized = query.replace('\u0085', ' ').replace(Regex("[\\s\\p{Z}]+"), " ").trim()
+    // Controller, transport and response validation share this canonical value. Remove all
+    // trailing command phrases so applying normalization again cannot erase the destination.
+    while (true) {
+        val action = KOREAN_DESTINATION_ACTION_RE.find(normalized) ?: return normalized
         normalized = normalized.substring(0, action.range.first).trim()
         normalized = when {
             normalized.endsWith("까지") -> normalized.dropLast(2).trim()
@@ -933,14 +936,17 @@ private fun normalizeDestinationQuery(query: String): String {
         }
         normalized = normalized.replaceFirst(KOREAN_DESTINATION_PREFIX_RE, "").trim()
     }
-    return normalized
 }
 
-internal fun canonicalDestinationSearchQueryOrNull(query: String): String? =
-    normalizeDestinationQuery(query).takeIf(::validDestinationSearchQuery)
+internal fun canonicalDestinationSearchQueryOrNull(query: String): String? {
+    // Bound raw paste/recognition input before the repeated command stripping runs on UI.
+    if (query.length > MAX_DESTINATION_QUERY_INPUT_CHARS) return null
+    return normalizeDestinationQuery(query).takeIf(::validDestinationSearchQuery)
+}
 
 private fun validDestinationSearchQuery(query: String): Boolean =
     query.codePointCount(0, query.length) in 1..MAX_DESTINATION_QUERY_CODE_POINTS &&
+        Charsets.UTF_8.newEncoder().canEncode(query) &&
         query.none { it.isISOControl() || Character.getType(it) == Character.FORMAT.toInt() }
 
 private fun requireProtocolValue(json: JSONObject, name: String, expected: String) {
@@ -1147,6 +1153,7 @@ private const val MAX_PROVIDER_ROUTE_ID_LENGTH = 256
 private const val MAX_DESTINATION_RESULT_LIMIT = 10
 private const val MAX_DESTINATION_COORDINATE_CANDIDATES = 4
 private const val MAX_DESTINATION_QUERY_CODE_POINTS = 80
+private const val MAX_DESTINATION_QUERY_INPUT_CHARS = 1_024
 internal const val WALKING_ROUTE_MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 private const val MAX_ROUTE_POLYLINE_POINTS = 8_192
 private const val MAX_ROUTE_STEPS = 1_024

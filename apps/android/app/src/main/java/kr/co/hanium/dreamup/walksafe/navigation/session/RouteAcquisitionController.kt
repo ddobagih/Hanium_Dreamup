@@ -184,7 +184,6 @@ internal class RouteAcquisitionController(
             sessionCurrent &&
             !gateway.storageBlocked && !gateway.deletionRecoveryOnly &&
             facts.rawActorId == completed.session.actorId && facts.actorId == completed.session.actorId &&
-            facts.selectedDestination?.point == completed.destination &&
             routeRequestGeneration == completed.requestGeneration
     }
 
@@ -202,7 +201,8 @@ internal class RouteAcquisitionController(
             session = renewed ?: installed.session,
             gatewayGeneration = if (renewed != null) gateway.generation else installed.gatewayGeneration)
         return owner.takeIf { currentDestination == installed.destination &&
-            isRouteActive && !archive.purgeFailed && confirmedArrivalOwnerCurrent(it) &&
+            isRouteActive && !routeRequestInFlight.get() && pendingExplicitRouteStart.currentOrNull() == null &&
+            !archive.purgeFailed && confirmedArrivalOwnerCurrent(it) &&
             routeNavigator.canCompleteDetectedArrival(expectedToken) }
     }
 
@@ -218,7 +218,10 @@ internal class RouteAcquisitionController(
         val owner = detectedArrivalOwner(expectedToken) ?: return null
         val intent = arrivalIntentGeneration
         val decision = routeNavigator.completeDetectedArrival(expectedToken) {
-            confirmedArrivalOwnerCurrent(owner) && beforeCommit()
+            confirmedArrivalOwnerCurrent(owner) && beforeCommit() &&
+                currentDestination == owner.destination && isRouteActive &&
+                !routeRequestInFlight.get() && pendingExplicitRouteStart.currentOrNull() == null &&
+                confirmedArrivalOwnerCurrent(owner)
         }
         if (!decision.arrived) return null
         resetRouteState()
@@ -538,7 +541,8 @@ internal class RouteAcquisitionController(
             clearPendingExplicitRouteStart()
             return
         }
-        if (!initialRouteRetry.eligibleAt(elapsedRealtimeMs())) return
+        if (expireInitialRouteRecovery(routeRequestGeneration) ||
+            !initialRouteRetry.eligibleAt(elapsedRealtimeMs())) return
         if (!archive.routeSnapshotPurgeFenceAllowsRoute()) return
         val location = trustedLocation() ?: return
         if (routeRequestInFlight.get() || facts.positionPaused ||
@@ -633,6 +637,10 @@ internal class RouteAcquisitionController(
         val now = elapsedRealtimeMs()
         val recovery = initialRouteRetry.retainFailure(context, explicit.requestedAtElapsedRealtimeMs,
             owner.requestId, now) ?: return false
+        if (recovery.exhaustedAt(now)) {
+            stopInitialRouteRecovery(recovery)
+            return true
+        }
         clearPendingExplicitRouteStart(clearConnectionRecovery = false)
         pendingExplicitRouteStart.replace(context, explicit.requestedAtElapsedRealtimeMs, keepUntilCancelled = true)
         pendingExplicitRouteStartRequestId = owner.requestId
@@ -656,9 +664,45 @@ internal class RouteAcquisitionController(
             clearPendingExplicitRouteStart()
             return false
         }
+        if (recovery.exhaustedAt(now)) {
+            stopInitialRouteRecovery(recovery)
+            return false
+        }
         effects.requestFreshGps()
         continuePendingExplicitRouteStartIfReady()
         return pendingExplicitRouteStart.currentOrNull() != null && !routeRequestInFlight.get()
+    }
+
+    /** Retires only this failed initial intent, including an HTTP call still awaiting a response. */
+    private fun stopInitialRouteRecovery(recovery: InitialRouteRetryEpisode.Episode): Boolean {
+        if (initialRouteRetry.current !== recovery || routeRequestGeneration != recovery.requestId ||
+            !explicitStartOwnerCurrent(recovery.context) || routeNavigator.hasRoute()) return false
+        val owner = activeRouteRequestOwner?.takeIf { it.requestId == recovery.requestId }
+        // Fence late worker/UI completion before cancelling the exact old transport.
+        invalidateActiveRouteRequestLease()
+        activeRouteRequestOwner = null
+        isRouteActive = false
+        latestTmapOnRoute = false
+        currentDestination = null
+        val retiredGeneration = routeRequestGeneration
+        owner?.let { navigationRequests.completeRoute(it.call); it.call.cancel() }
+        // A cancellation callback may already have admitted a new intent or ended this walk.
+        if (routeRequestGeneration != retiredGeneration || !facts.foreground || facts.activityDestroyed ||
+            !lifecycle.isRuntimeEpochCurrent(recovery.context.walkEpoch) ||
+            recovery.context.gatewaySession?.let(facts::sessionCurrent) != true) return true
+        val detail = "경로 연결을 여러 번 시도했지만 완료하지 못했습니다. 선택한 목적지는 유지했습니다. " +
+            "네트워크와 위치 서비스를 확인한 뒤 안내 시작을 다시 선택해 주세요."
+        presentation.updateRouteButton()
+        presentation.navigationStatus("navigation=route_failed automatic_retry_limit explicit_start_required")
+        presentation.status("길안내 연결 확인 필요", detail)
+        presentation.speakStatus(detail)
+        return true
+    }
+
+    private fun expireInitialRouteRecovery(requestId: Int): Boolean {
+        val recovery = initialRouteRetry.current ?: return false
+        return recovery.requestId == requestId && recovery.exhaustedAt(elapsedRealtimeMs()) &&
+            stopInitialRouteRecovery(recovery)
     }
 
     private fun retainInitialConnectionRecovery(
@@ -1499,6 +1543,7 @@ internal class RouteAcquisitionController(
         }
         fun finishCurrentRouteRequest(completedResponse: Boolean = false,
             terminalCause: RequestTerminalCause = RequestTerminalCause.OTHER): Boolean {
+            if (expireInitialRouteRecovery(requestId)) return false
             val cause = if (terminalCause == RequestTerminalCause.OTHER && completedResponse &&
                 successfulResponseReceived.get() && archive.preparationPending)
                 RequestTerminalCause.ARCHIVE_PREPARATION_WITH_VALID_RESPONSE else terminalCause
@@ -1651,6 +1696,7 @@ internal class RouteAcquisitionController(
                     }
                     navigationRequests.completeRoute(routeCall)
                     postToUi {
+                        if (expireInitialRouteRecovery(requestId)) return@postToUi
                         if (!routeResponseInstallLeaseCurrent(requestId, ::isCurrentRouteRequest)) {
                             finishCurrentRouteRequest(completedResponse = true)
                             return@postToUi
@@ -1775,6 +1821,7 @@ internal class RouteAcquisitionController(
                             ::storageAdmissionCurrent, scope, route, destination,
                             requestedDestinationCoordinateEvidence).thenAccept { storedRouteSnapshot ->
                             postToUi completeSnapshot@{
+                                if (expireInitialRouteRecovery(requestId)) return@completeSnapshot
                                 effects.recordStage("ROUTE_ARCHIVE_COMPLETE")
                                 if (!storageAdmissionCurrent() ||
                                     !routeResponseInstallLeaseCurrent(requestId, ::isCurrentRouteRequest) ||

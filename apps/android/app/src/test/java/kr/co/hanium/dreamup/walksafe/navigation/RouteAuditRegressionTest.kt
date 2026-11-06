@@ -173,7 +173,7 @@ class RouteAuditRegressionTest {
         assertNotEquals("guidance_in_flight", navigator.retryGuidance(2_201, facing(0.0, 2_201))?.reason)
     }
 
-    @Test fun repeatedReferenceWaitsTenSecondsAfterCompletionAndKeepsPendingSpeech() {
+    @Test fun repeatedClockReferenceWaitsFiveSecondsAfterCompletionAndKeepsPendingSpeech() {
         val raw = fix(0.0, 15.0, 3f)
         val navigator = navigator(straightWithGuide(), raw)
         val first = navigator.update(raw, 1_000, false, facingObservation = facing(0.0))
@@ -183,11 +183,11 @@ class RouteAuditRegressionTest {
         assertEquals("guidance_in_flight", next.reason)
         assertFalse(next.cancelStaleNavigationSpeech)
         navigator.acknowledgeInstruction(first, 2_100)
-        for (at in listOf(8_100L, 12_099L)) {
+        for (at in listOf(4_100L, 7_099L)) {
             val quiet = navigator.update(raw.copy(elapsedRealtimeMs = at), at, false, facingObservation = facing(0.0, at))
             assertNull(quiet.instruction)
         }
-        val periodic = requireNotNull(navigator.retryGuidance(12_100, facing(0.0, 12_100)))
+        val periodic = requireNotNull(navigator.retryGuidance(7_100, facing(0.0, 7_100)))
         assertReference(periodic)
         assertTrue(navigator.reserveInstruction(periodic))
     }

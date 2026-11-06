@@ -39,7 +39,7 @@ class RouteNavigatorLateSpeechCallbackTest {
                 // Arrival confirmation clears the engine before a new route is installed.
                 nav.setRoute(route())
                 // S07-32 (R6): 3 s of consecutive evidence opens the question.
-                listOf(5_000L, 6_000L, 7_000L, 8_000L).forEach { at ->
+                listOf(4_000L, 5_000L, 6_000L, 7_000L, 8_000L).forEach { at ->
                     val raw = fix(298.0, at)
                     nav.update(raw, at, false, FilteredRoutePosition(RoutePoint(raw.latitude, raw.longitude), 3.0, at,
                         heading = RouteHeadingEstimate(180.0, 8.0)))

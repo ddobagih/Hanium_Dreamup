@@ -259,16 +259,17 @@ class RouteNavigatorDestinationApproachTest {
     }
 
     @Test
-    fun anUnpassedUnmappedStairGuideNearTheDestinationKeepsTheExistingGuideAction() {
+    fun anUnpassedUnmappedStairGuideKeepsApproachDistanceWithoutInventingAFutureAction() {
         // Provider text is not promoted to a new movement instruction. Preserve the existing
-        // generic guide action for this unpassed guide, rather than hiding the guide altogether.
+        // approach distance for this unpassed guide without repeating it as a future action.
         val navigator = navigator(guide = WalkingRouteGuidePoint(0, point(195.0), "계단", 195, 5, turnType = 241))
         walk(navigator)
         sample(navigator, 190.0, 71_000L, heading = 90.0)
         val current = requireNotNull(navigator.currentInstruction(fix(190.0, 71_000L)))
         assertTrue(current, current.contains("전방 5m 안내 지점까지 이동하세요."))
         val spoken = requireNotNull(navigator.currentGuidance(71_000L, facing(90.0, 71_000L))?.instruction)
-        assertTrue(spoken, spoken.contains("전방 5m 안내 지점까지 이동하세요."))
+        assertTrue(spoken, spoken.contains("다음 안내 지점까지 경로를 따라 약 5미터입니다."))
+        assertFalse(spoken, spoken.contains("다음 안내 지점에서 경로 기준으로"))
         assertFalse(spoken, spoken.contains("목적지 근처일 수 있습니다"))
         assertNull(navigator.pendingDecisionToken())
     }
@@ -309,6 +310,44 @@ class RouteNavigatorDestinationApproachTest {
         val spoken = requireNotNull(navigator.currentGuidance(71_000L, facing(90.0, 71_000L))?.instruction)
         assertTrue(spoken, spoken.contains(CROSSWALK_REFERENCE_NOTICE_KO))
         assertFalse(spoken, spoken.contains("목적지 근처일 수 있습니다"))
+    }
+
+    @Test
+    fun arrivalCannotSkipTheLastProtectedGuideEvenInsideTheArrivalRadius() {
+        for (code in listOf(211, 125, 126, 128, 218)) {
+            val navigator = navigator(guide = WalkingRouteGuidePoint(0, point(195.0), null, 195, 5, turnType = code))
+            walk(navigator)
+            for (at in 71_000L..76_000L step 1_000L) {
+                val before = sample(navigator, 192.0, at, accuracyM = 3f, heading = 90.0)
+                assertFalse("code=$code at=$at", before.arrivalCandidate)
+                assertFalse(navigator.confirmArrival().arrived)
+            }
+            // Real progress past the guide, then fresh stationary evidence at the destination.
+            for (east in 193..200) sample(navigator, east.toDouble(), 77_000L + (east - 193) * 1_000L,
+                accuracyM = 1f, heading = 90.0)
+            for (at in 85_000L..89_000L step 1_000L) sample(navigator, 200.0, at, accuracyM = 1f, heading = 90.0)
+            assertEquals("code=$code", RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION,
+                navigator.pendingDecisionToken()?.decision)
+        }
+    }
+
+    @Test
+    fun firstProtectedGuideAtTheEndpointNeedsRealPassageButCanThenComplete() {
+        for (guideM in listOf(198.0, 200.0)) {
+            val navigator = navigator(guide = WalkingRouteGuidePoint(0, point(guideM), null, guideM.toInt(),
+                200 - guideM.toInt(), turnType = 211))
+            walk(navigator)
+            for (at in 71_000L..75_000L step 1_000L) {
+                assertFalse(sample(navigator, 200.0, at, accuracyM = 3f).arrivalCandidate)
+            }
+            // Just beyond the full uncertainty interval, while still within accepted route matching.
+            listOf(201.0, 202.0, 203.0, 203.2).forEachIndexed { index, east ->
+                sample(navigator, east, 76_000L + index * 1_000L, accuracyM = 3f)
+            }
+            for (at in 80_000L..84_000L step 1_000L) sample(navigator, 203.2, at, accuracyM = 3f)
+            assertEquals("guide=$guideM", RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION,
+                navigator.pendingDecisionToken()?.decision)
+        }
     }
 
     private fun assertAcceptedNonterminal(navigator: RouteNavigator, update: RouteNavigatorUpdate, at: Long = 71_000L) {
